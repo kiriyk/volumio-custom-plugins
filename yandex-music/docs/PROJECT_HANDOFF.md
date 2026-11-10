@@ -16,6 +16,7 @@
 - `volumio-artwork-one-custom/` — отдельный Git-репозиторий темы. Его origin — upstream автора, не хранилище пользовательской копии. Обновление темы из upstream может перезаписать наши доработки.
 - При развертывании плагина использовать штатный update, а не uninstall/install: удаление стирает сохранённый вход. Пакеты предыдущих версий лежат в `volumio-yandex-music/dist/`.
 - На Pi исправлена утечка D-Bus соединений в `volumiodiscovery`: при перезапуске mDNS исправлена ссылка `browse` на `browser`. Копия оригинала: `/data/volumiodiscovery-index-before-dbus-fix.js`. Восстановление: `volumio-yandex-music/scripts/repair-volumio-discovery.py`; это утилита изменения штатной прошивки, а не отдельный плагин. Ошибки DNS обнаружения могли оставаться; обновление Volumio может перезаписать исправление.
+- Обход высокой загрузки CPU: для `volumio.service` установлен systemd drop-in `/etc/systemd/system/volumio.service.d/90-no-io-uring.conf` с `UV_USE_IO_URING=0`; на armhf / Node 20.5.1 / libuv 1.46.0 краткий замер снизился со 100% до 1,3% ядра. Откат: удалить этот drop-in, выполнить daemon-reload и перезапустить Volumio. Это обход проблемы, а не подтверждение её первопричины для всех версий.
 
 ## Выполнено
 

@@ -80,3 +80,21 @@ sudo systemctl restart volumio
 После обновления прошивки сначала проверьте версию исходного файла: старую
 резервную копию нельзя автоматически считать подходящей для новой прошивки.
 Ни приложение исправления, ни откат сами по себе не устраняют причину ошибок DNS.
+
+## Высокая загрузка CPU в Node.js на Raspberry Pi
+
+На проверенной Volumio 4.239 с Node 20.5.1 / libuv 1.46.0 и armhf наблюдалась
+постоянная загрузка одного ядра в цикле epoll/io_uring. Отключение io_uring
+для одного сервиса снизило загрузку в коротком замере; это обходной путь для
+данного окружения, а не гарантия для всех версий. На новой прошивке применяйте
+его, только если проблема воспроизводится и системный drop-in не конфликтует с
+вашей настройкой. После распаковки плагина в `/tmp/yandex-music-install`:
+
+```bash
+sudo install -D -m 644 /tmp/yandex-music-install/yandex_music/systemd/volumio-no-io-uring.conf /etc/systemd/system/volumio.service.d/90-no-io-uring.conf
+sudo systemctl daemon-reload
+sudo systemctl restart volumio
+```
+
+Откат: удалите только `/etc/systemd/system/volumio.service.d/90-no-io-uring.conf`,
+затем выполните `sudo systemctl daemon-reload` и `sudo systemctl restart volumio`.
