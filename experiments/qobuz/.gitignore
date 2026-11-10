@@ -1,0 +1,10 @@
+__pycache__/
+parameters.json
+session.json
+status.json
+stream*.json
+*result.json
+sample*.bin
+callback.log
+callback.pid
+test-mpd/
