@@ -52,7 +52,7 @@ class Browse {
       const items = page.items.map(item);
       if (page.next_cursor != null) items.push({ service: 'qobuz_custom', type: 'folder', title: this.t('more'),
         uri: `qobuz_custom/search?q=${enc(text)}&type=${kind}&cursor=${enc(page.next_cursor)}` });
-      return this.list(items, `Qobuz · ${this.t(kind + 's')}`);
+      return this.list(items, `Qobuz · ${this.t(kind === 'album' ? 'searchAlbums' : 'tracks')}`);
     }));
   }
   async explode(uri) {

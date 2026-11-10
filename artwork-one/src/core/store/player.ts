@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import { on, emit } from '../socket';
 import type { PlayerState } from '../format';
-import { actualYandexQuality } from '../yandexQuality';
+import { actualYandexQuality as actualStreamQuality } from '../yandexQuality';
 
 const TICK = 250;
 
@@ -38,7 +38,7 @@ interface PlayerStore {
 }
 
 let timer: number | null = null;
-let yandexQuality: { uri: string; codec: string; sampleRate?: number; bitDepth?: number } | null = null;
+let streamQuality: { uri: string; codec: string; sampleRate?: number; bitDepth?: number } | null = null;
 let qualityRequestUri = '';
 
 export const usePlayer = create<PlayerStore>((set, get) => ({
@@ -91,15 +91,15 @@ function startClock() {
 
 on('pushState', (data: PlayerState) => {
   const st = { ...(data || {}) };
-  if (st.service === 'yandex_music' && st.uri) {
+  if (['yandex_music', 'qobuz_custom'].includes(st.service || '') && st.uri) {
     delete st.bitrate;
-    if (yandexQuality?.uri === st.uri) {
-      Object.assign(st, actualYandexQuality(yandexQuality));
+    if (streamQuality?.uri === st.uri) {
+      Object.assign(st, actualStreamQuality(streamQuality));
     } else if (qualityRequestUri !== st.uri) {
       qualityRequestUri = st.uri;
-      emit('callMethod', { endpoint: 'music_service/yandex_music', method: 'getPlaybackQuality' });
+      emit('callMethod', { endpoint: `music_service/${st.service}`, method: 'getPlaybackQuality' });
     }
-  } else { qualityRequestUri = ''; yandexQuality = null; }
+  } else { qualityRequestUri = ''; streamQuality = null; }
   st.disableUi = !!st.disableUiControls || st.service === 'analogin';
   usePlayer.setState({ state: st, elapsedMs: (st.seek || 0), ready: true });
   if (st.status === 'play') { startClock(); } else { stopClock(); }
@@ -111,14 +111,15 @@ on('pushState', (data: PlayerState) => {
     if (icon && icon.getAttribute('href') !== href) { icon.setAttribute('href', href); }
   } catch { /* no document */ }
 });
-on('pushYandexQuality', (info: any) => {
+function acceptStreamQuality(info: any, service: string) {
   if (!info || typeof info.uri !== 'string' || !['flac', 'flac-mp4', 'mp3'].includes(info.codec)) { return; }
-  yandexQuality = { uri: info.uri, codec: info.codec, sampleRate: info.sampleRate, bitDepth: info.bitDepth };
   const state = usePlayer.getState().state;
-  if (state.service === 'yandex_music' && state.uri === info.uri) {
-    usePlayer.setState({ state: { ...state, ...actualYandexQuality(info) } });
-  }
-});
+  if (state.service !== service || state.uri !== info.uri) { return; }
+  streamQuality = { uri: info.uri, codec: info.codec, sampleRate: info.sampleRate, bitDepth: info.bitDepth };
+  usePlayer.setState({ state: { ...state, ...actualStreamQuality(info) } });
+}
+on('pushYandexQuality', (info: any) => acceptStreamQuality(info, 'yandex_music'));
+on('pushQobuzCustomQuality', (info: any) => acceptStreamQuality(info, 'qobuz_custom'));
 on('urifavourites', (data: Favourite) => usePlayer.setState({ favourite: data || { favourite: false } }));
 
 emit('getState');

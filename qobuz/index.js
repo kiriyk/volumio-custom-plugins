@@ -53,13 +53,13 @@ class ControllerQobuz {
         error => { this.notify(error); Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {}); }, () => this.quality);
       this.playback.onQuality = info => this.router.broadcastMessage('pushQobuzCustomQuality', info);
       this.started = true;
-      this.router.volumioAddToBrowseSources({ name: 'Qobuz', uri: 'qobuz_custom', plugin_type: 'music_service', plugin_name: 'qobuz_custom', icon: 'fa-music' });
+      this.router.volumioAddToBrowseSources({ name: 'Qobuz Custom', uri: 'qobuz_custom', plugin_type: 'music_service', plugin_name: 'qobuz_custom', icon: 'fa-music' });
     } catch (e) { await this.service.stop(); throw e; }
   }
   onStop() { return kew(this.shutdown()); }
   async shutdown() {
     this.generation++; this.started = false; clearTimeout(this.timer);
-    this.router.volumioRemoveToBrowseSources('Qobuz');
+    this.router.volumioRemoveToBrowseSources('Qobuz Custom');
     if (this.playback?.current()) await this.playback.stop(); else this.playback?.cancel();
     this.browse = null; this.playback = null; await this.service.stop();
   }

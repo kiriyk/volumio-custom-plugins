@@ -1,3 +1,4 @@
+import asyncio
 import json
 import pathlib
 import tempfile
@@ -78,6 +79,21 @@ class AppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await self.client.get(ticket['path'])).status, 404)
         finally:
             await server.close()
+
+    async def test_logout_revokes_inflight_resolve(self):
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def delayed(id_, quality):
+            entered.set(); await release.wait()
+            return {'url': 'https://streaming-qobuz-std.akamaized.net/old', 'codec': 'flac', 'bitrate': None}
+        self.provider.resolve = delayed
+        async def resolve():
+            return await self.client.post('/v1/playback/resolve', headers=self.headers,
+                json={'track_id': '42', 'quality': '27'})
+        task = asyncio.create_task(resolve()); await entered.wait()
+        await self.client.post('/v1/auth/logout', headers=self.headers)
+        release.set(); response = await task
+        self.assertEqual(response.status, 401)
+        self.assertEqual(len(self.streaming.tickets), 0)
 
     def test_cdn_policy(self):
         validate_upstream('https://streaming-qobuz-std.akamaized.net/file')

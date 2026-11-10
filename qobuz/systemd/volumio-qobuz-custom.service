@@ -1,0 +1,29 @@
+[Unit]
+Description=Qobuz Custom API for Volumio
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=volumio
+Group=volumio
+WorkingDirectory=@PLUGIN_DIR@
+Environment=QOBUZ_STATE_DIR=@STATE_DIR@
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=@PLUGIN_DIR@/.venv/bin/python -m service.app
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=@STATE_DIR@
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

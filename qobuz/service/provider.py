@@ -64,6 +64,7 @@ class Provider:
         self.session = None
         self.lock = asyncio.Lock()
         self.secret = None
+        self.auth_epoch = 0
         self.on_change = lambda: None
 
     async def start(self):
@@ -105,12 +106,14 @@ class Provider:
 
     async def call(self, path, params=None):
         token = self.credentials.get('access_token')
+        epoch = self.auth_epoch
         if not token:
             raise ServiceError('AUTH_EXPIRED', 'Sign in to Qobuz', 401)
         try:
             return await self._http(path, params, token=token)
         except ServiceError as error:
-            if error.code == 'AUTH_EXPIRED':
+            if error.code == 'AUTH_EXPIRED' and epoch == self.auth_epoch:
+                self.auth_epoch += 1
                 self.credentials.pop('access_token', None)
                 self.store.clear()
                 self.on_change()
@@ -161,6 +164,7 @@ class Provider:
             if not user.get('id') or not (user.get('credential') or {}).get('parameters'):
                 raise ServiceError('UNAVAILABLE', 'Qobuz subscription required', 403)
             self.credentials.update(access_token=profile.get('user_auth_token') or token, user_id=user['id'])
+            self.auth_epoch += 1
             self.store.save(self.credentials)
             self.on_change()
             return self.account()
@@ -168,6 +172,7 @@ class Provider:
     async def logout(self):
         async with self.lock:
             self.credentials = {}
+            self.auth_epoch += 1
             self.secret = None
             self.store.clear()
             self.on_change()

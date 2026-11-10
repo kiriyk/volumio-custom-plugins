@@ -1,3 +1,4 @@
+import { isCustomMusicPage } from '../../core/customMusicSources';
 /** The album / playlist header: cover, title, artist, meta line, actions; the crumbs in the shared head. */
 import Icon from '../Icon';
 import PageHead from '../PageHead';
@@ -19,7 +20,7 @@ export function useCrumbs(): BrowseItem[] {
   // an album's own page is a leaf: never an ancestor; and the trail is cut to the last two steps
   const leaf = (s: BrowseItem) => /^albums:\/\/[^/]+\/.+/.test(String(s.uri || ''));
   const ancestors = trail.slice(0, -1).filter(s => (s.title || s.name) && !leaf(s));
-  return uri === 'yandex_music' || uri.startsWith('yandex_music/') ? ancestors : ancestors.slice(-2);
+  return isCustomMusicPage(uri) ? ancestors : ancestors.slice(-2);
 }
 export function goCrumb(item: BrowseItem): void {
   if (!item) { return; }

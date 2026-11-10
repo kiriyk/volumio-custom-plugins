@@ -1,0 +1,11 @@
+{
+  "name": "qobuz_custom", "category": "music_service", "version": "0.1.0",
+  "description": "Independent Qobuz source for Volumio 4", "main": "index.js",
+  "license": "GPL-3.0-or-later", "author": "Kirill",
+  "engines": {"node": ">=20", "volumio": ">=4"},
+  "scripts": {"test": "node --test tests/node/*.test.js", "package": "bash scripts/package.sh"},
+  "dependencies": {"kew": "0.7.0"},
+  "volumio_info": {"prettyName": "Qobuz Custom", "plugin_type": "music_service", "icon": "fa-music",
+    "architectures": ["armhf", "amd64"], "os": ["bookworm"],
+    "details": "Search Qobuz albums and play FLAC with your subscription", "changelog": "Initial version"}
+}

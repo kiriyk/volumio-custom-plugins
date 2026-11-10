@@ -16,7 +16,7 @@ import AlbumHead, { AlbumPageHead, useCrumbs, goCrumb, isPlaylistInfo } from '..
 import ArtistHead, { artistLists, norm } from '../components/browse/ArtistHead';
 import BrowseLists from '../components/browse/BrowseLists';
 import SearchResults from '../components/browse/SearchResults';
-import { isYandexRoot, needsYandexListHead } from '../core/yandexSearch';
+import { isCustomMusicRoot, needsCustomMusicListHead } from '../core/customMusicSources';
 import { albumart } from '../core/api';
 import { emit } from '../core/socket';
 import { useBrowse } from '../core/store/browse';
@@ -51,7 +51,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
   const isAlbum = !!info && !isPlaylist && (info.type === 'album' || info.type === 'cd');
   const isArtist = !!info && info.type === 'artist';
   const hideInfo = dedicated;
-  const isPlainList = !!(b.isBrowsing && !b.isSearching && (!info || needsYandexListHead(uri, info.type)) && listTitle);
+  const isPlainList = !!(b.isBrowsing && !b.isSearching && (!info || needsCustomMusicListHead(uri, info.type)) && listTitle);
   const isLandingSearch = !!(b.isSearching && !b.isBrowsing);
   const artistsPage = uri === 'artists://';
   const lists = b.lists || [];
@@ -111,7 +111,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
     if (u === 'music-library' || u.indexOf('music-library/') === 0) { return b.sources.find(s => s.uri === 'music-library') || { name: 'Music Library', uri: 'music-library', plugin_name: 'mpd', plugin_type: 'music_service' }; }
     return streamingOf(b.sources).find(s => (s.plugin_name && (s.plugin_name === r.plugin_name || s.plugin_name === r.service)) || (s.service && s.service === r.service) || (s.uri && String(r.uri) === s.uri) || (s.uri && String(r.uri).indexOf(s.uri + '/') === 0) || (s.uri && String(r.uri).indexOf(s.uri + ':') === 0)) || null;
   }, [request, b.sources]);
-  const placeholder = service && (!info || isYandexRoot(uri)) ? 'Search ' + (service.name || service.title || '') : 'Filter ' + String(listTitle || '').toLowerCase();
+  const placeholder = service && (!info || isCustomMusicRoot(uri)) ? 'Search ' + (service.name || service.title || '') : 'Filter ' + String(listTitle || '').toLowerCase();
   // the Playlists list: the field also finds the songs inside the playlists (Volumio lists only their names)
   const [inPlaylists, setInPlaylists] = useState<any>(null);
   useEffect(() => {
@@ -125,7 +125,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
   const listsShown = inPlaylists && inPlaylists.items.length ? [...lists, { ...inPlaylists, awNoFilter: true }] : lists;
   const headInput = (v: string) => {
     setFilter(v);
-    if (!service || (!!info && !isYandexRoot(uri))) { return; }
+    if (!service || (!!info && !isCustomMusicRoot(uri))) { return; }
     const q = v.trim(); const sc = scope.current;
     if (sc.timer) { window.clearTimeout(sc.timer); sc.timer = null; }
     if (!q) { const from = sc.from; sc.from = null; sc.searching = false; if (from && from.uri) { emit('browseLibrary', { uri: from.uri }); } return; }
@@ -135,7 +135,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
     sc.timer = window.setTimeout(() => { sc.searching = true; emit('search', { type: 'any', value: q, service: r.service || service.service || service.plugin_name, plugin_name: service.plugin_name || r.plugin_name, plugin_type: service.plugin_type || r.plugin_type || 'music_service', uri: service.uri }); }, 400);
   };
   // an album's or a playlist's page filters its own rows whatever the service: the field there is "Filter album", not the service's search
-  const localFilter = !service || (!!info && !isYandexRoot(uri));
+  const localFilter = !service || (!!info && !isCustomMusicRoot(uri));
   const q = localFilter ? norm(filter).trim() : '';
   const visibleCount = useMemo(() => {
     if (!q) { return null; }

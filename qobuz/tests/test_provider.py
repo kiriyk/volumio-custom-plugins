@@ -1,3 +1,4 @@
+import asyncio
 import pathlib
 import tempfile
 import unittest
@@ -91,3 +92,18 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.load()['access_token'], 'new-token')
         self.assertTrue(self.provider.account()['authenticated'])
         self.assertNotIn('new-token', str(self.provider.account()))
+
+    async def test_old_unauthorized_response_does_not_clear_new_login(self):
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def request(path, params, post=False, token=None):
+            if path == '/catalog/search':
+                entered.set(); await release.wait()
+                raise ServiceError('AUTH_EXPIRED', 'old session', 401)
+            if path == '/oauth/callback': return {'token': 'new-token'}
+            return {'user_auth_token': 'new-token', 'user': {'id': 1, 'credential': {'parameters': {'valid': True}}}}
+        self.provider.transport = request
+        task = asyncio.create_task(self.provider.search('x', 'album', 0, 50)); await entered.wait()
+        await self.provider.finish_login('new-code'); release.set()
+        with self.assertRaises(ServiceError): await task
+        self.assertTrue(self.provider.account()['authenticated'])
+        self.assertEqual(self.store.load()['access_token'], 'new-token')

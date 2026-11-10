@@ -31,10 +31,10 @@ Files: `qobuz/service/provider.py`, `storage.py`, `errors.py`, `tests/test_provi
 
 Interfaces: async `Provider.search(query, kind, offset, limit)`, `album(id, offset, limit)`, `library(offset, limit)`, `resolve(id, quality)`, `begin_login(host)`, `finish_login(code)`, `account()`, `logout()`. DTO page `{items,next_cursor}`, stream `{url,codec,bitrate,sampleRate,bitDepth}`.
 
-- [ ] Write failing tests for French callback, atomic private storage, opaque album IDs, pagination, quality mapping and invalid stream format.
-- [ ] Run `python3 -m unittest discover -s qobuz/tests -p 'test_*.py'` (expect failures before implementation).
-- [ ] Implement focused provider/state modules, with injected async HTTP transport for protocol tests.
-- [ ] Run those tests (expect pass); commit backend protocol.
+- [x] Write failing tests for French callback, atomic private storage, opaque album IDs, pagination, quality mapping and invalid stream format.
+- [x] Run `python3 -m unittest discover -s qobuz/tests -p 'test_*.py'` (expect failures before implementation).
+- [x] Implement focused provider/state modules, with injected async HTTP transport for protocol tests.
+- [x] Run those tests (expect pass); commit backend protocol.
 
 ### Task 2: Local API, transport, Volumio integration
 
@@ -42,20 +42,20 @@ Files: `qobuz/service/app.py`, `streaming.py`, `qobuz/index.js`, `lib/`, `tests/
 
 Interfaces: `/health`, keyed `/v1/account`, `/v1/auth/{start,logout}`, `/v1/search`, `/v1/albums/{id}`, `/v1/library/albums`, `/v1/playback/resolve`, `/stream/{ticket}`. Node browse URI prefix `qobuz_custom` and quality event `pushQobuzCustomQuality`.
 
-- [ ] Add failing tests for stale playback, URI mapping, loopback authorization, range forwarding and callback replay.
-- [ ] Implement API, one-use callback, bounded streaming and native source lifecycle by adapting Yandex modules.
-- [ ] Run Python and Node suites once changes are complete; resolve any failures before proceeding.
-- [ ] Commit native source and service.
+- [x] Add failing tests for stale playback, URI mapping, loopback authorization, range forwarding and callback replay.
+- [x] Implement API, one-use callback, bounded streaming and native source lifecycle by adapting Yandex modules.
+- [x] Run Python and Node suites once changes are complete; resolve any failures before proceeding.
+- [x] Commit native source and service.
 
 ### Task 3: Installable package and Artwork One
 
 Files: `qobuz/{install.sh,uninstall.sh,package.json,UIConfig.json,config.json,README.md,systemd/,scripts/,i18n/}`, `artwork-one/src/` search/quality/source glue, package artifacts.
 
-- [ ] Add installer smoke check for private research-session import and preservation on update; add UI helper tests where behavior changes.
-- [ ] Implement isolated service installation, update/package scripts and independent quality/search UI wiring.
-- [ ] Build packages and theme, run targeted tests; review final diff and package members for private files.
-- [ ] Deploy source and theme through existing installation paths, retaining account and avoiding Volumio restart. Verify health/account/search/album/resolve on device; use test MPD rather than main queue for audio.
-- [ ] Save outcomes, exact limitations and restoration instructions; commit and push all public artifacts.
+- [x] Add installer smoke check for private research-session import and preservation on update; add UI helper tests where behavior changes.
+- [x] Implement isolated service installation, update/package scripts and independent quality/search UI wiring.
+- [x] Build packages and theme, run targeted tests; review final diff and package members for private files.
+- [x] Deploy source and theme through existing installation paths, retaining account and avoiding Volumio restart. Verify health/account/search/album/resolve on device; use test MPD rather than main queue for audio.
+- [x] Save outcomes, exact limitations and restoration instructions; commit and push all public artifacts.
 
 ## Execution ledger
 

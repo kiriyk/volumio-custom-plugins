@@ -43,9 +43,11 @@ class Streaming:
         self.tickets.clear()
 
     async def resolve(self, track_id, quality='27'):
-        stream = await self.auth.call('resolve', track_id, quality)
-        self.policy(stream['url'])
         epoch = self.epoch
+        stream = await self.auth.call('resolve', track_id, quality)
+        if epoch != self.epoch:
+            raise ServiceError('AUTH_EXPIRED', 'Account changed', 401)
+        self.policy(stream['url'])
         now = time.monotonic()
         for key in list(self.tickets):
             if self.tickets[key]['expires'] < now:

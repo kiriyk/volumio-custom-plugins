@@ -1,0 +1,12 @@
+{"page":{"label":"Qobuz Custom"},"sections":[
+  {"id":"account","element":"section","label":"Qobuz","description":"","content":[
+    {"id":"startLogin","element":"button","label":"Sign in","onClick":{"type":"emit","message":"callMethod","data":{"endpoint":"music_service/qobuz_custom","method":"startLogin","data":{}}}},
+    {"id":"verification","element":"button","label":"Open Qobuz","hidden":true,"onClick":{"type":"openUrl","url":"https://www.qobuz.com"}},
+    {"id":"refreshSettings","element":"button","label":"Refresh","onClick":{"type":"emit","message":"callMethod","data":{"endpoint":"music_service/qobuz_custom","method":"refreshSettings","data":{}}}},
+    {"id":"logout","element":"button","label":"Sign out","onClick":{"type":"emit","message":"callMethod","data":{"endpoint":"music_service/qobuz_custom","method":"logout","data":{}}}}
+  ]},
+  {"id":"audio","element":"section","label":"Audio",
+    "onSave":{"type":"controller","endpoint":"music_service/qobuz_custom","method":"saveQuality"},
+    "saveButton":{"label":"Save","data":["quality"]},
+    "content":[{"id":"quality","element":"select","label":"Quality","value":{"value":"27","label":"Maximum FLAC"},"options":[]}]}
+]}
