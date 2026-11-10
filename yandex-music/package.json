@@ -1,0 +1,35 @@
+{
+  "name": "yandex_music",
+  "category": "music_service",
+  "version": "0.2.1",
+  "description": "Yandex Music for Volumio 4",
+  "main": "index.js",
+  "license": "MIT",
+  "author": "Kirill",
+  "engines": {
+    "node": ">=20",
+    "volumio": ">=4"
+  },
+  "scripts": {
+    "test": "node --test tests/node/*.test.js",
+    "package": "bash scripts/package.sh"
+  },
+  "volumio_info": {
+    "prettyName": "Яндекс Музыка",
+    "plugin_type": "music_service",
+    "icon": "fa-music",
+    "architectures": [
+      "armhf",
+      "amd64"
+    ],
+    "os": [
+      "bookworm"
+    ],
+    "details": "Search and play your Yandex Music collection",
+    "changelog": "Initial release"
+  },
+  "dependencies": {
+    "kew": "0.7.0",
+    "v-conf": "1.4.2"
+  }
+}

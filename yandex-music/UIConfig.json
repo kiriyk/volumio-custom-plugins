@@ -1,0 +1,21 @@
+{
+  "page": {"label": "Яндекс Музыка"},
+  "sections": [
+    {"id": "account", "element": "section", "label": "Аккаунт", "icon": "fa-user", "description": "",
+      "content": [
+        {"id": "login", "element": "button", "label": "Войти по коду", "onClick": {"type": "controller", "endpoint": "music_service/yandex_music", "method": "startLogin"}},
+        {"id": "verification", "element": "button", "label": "Открыть страницу входа", "hidden": true, "onClick": {"type": "openUrl", "url": "https://oauth.yandex.ru/device"}},
+        {"id": "refresh", "element": "button", "label": "Проверить статус", "onClick": {"type": "controller", "endpoint": "music_service/yandex_music", "method": "refreshSettings"}},
+        {"id": "logout", "element": "button", "label": "Выйти", "onClick": {"type": "controller", "endpoint": "music_service/yandex_music", "method": "logout"}}
+      ]},
+    {"id": "manual", "element": "section", "label": "Вход по готовому токену", "description": "Запасной способ входа. Пароль Яндекса сюда вводить не нужно.",
+      "onSave": {"type": "controller", "endpoint": "music_service/yandex_music", "method": "saveToken"},
+      "saveButton": {"label": "Войти", "data": ["token"]},
+      "content": [{"id": "token", "element": "input", "type": "password", "label": "OAuth token", "value": ""}]},
+    {"id":"audio", "element":"section", "label":"Качество звука",
+      "onSave":{"type":"controller","endpoint":"music_service/yandex_music","method":"saveQuality"},
+      "saveButton":{"label":"Сохранить","data":["quality"]},
+      "content":[{"id":"quality","element":"select","label":"Качество",
+        "value":{"value":"auto","label":"Предпочитать FLAC"},"options":[]}]}
+  ]
+}

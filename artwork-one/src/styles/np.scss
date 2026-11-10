@@ -1,0 +1,341 @@
+/* ============ Now Playing (spec §6.1) — the theme's rules, one to one ============ */
+#np {
+  --np-title: clamp(34px, 4.44vw, 64px);
+  position: relative; z-index: 1; display: flex; flex-direction: column;
+  height: 100%; min-height: 100%; overflow: hidden; box-sizing: border-box;
+  padding: clamp(20px, 3.8vh, 34px) var(--pad-screen) clamp(16px, 3.1vh, 28px);
+  color: var(--ink-1);
+
+  #np-topbar { display: flex; align-items: center; justify-content: space-between; min-height: 40px;
+    .np-chevron { color: var(--ink-2); cursor: pointer; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--fill-10);
+      .material-symbols-rounded { font-size: 22px; } &:hover { background: var(--fill-16); } } }
+  .np-menu-btn { display: none; }
+  .np-topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .np-zone { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw;
+    .np-zone-out { color: var(--ink-muted); } }
+  #np-badge-slot { display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-width: 0; }
+  .np-badge { display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 14px; border-radius: 18px; background: var(--fill-10); border: 1px solid var(--fill-13); color: var(--ink-1); font-size: 11px; letter-spacing: .08em; max-width: 48vw; overflow: hidden; }
+  .np-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+  /* container-type: size, so #np-cover can express "the largest square that fits both the
+     available height and half the available width" directly via cqh/cqw — align-items: stretch
+     alone gave a definite height to derive from but then never re-shrank it after max-width
+     clamped the derived width in a "boxy" (near-square) window, cropping the cover; flex-start
+     never gave a definite size to derive from at all, so the box fell back to the raw image's
+     intrinsic pixel size (tiny). Query units solve both at once, no JS measurement needed. */
+  #np-hero { display: flex; align-items: flex-start; gap: clamp(20px, 3.9vw, 56px); margin-top: clamp(14px, 3.1vh, 28px); flex: 1 1 0; min-height: 0; container-type: size; }
+  #np-cover { flex: none; width: min(100cqh, 50cqw); height: min(100cqh, 50cqw); aspect-ratio: 1 / 1; border-radius: 6px;
+    img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 6px; box-shadow: var(--shadow-cover); } }
+  #np-meta { min-width: 0; padding-top: 0; flex: 1; display: flex; flex-direction: column; min-height: 0; }   /* the theme's fluid clamp for this never applied (csso dropped it): 14px is what shipped */
+  .np-eyebrow { font-size: 11px; letter-spacing: .16em; color: var(--ink-muted); margin-bottom: 10px; }
+  .np-title { font-family: var(--font-ui); font-size: var(--np-title); line-height: 1; letter-spacing: -.032em; font-weight: 800; color: var(--ink); margin: 0; text-wrap: pretty; }
+  /* two lines at most: ClampedTitle shortens the text itself (a clip would cut the descenders) */
+  .np-title { overflow-wrap: anywhere; }
+  .np-byline { display: contents; }
+  .np-artist { font-size: clamp(17px, 1.67vw, 24px); font-weight: 600; color: var(--ink); margin-top: 14px; text-wrap: pretty; }
+  .np-album { font-size: clamp(14px, 1.18vw, 17px); font-weight: 400; color: var(--ink-2); margin-top: 5px; }
+  #np-chip-slot { margin-top: clamp(14px, 3.5vh, 32px); }
+
+  .np-quality { display: flex; align-items: center; gap: 12px; }
+  /* the quality chip (16B): depth/rate, then the format */
+  .np-chip { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: var(--r-pill); background: var(--tb-pill); border: 1px solid var(--tb-pill-line); }
+  .np-chip-num { font-size: 11px; font-weight: 700; color: var(--ink-2); }
+  .np-chip-unit { font-size: 10px; letter-spacing: .14em; color: var(--ink-3); text-transform: uppercase; }
+  .np-bp { display: none; }   /* the phone's (phone.scss): the top bar's badge stands for it elsewhere */
+  .np-signalpath { margin-top: 26px; display: flex; align-items: center; gap: 10px; text-transform: uppercase; font-size: 11px; letter-spacing: .14em; color: var(--ink-3); }
+  .np-arrow { color: var(--ink-faint); }
+  .np-node-final { color: var(--ink); }
+
+  /* the column's face switch (handoff 6a) */
+  /* the face switch's row, the heart pinned to its end */
+  .np-tabrow { display: flex; align-items: center; gap: 16px; min-height: 46px; margin-bottom: 26px; }
+  .np-heart { margin-left: auto; flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; padding: 0; background: var(--fill-08); border: 1px solid var(--fill-14); color: var(--ink-2); cursor: pointer;
+    .material-symbols-rounded { font-size: 24px; } &:hover { color: var(--ink); background: var(--fill-12); } &.active { color: var(--ink); }
+    &:disabled { opacity: .4; cursor: default; } &:focus-visible { outline: 2px solid var(--ink-1); outline-offset: 2px; } }
+  .np-seg { display: inline-flex; align-self: flex-start; padding: 3px; border-radius: 999px; background: var(--fill-10); border: 1px solid var(--fill-13);
+    button { border: 0; background: transparent; border-radius: 999px; padding: 8px 16px; font-family: var(--font-ui); font-size: 14px; line-height: 20px; font-weight: 500; color: var(--ink-3); cursor: pointer;
+      &:hover:not(.active):not(:disabled) { color: var(--ink); } &.active { background: var(--ink-1); color: var(--ground); font-weight: 700; }
+      &:disabled { opacity: .4; cursor: default; } &:focus-visible { outline: 2px solid var(--ink-1); outline-offset: 2px; } } }
+  --lyr-near: var(--ink-muted); --lyr-mid: var(--ink-dim); --lyr-far: var(--ink-faint);
+  .np-lsheet { display: none; }
+  .np-lyrics-host { display: contents; }
+  &.np--lyrics #np-hero, &.np--info #np-hero { align-items: stretch; }
+  &.np--info #np-meta { display: flex; flex-direction: column; min-height: 0; }
+  &.np--info .np-about { flex: 1 1 auto; }
+  .np-meta--lyrics { align-self: stretch; }
+  /* ---- the Info face (12B–12D) ---- */
+  @at-root body#artwork #np.np--info {
+    .np-byline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 12px; }
+    .np-artist { flex-basis: 100%; font-size: 21px; font-weight: 600; color: var(--ink); margin: 0; }
+    .np-album { font-size: 16px; font-weight: 400; color: var(--ink-2); margin: 0; }
+    #np-chip-slot { margin: 0; display: inline-flex; }
+    .np-chip { height: 28px; padding: 0 11px; gap: 7px; .np-chip-num { font-size: 11px; } .np-chip-unit { font-size: 10px; } }
+    @media (max-width: 1100px) {
+      .np-eyebrow { display: none; }
+      .np-title { font-size: 28px; letter-spacing: -.02em; line-height: 1.1; }
+      .np-byline { gap: 0; margin-top: 6px; align-items: baseline; }
+      .np-artist { flex-basis: auto; font-size: 16px; font-weight: 400; color: var(--ink-2); &::after { content: '·'; margin: 0 8px; color: var(--ink-dim); } }
+      .np-album { font-size: 16px; }
+      #np-chip-slot { display: none; }
+    }
+    @media (max-width: 840px) {
+      .np-title { font-size: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .np-artist { font-size: 15px; &::after { content: none; } }
+      .np-album { display: none; }
+    }
+  }
+  .np-about { min-height: 0; overflow-y: auto; scrollbar-width: none; max-width: 680px; &::-webkit-scrollbar { display: none; } }
+  .np-about__rule { height: 1px; background: var(--fill-10); margin: 26px 0 22px; flex: none; }
+  .np-about__row { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 16px; align-items: start; &.is-link { cursor: pointer; } }
+  .np-about__row--album { align-items: center; margin-top: 14px; }
+  .np-about__img { width: 48px; height: 48px; border-radius: 11px; object-fit: cover; display: block; background: var(--fill-08); }
+  .np-about__img--round { border-radius: 50%; object-position: 10% 5%; }
+  .np-about__body { min-width: 0; }
+  .np-about__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .np-about__name { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .np-about__sub { font-size: 13px; color: var(--ink-muted); }
+  .np-about__row--album .np-about__sub { display: block; margin-top: 2px; }
+  .np-about__text { margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-wrap: pretty; }
+  .np-about__text--album { display: none; }
+  .np-about__src { display: inline-block; margin-top: 6px; font-size: 10px; letter-spacing: .16em; color: var(--ink-dim); text-decoration: none; &:hover { color: var(--ink-3); } }
+  .np-about__go { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 8px 0 14px; border-radius: 999px; background: var(--fill-10); border: 1px solid var(--fill-13); color: var(--ink); cursor: pointer; font-family: var(--font-ui);
+    > span:first-child { font-size: 13px; font-weight: 600; } .material-symbols-rounded { font-size: 19px; color: var(--ink-3); } &:hover { background: var(--fill-14); } }
+  @media (min-width: 1800px) {
+    .np-about__row { grid-template-columns: 56px minmax(0, 1fr) auto; gap: 18px; }
+    .np-about__img { width: 56px; height: 56px; }
+    .np-about__body { max-width: 62ch; }
+    .np-about__head { display: block; }
+    .np-about__name { font-size: 17px; }
+    .np-about__sub { display: block; margin-top: 2px; }
+    .np-about__text { margin-top: 10px; font-size: 15px; -webkit-line-clamp: 5; }
+    .np-about__text--album { display: -webkit-box; -webkit-line-clamp: 3; }
+    .np-about__row--album { align-items: start; }
+    .np-about__src { margin-top: 8px; }
+    .np-about__go { height: 40px; padding: 0 10px 0 16px; > span:first-child { font-size: 14px; } .material-symbols-rounded { font-size: 20px; } }
+  }
+  @media (max-width: 1100px) {
+    .np-about { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent); }
+    .np-about__rule { margin: 14px 0 0; background: transparent; }
+    .np-about__row { grid-template-columns: 44px minmax(0, 1fr) 24px; gap: 14px; align-items: center; min-height: 64px; }
+    .np-about__row--album { margin-top: 0; }
+    .np-about__img { width: 44px; height: 44px; }
+    .np-about__head { display: block; }
+    .np-about__name { font-size: 15px; font-weight: 600; }
+    .np-about__sub { display: block; margin-top: 1px; }
+    .np-about__body { display: contents; }
+    .np-about__body > .np-about__head, .np-about__row--album .np-about__body > .np-about__name, .np-about__row--album .np-about__body > .np-about__sub { grid-column: 2; }
+    .np-about__row--album .np-about__body > .np-about__name { align-self: end; }
+    .np-about__row--album .np-about__body > .np-about__sub { align-self: start; margin-top: 0; }
+    .np-about__text { grid-column: 2 / -1; margin: 0 0 14px; -webkit-line-clamp: 3; }
+    .np-about__row--album { position: relative; &::before { content: ''; position: absolute; left: 58px; right: 0; top: 0; height: 1px; background: var(--fill-08); } }
+    .np-about__src { display: none; }
+    .np-about__img, .np-about__body > .np-about__head, .np-about__go { grid-row: 1; }
+    .np-about__row--artist .np-about__text { grid-row: 2; }
+    .np-about__go { grid-column: 3; align-self: center; height: auto; padding: 0; border: 0; background: transparent; > span:first-child { display: none; } .material-symbols-rounded { font-size: 22px; } }
+  }
+  @media (max-width: 840px) {
+    .np-about__row { min-height: 52px; grid-template-columns: minmax(0, 1fr) 24px; gap: 0; border-bottom: 1px solid var(--fill-08); }
+    .np-about__row--album { border-bottom: 0; &::before { left: 0; } }
+    .np-about__img, .np-about__text, .np-about__row .np-about__sub, .np-about__row--album .np-about__body > .np-about__sub { display: none; }
+    .np-about__body > .np-about__head, .np-about__row--album .np-about__body > .np-about__name { grid-column: 1; align-self: center; }
+    .np-about__go { grid-column: 2; }
+  }
+  /* the Lyrics face: a compact head */
+  .np-meta--lyrics {
+    .np-title { font-size: 52px; letter-spacing: -.032em; line-height: 1.02; margin-top: 0; }
+    .np-byline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-top: 12px; }
+    .np-format { display: none; }
+  }
+  .np-lyrics { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; margin-top: 28px; }
+  .np-lyrics__col { position: relative; flex: 1 1 0; min-height: 0; overflow: hidden; }
+  .np-lyrics__col--synced { mask-image: linear-gradient(transparent 0, #000 58px, #000 calc(100% - 58px), transparent 100%); -webkit-mask-image: linear-gradient(transparent 0, #000 58px, #000 calc(100% - 58px), transparent 100%); }
+  .np-lyrics__stack { display: flex; flex-direction: column; gap: 14px; will-change: transform; transition: transform .28s cubic-bezier(.2, .7, .2, 1); &.no-tween { transition: none; } }
+  .np-lyrics__line {
+    display: flex; align-items: flex-start; gap: 16px; font-size: 24px; font-weight: 500; line-height: 1.4; color: var(--lyr-far); cursor: pointer; border-radius: 8px; transition: background-color .12s ease;
+    .np-lyrics__mark { flex: none; width: 3px; align-self: stretch; border-radius: 2px; margin: 4px 0; background: transparent; }
+    &.is-near, &.is-muted { color: var(--lyr-near); }
+    &.is-dim { color: var(--lyr-mid); }
+    &.is-faint { color: var(--lyr-far); }
+    &.is-now { font-size: 26px; font-weight: 600; line-height: 1.38; color: var(--ink); .np-lyrics__mark { background: var(--ink-1); } .np-lyrics__text { animation: aw-lyr-in .28s cubic-bezier(.2, .7, .2, 1); } }
+    &.is-now ~ .np-lyrics__line { .np-lyrics__mark { width: 3px; } }
+    .np-lyrics__mark { width: 0; }
+    &.is-now .np-lyrics__mark { width: 3px; }
+    &:active { background: var(--fill-07); }
+  }
+  .np-lyrics__col--plain { overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .np-lyrics__eyebrow { font-size: 11px; letter-spacing: .16em; color: var(--ink-dim); margin-bottom: 14px; }
+  .np-lyrics__plain { display: flex; flex-direction: column; gap: 10px; padding-bottom: 24px; }
+  .np-lyrics__line.is-plain { color: var(--ink-2); cursor: default; &:active { background: transparent; } }
+  .np-lyrics__empty { font-size: 24px; font-weight: 500; line-height: 1.4; color: var(--ink-dim); }
+  .np-lyrics__skeleton { display: flex; flex-direction: column; gap: 18px; padding-top: 6px; animation: aw-lyr-pulse 1.4s ease-in-out infinite;
+    i { display: block; height: 18px; border-radius: 4px; background: var(--fill-10); width: 62%; &:nth-child(2) { width: 78%; } &:nth-child(3) { width: 70%; } &:nth-child(4) { width: 54%; } &:nth-child(5) { width: 66%; } } }
+  .np-lyrics__eyebrow--synced { flex: none; margin-bottom: 12px; }
+
+  /* ---- the bar (handoff 16B): the seek row full width, then one grid of three zones — up next, the
+     transport centred on the content area, volume · output · queue ---- */
+  #np-footer { margin-top: auto; padding-top: clamp(14px, 3vh, 28px); }
+  #np-seek .artwork-seek { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; column-gap: 16px; align-items: center; }
+  #np-seek .artwork-seek__hit { width: 100%; height: 24px; }
+  #np-seek .seek-track { height: 6px; border-radius: 3px; background: var(--tb-track); }
+  #np-seek .seek-fill { background: var(--ink-1); }
+  #np-seek .seek-handle { width: 16px; height: 16px; margin: -8px 0 0 -8px; background: var(--ink); box-shadow: 0 0 0 4px var(--fill-14), 0 0 18px rgba(255, 255, 255, .45), 0 3px 8px var(--shadow-soft); }   /* the knob keeps its ring and glow */
+  #np-seek .seek-time { font-size: 12px; }
+  #np-seek .seek-elapsed { color: var(--ink-2); }
+  #np-seek .seek-remaining, #np-seek .seek-duration { justify-self: end; color: var(--tb-dim); }
+  #np-footer-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr); align-items: center; gap: 24px; margin-top: 16px; }
+  #np-upnext { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .np-upnext-label { margin-left: 6px; font-size: 10px; letter-spacing: .16em; color: var(--ink-muted); white-space: nowrap; background: transparent; border: 0; padding: 0; cursor: pointer; font-family: var(--font-mono);
+    &:hover { color: var(--ink); } &:focus-visible { outline: 2px solid var(--ink-1); outline-offset: 4px; border-radius: 4px; } }
+  .np-upnext-films { display: flex; gap: 10px; }
+  .np-upnext--covers-away { .np-upnext-label, .np-upnext-films { display: none; } }   /* no room in the left zone */
+  .np-upnext-film { display: block; padding: 0; margin: 0; border: 0; background: transparent; border-radius: 6px; cursor: pointer; transition: transform .15s ease;
+    img { display: block; width: 44px; height: 44px; border-radius: 6px; object-fit: cover; transition: opacity .15s ease; }
+    /* the order reads at a glance: 1 → .45 → .18 */
+    &:nth-child(1) img { opacity: 1; } &:nth-child(2) img { opacity: .45; } &:nth-child(3) img { opacity: .18; }
+    &:hover { transform: translateY(-2px); img { opacity: 1 !important; } } &:focus-visible { outline: 2px solid var(--ink-1); outline-offset: 2px; } }
+  #np-transport { display: flex; align-items: center; justify-content: center;
+    #playerButtons { gap: clamp(20px, 2.2vw, 32px); }
+    .btn-link { color: var(--ink-1); padding: 0; .material-symbols-rounded { font-size: 36px; } &:hover { color: var(--ink); } }
+    .player-action-shuffle, .repeat-button { color: var(--tb-dim); .material-symbols-rounded { font-size: 26px; } &.active { color: var(--ink); } }
+    .playPause { width: clamp(56px, 5.3vw, 76px); height: clamp(56px, 5.3vw, 76px); padding: 0; background: var(--ink-1); color: var(--on-ink); flex: none;
+      .material-symbols-rounded { font-size: clamp(32px, 2.9vw, 42px); } &:hover { background: var(--ink); color: var(--on-ink); } }
+  }
+  #np-footer-right { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+  .np-volume { display: flex; align-items: center; margin-right: 6px;
+    .volume-slider { gap: 12px; input[type=range] { width: clamp(80px, 7.6vw, 110px); height: 20px; }
+      input[type=range]::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(90deg, var(--ink-1) var(--aw-fill), var(--tb-track) var(--aw-fill)); }
+      input[type=range]::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; opacity: 1; background: var(--ink); box-shadow: 0 0 0 3px var(--fill-14), 0 2px 6px var(--shadow-soft); }
+      input[type=range]::-moz-range-thumb { width: 14px; height: 14px; opacity: 1; background: var(--ink); box-shadow: 0 0 0 3px var(--fill-14), 0 2px 6px var(--shadow-soft); }
+      .button-mute { width: 24px; height: 24px; color: var(--tb-dim); .material-symbols-rounded { font-size: 22px; } } } }
+  .tb-pill { height: 44px; padding: 0 14px; gap: 8px; border-radius: 22px;
+    .material-symbols-rounded { font-size: 20px; } &.tb-pill--output .material-symbols-rounded { font-size: 19px; }
+    .tb-pill__name { font-size: 14px; } }
+  .np-m-actions, .np-m-bar { display: none; }
+}
+@keyframes aw-lyr-in { from { opacity: .4; } to { opacity: 1; } }
+@keyframes aw-lyr-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+html.aw-is-light body#artwork #np { --lyr-near: #5e646c; --lyr-mid: #676d74; --lyr-far: #8b9098; }
+html.aw-is-light body#artwork #np .np-lyrics__line:active { background: rgba(20, 22, 26, .07); }
+/* the Lyrics face's head: the title alone (not on the phone, where the words are a panel) */
+@media not all and (max-width: 700px) and (orientation: portrait) {
+  body#artwork #np .np-meta--lyrics .np-byline { display: none; }
+  body#artwork #np .np-meta--lyrics #np-chip-slot { display: inline-flex; align-self: center; margin: 0; }
+  body#artwork #np .np-meta--lyrics .np-chip { height: 30px; padding: 0 12px; gap: 7px; .np-chip-num { font-size: 12px; } .np-chip-unit { font-size: 10px; } }
+}
+html.aw-is-light body#artwork #np .np-about__go { background: rgba(255, 255, 255, .7); border-color: rgba(20, 22, 26, .12); }
+html.aw-is-light body#artwork #np .np-about__rule { background: rgba(20, 22, 26, .09); }
+/* below this the seg control has no room to earn its keep: Cover is the only face on offer
+   (Lyrics stays reachable through the phone's own tile once that layout kicks in) */
+@media (max-width: 1100px) { body#artwork #np .np-seg { display: none; } }
+body#artwork #np.np--cramped .np-seg { display: none; }   /* beside the docked queue, when the footer no longer fits (NowPlaying.tsx) */
+/* tall or narrow: the cover above the text (a landscape window merely resized boxy — not
+   actually tall — keeps the cover beside the text instead; only real portrait shapes stack) */
+@media (max-aspect-ratio: 3/4), (max-width: 760px) {
+  body#artwork #np { height: auto; min-height: 100%; overflow: visible; }
+  body#artwork #np #np-hero { flex-direction: column; align-items: flex-start; flex: 1 0 auto; }
+  body#artwork #np #np-cover { height: auto; width: min(100%, max(36vh, calc(100vh - 560px))); max-width: none; }   /* a tablet upright: what the text and the bar leave */
+  body#artwork #np #np-meta { padding-top: 0; }
+  body#artwork #np .np-title { font-size: clamp(26px, 7.5vw, 54px); }
+  body#artwork #np .np-upnext-films, body#artwork #np .np-upnext-label { display: none; }
+}
+/* a short landscape window (a phone on its side): landscape.scss */
+
+/* Now Playing opens as a sheet sliding up from the mini player and slides back down on the chevron */
+@keyframes aw-np-in { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes aw-np-out { from { transform: none; } to { transform: translateY(100%); } }
+body#artwork #np { animation: aw-np-in .42s cubic-bezier(.2, .7, .2, 1) both; }
+body#artwork #np.aw-np-out { animation: aw-np-out .38s cubic-bezier(.4, 0, .6, 1) forwards; pointer-events: none; overflow: hidden; }
+body#artwork #np.aw-np-out > .art-stack { position: absolute; z-index: -1; }   /* the leaving sheet carries its wash over the page it uncovers */
+/* pulled down by a finger (phone): the entry animation must let go of the transform, and the sheet carries its wash as when leaving */
+body#artwork #np.aw-np-drag { animation: none; overflow: hidden; box-shadow: 0 -20px 50px -20px var(--shadow-deep); }
+body#artwork #np.aw-np-drag > .art-stack { position: absolute; z-index: -1; }
+@media (prefers-reduced-motion: reduce) { body#artwork #np, body#artwork #np.aw-np-out { animation: none; } }
+
+/* something outside the player drives it (AirPlay, the analog input, a group's leader): a pill in
+   the signal path's place saying why the controls are off */
+body#artwork #np .np-external {
+  margin-top: 22px; display: inline-flex; align-items: flex-start; gap: 12px; max-width: 460px; text-align: left; padding: 12px 18px 12px 14px; border-radius: 16px;
+  background: var(--glass-2-fill); border: 1px solid var(--glass-2-border);
+  > .material-symbols-rounded { flex: none; font-size: 22px; color: var(--ink-1); margin-top: 1px; }
+  &__text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  &__title { font-size: 14px; font-weight: 600; color: var(--ink); }
+  &__sub { font-size: 13px; color: var(--ink-3); a { color: var(--ink-1); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; } }
+}
+
+/* nothing to show: where to find music, and the last tracks played */
+body#artwork #np.np--empty {
+  .np-empty { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; gap: clamp(32px, 6vw, 96px); padding: clamp(16px, 4vh, 40px) 0; overflow-y: auto; }
+  .np-empty__intro { flex: 0 1 500px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  /* Volumio's own cover at a cover's size: a share of the width, never more than the height leaves for the words under it */
+  .np-empty__icon { width: min(clamp(160px, 24vw, 340px), 40vh); aspect-ratio: 1; border-radius: var(--r-cover); overflow: hidden; background: var(--fill-10); box-shadow: var(--shadow-cover); margin-bottom: 28px;   /* as #np-cover: no frame */
+    img { display: block; width: 100%; height: 100%; object-fit: cover; } }   /* Volumio's own cover: nothing playing */
+  .np-empty__title { margin: 0; font-family: var(--font-ui); font-size: clamp(30px, 3vw, 44px); line-height: 1.02; letter-spacing: -.03em; font-weight: 800; color: var(--ink); }
+  .np-empty__text { margin: 12px 0 0; font-size: 15px; line-height: 1.45; color: var(--ink-3); text-wrap: pretty; }
+  .np-empty__actions { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .np-empty__recent { flex: 0 1 460px; min-width: 0; }
+  .np-empty__eyebrow { font-size: 11px; letter-spacing: .2em; color: var(--ink-35); margin: 0 0 10px; }
+  .np-empty__list { display: flex; flex-direction: column; margin: 0 -12px; }
+  .np-empty__row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 8px 12px; border: 0; border-radius: 12px; background: transparent; color: var(--ink-1); text-align: left; cursor: pointer;
+    &:hover { background: var(--fill-06); .np-empty__play { opacity: 1; } } }
+  .np-empty__art { position: relative; flex: none; width: 48px; height: 48px; border-radius: 8px; overflow: hidden; display: grid; place-items: center; background: var(--fill-08);
+    img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    > .material-symbols-rounded { font-size: 22px; color: var(--ink-dim); } }
+  .np-empty__play { position: absolute; inset: 0; display: grid; place-items: center; font-size: 26px !important; color: #fff !important; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .15s; }
+  .np-empty__meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .np-empty__name { font-size: 15px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-empty__by { font-size: 13px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-empty__dur { flex: none; font-size: 12px; color: var(--ink-muted); }
+}
+@media (max-width: 900px) {
+  body#artwork #np.np--empty {
+    .np-empty { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 36px; }
+    .np-empty__intro, .np-empty__recent { flex: none; }
+    .np-empty__icon { width: min(56vw, 34vh); }   /* a phone or a tablet upright: most of the width, the words still under it */
+  }
+}
+
+/* Now Playing's text size on the player's own display (Appearance → Text size on the display): the meta column scaled, the cover untouched */
+html[data-aw-text="s"] body#artwork #np .np-title { font-size: calc(var(--np-title) * .85); }
+html[data-aw-text="s"] body#artwork #np .np-artist, html[data-aw-text="s"] body#artwork #np .np-album { font-size: .9em; }
+html[data-aw-text="l"] body#artwork #np .np-title { font-size: calc(var(--np-title) * 1.25); }
+html[data-aw-text="l"] body#artwork #np .np-artist { font-size: clamp(21px, 2vw, 29px); }
+html[data-aw-text="l"] body#artwork #np .np-album { font-size: clamp(17px, 1.55vw, 22px); }
+html[data-aw-text="xl"] body#artwork #np .np-title { font-size: calc(var(--np-title) * 1.55); }
+html[data-aw-text="xl"] body#artwork #np .np-artist { font-size: clamp(25px, 2.5vw, 36px); }
+html[data-aw-text="xl"] body#artwork #np .np-album { font-size: clamp(20px, 1.9vw, 28px); }
+html[data-aw-text="l"] body#artwork #np .np-chip, html[data-aw-text="xl"] body#artwork #np .np-chip { height: 44px; .np-chip-num { font-size: 15px; } .np-chip-unit { font-size: 12px; } }
+html[data-aw-text="l"] body#artwork #np .np-format, html[data-aw-text="xl"] body#artwork #np .np-format, html[data-aw-text="l"] body#artwork #np .np-signalpath, html[data-aw-text="xl"] body#artwork #np .np-signalpath { font-size: 13px; }
+/* the volume control hidden on the player's own display (Appearance → Hide the volume on the display): whoever sets it on the amplifier */
+html.aw-no-volume body#artwork .np-volume, html.aw-no-volume body#artwork .mini-volume { display: none !important; }
+/* larger text on a low screen: the meta column may not fit the hero's height — it scrolls there, under the seek bar never */
+html[data-aw-text="l"] body#artwork #np #np-meta, html[data-aw-text="xl"] body#artwork #np #np-meta { overflow-y: auto; scrollbar-width: none; }
+html[data-aw-text="l"] body#artwork #np #np-meta::-webkit-scrollbar, html[data-aw-text="xl"] body#artwork #np #np-meta::-webkit-scrollbar { display: none; }
+
+/* the cover face's byline (16B): the artist on its own line, then the album · year with the quality chip
+   beside it; the signal path and an outside source's note on lines of their own (not on the phone) */
+@media not all and (max-width: 700px) and (orientation: portrait) {
+  body#artwork #np:not(.np--info) #np-meta:not(.np-meta--lyrics) {
+    .np-byline { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; }
+    .np-artist { flex-basis: 100%; }
+    .np-album { margin-top: 10px; }
+    #np-chip-slot { display: contents; }
+    .np-quality { margin-top: 10px; }
+    .np-external, .np-signalpath { flex-basis: 100%; }
+  }
+}
+
+/* --- the Info face's credits and related artists (MusicBrainz, ListenBrainz) --------------- */
+body#artwork .np-about__credits { margin: 10px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; align-items: baseline;
+  .np-about__credit { display: contents; }
+  dt, dd { margin: 0; }
+  .np-about__role { font-size: 10px; letter-spacing: .14em; color: var(--ink-dim); }
+  .np-about__names { font-size: 13px; color: var(--ink-2); line-height: 1.4; } }
+body#artwork .np-about__related { margin-top: 10px; display: flex; flex-direction: column; gap: 7px;
+  .np-about__role { font-size: 10px; letter-spacing: .14em; color: var(--ink-dim); } }
+body#artwork .np-about__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+body#artwork .np-about__chip { height: 28px; padding: 0 12px; border-radius: 14px; border: 1px solid var(--fill-12); background: var(--fill-06); color: var(--ink-2); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; line-height: normal; white-space: nowrap;
+  &:hover { background: var(--fill-10); color: var(--ink); } }
+body#artwork .np-about__row--track { margin-top: 14px; align-items: start; }
+body#artwork .np-about__img--track { display: grid; place-items: center; color: var(--ink-dim); .material-symbols-rounded { font-size: 24px; } }
+/* the phone's Info face is a compact list of the artist and the record: the credits and the related artists stay on wider screens */
+@media (max-width: 1100px) { body#artwork .np-about__credits, body#artwork .np-about__related, body#artwork .np-about__row--track { display: none; } }
