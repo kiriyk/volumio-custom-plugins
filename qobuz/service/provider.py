@@ -64,6 +64,7 @@ class Provider:
         self.session = None
         self.lock = asyncio.Lock()
         self.secret = None
+        self.on_change = lambda: None
 
     async def start(self):
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=25),
@@ -94,9 +95,11 @@ class Provider:
                 raise ServiceError(code, 'Qobuz request failed', status if status >= 400 else 502)
             if response.content_length and response.content_length > 8 * 1024 * 1024:
                 raise ServiceError()
-            data = await response.content.read(8 * 1024 * 1024 + 1)
-            if len(data) > 8 * 1024 * 1024:
-                raise ServiceError()
+            data = bytearray()
+            async for chunk in response.content.iter_chunked(65536):
+                data.extend(chunk)
+                if len(data) > 8 * 1024 * 1024:
+                    raise ServiceError()
             import json
             return json.loads(data)
 
@@ -110,6 +113,7 @@ class Provider:
             if error.code == 'AUTH_EXPIRED':
                 self.credentials.pop('access_token', None)
                 self.store.clear()
+                self.on_change()
             raise
 
     async def discover(self):
@@ -158,6 +162,7 @@ class Provider:
                 raise ServiceError('UNAVAILABLE', 'Qobuz subscription required', 403)
             self.credentials.update(access_token=profile.get('user_auth_token') or token, user_id=user['id'])
             self.store.save(self.credentials)
+            self.on_change()
             return self.account()
 
     async def logout(self):
@@ -165,6 +170,7 @@ class Provider:
             self.credentials = {}
             self.secret = None
             self.store.clear()
+            self.on_change()
 
     async def search(self, query, kind, offset=0, limit=50):
         if kind not in ('track', 'album') or not isinstance(query, str) or not query.strip() or len(query) > 300:
@@ -186,6 +192,10 @@ class Provider:
         data = await self.call('/favorite/getUserFavorites', {'type': 'albums', 'offset': offset, 'limit': limit})
         result = data.get('albums') or {}
         return page(result.get('items') or [], int(result.get('total') or 0), offset, map_album)
+
+    async def track(self, id_):
+        data = await self.call('/track/get', {'track_id': identifier(id_, numeric=True)})
+        return {'items': [map_track(data)], 'next_cursor': None}
 
     async def resolve(self, id_, quality='27'):
         id_ = identifier(id_, numeric=True)

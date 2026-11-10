@@ -15,8 +15,8 @@ def validate_upstream(url):
     try:
         parsed = urlsplit(url)
         host = (parsed.hostname or '').lower()
-        allowed = ('storage.yandex.net', 'storage.mds.yandex.net', 'music.yandex.net',
-                   'music.yandex.ru', 'strm.yandex.net')
+        allowed = ('qobuz.com', 'streaming-qobuz-std.akamaized.net',
+                   'streaming-qobuz-hires.akamaized.net')
         if (parsed.scheme != 'https' or parsed.username or parsed.password
                 or parsed.port not in (None, 443)
                 or not any(host == suffix or host.endswith('.' + suffix) for suffix in allowed)):
@@ -42,8 +42,8 @@ class Streaming:
         self.epoch += 1
         self.tickets.clear()
 
-    async def resolve(self, track_id, quality='auto'):
-        stream = await self.auth.call('resolve', track_id, quality) if quality != 'auto' else await self.auth.call('resolve', track_id)
+    async def resolve(self, track_id, quality='27'):
+        stream = await self.auth.call('resolve', track_id, quality)
         self.policy(stream['url'])
         epoch = self.epoch
         now = time.monotonic()
@@ -55,7 +55,8 @@ class Streaming:
                              'epoch': epoch}
         while len(self.tickets) > 128:
             self.tickets.popitem(last=False)
-        return {'path': f'/stream/{key}', 'codec': stream['codec'], 'bitrate': stream['bitrate']}
+        return {'path': f'/stream/{key}', 'codec': stream['codec'], 'bitrate': stream['bitrate'],
+                'sampleRate': stream.get('sampleRate'), 'bitDepth': stream.get('bitDepth')}
 
     async def _open(self, method, url, headers):
         for _ in range(4):
@@ -84,8 +85,7 @@ class Streaming:
                 upstream = await self._open(request.method, ticket['stream']['url'], headers)
                 if upstream.status in (401, 403, 410):
                     upstream.release()
-                    fresh = (await self.auth.call('resolve', ticket['id'], ticket['quality'])
-                             if ticket['quality'] != 'auto' else await self.auth.call('resolve', ticket['id']))
+                    fresh = await self.auth.call('resolve', ticket['id'], ticket['quality'])
                     self.policy(fresh['url'])
                     if ticket['epoch'] != self.epoch:
                         raise ServiceError('AUTH_REQUIRED', 'Account changed', 401)
