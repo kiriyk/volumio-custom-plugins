@@ -6,8 +6,10 @@
 
 - [Яндекс Музыка](yandex-music/README.md): авторизация, поиск, коллекция,
   плейлисты, страницы исполнителей и воспроизведение MP3 или FLAC.
-- [Qobuz Custom](qobuz/README.md): независимый плагин 0.2.0, браузерный вход,
+- [Qobuz Custom](qobuz/README.md): независимый плагин 0.3.1, браузерный вход,
   поиск треков, альбомов и исполнителей, дискография, воспроизведение и скачивание FLAC на внешний диск. Нужна подписка Qobuz.
+- [Playback Engines](playback-engines/README.md): отдельный выбор MPD / Album Player,
+  независимые профили обработки, прямой ALSA-выход и список подключённых ЦАПов.
 - [Artwork One](artwork-one/README.md): тема на основе проекта
   [michaltamas/volumio-artwork-one](https://github.com/michaltamas/volumio-artwork-one)
   с поиском и навигацией Яндекса/Qobuz, крошками и данными качества аудио.

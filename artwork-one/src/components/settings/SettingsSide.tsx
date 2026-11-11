@@ -3,6 +3,7 @@ import { useMenu } from '../../core/store/menu';
 import { useSettings } from '../../core/store/settings';
 import { usePlayer } from '../../core/store/player';
 import { useSignal } from '../../core/store/signal';
+import { playbackEngineView } from '../../core/playbackEngine';
 import { buildDay } from '../../core/format';
 
 // Volumio names its boards by their build ('pi'); the one everyone knows by a longer name says it
@@ -16,7 +17,9 @@ export default function SettingsSide() {
   const systemInfo = useMenu(s => s.systemInfo);
   const st: any = usePlayer(s => s.state);
   useSignal(s => s.alsa);   // the badge and the DSP step follow the signal store (FusionDsp's state included)
+  const engineState = useSignal(s => s.engineState);
   if (!key) { return null; }
+  const engine = playbackEngineView(engineState);
   const dsp = useSignal.getState().dsp();
   // the badge says why the path is not bit-perfect: resampling, the DSP, a software volume, normalisation
   const why = useSignal.getState().notBitPerfect();
@@ -37,10 +40,11 @@ export default function SettingsSide() {
           {resampling !== null && why !== 'UNKNOWN' ? <div className="aw-badge"><span className={'aw-badge__dot' + (why ? ' aw-badge__dot--warn' : '')} /><span className="mono">{why || 'BIT PERFECT'}</span></div> : null}
           <ol className="aw-path">
             {source ? <li><div className="aw-path__name">Source</div><div className="aw-path__val mono">{source}</div></li> : null}
-            {resampling !== null ? <li><div className="aw-path__name">Resampling</div><div className="aw-path__val mono">{resampling ? (alsa && alsa.resamplingTarget ? 'ON · ' + alsa.resamplingTarget : 'ON') : 'NONE · PASSTHROUGH'}</div></li> : null}
+            {engine ? <li><div className="aw-path__name">Engine</div><div className="aw-path__val mono">{engine.engine} · {engine.processing}</div></li> : null}
+            {!engine && resampling !== null ? <li><div className="aw-path__name">Resampling</div><div className="aw-path__val mono">{resampling ? (alsa && alsa.resamplingTarget ? 'ON · ' + alsa.resamplingTarget : 'ON') : 'NONE · PASSTHROUGH'}</div></li> : null}
             {dsp ? <li><div className="aw-path__name">DSP</div><div className="aw-path__val mono">{dsp}</div></li> : null}
-            {mixer ? <li><div className="aw-path__name">Volume</div><div className="aw-path__val mono">{mixer}</div></li> : null}
-            {alsa && alsa.output ? <li><div className="aw-path__name">Output</div><div className="aw-path__val mono">{alsa.output}</div></li> : null}
+            {!engine && mixer ? <li><div className="aw-path__name">Volume</div><div className="aw-path__val mono">{mixer}</div></li> : null}
+            {(engine?.output || alsa?.output) ? <li><div className="aw-path__name">Output</div><div className="aw-path__val mono">{engine?.output || alsa?.output}</div></li> : null}
           </ol>
         </div>
       ) : null}

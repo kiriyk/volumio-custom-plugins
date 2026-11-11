@@ -1,7 +1,7 @@
 {
   "name": "yandex_music",
   "category": "music_service",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Yandex Music for Volumio 4",
   "main": "index.js",
   "license": "MIT",

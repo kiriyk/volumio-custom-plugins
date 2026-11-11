@@ -18,4 +18,25 @@ function createTransportFromFile(filename, options = {}) {
   }
   return createTransport({ ...options, config });
 }
-module.exports = { createTransport, createTransportFromFile, MpdTransport, AlbumPlayerTransport, SoapClient };
+// Resolve the plugin at play time: sources may have started while it was disabled.
+function createTransportWithManager(filename, options = {}) {
+  let fallback, owner, managed, active;
+  const native = () => fallback ||= createTransportFromFile(filename, options);
+  const select = () => {
+    const manager = options.getManager?.();
+    if (!manager?.getTransport) return native();
+    if (owner !== manager) { managed?.close(); owner = manager; managed = manager.getTransport(options.service, options.onError); }
+    return managed;
+  };
+  return {
+    get kind() { return active?.kind || 'mpd'; },
+    play: (...args) => { active = select(); return active.play(...args); },
+    activate: () => active?.activate?.() || Promise.resolve(),
+    pause: () => active?.pause?.() || Promise.resolve(),
+    resume: () => active?.resume?.() || Promise.resolve(),
+    seek: ms => active?.seek?.(ms) || Promise.resolve(),
+    stop: () => active?.stop?.() || Promise.resolve(),
+    close: () => { managed?.close(); fallback?.close(); active = null; },
+  };
+}
+module.exports = { createTransportWithManager, createTransport, createTransportFromFile, MpdTransport, AlbumPlayerTransport, SoapClient };

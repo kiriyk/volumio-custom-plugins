@@ -15,16 +15,17 @@ function milliseconds(value) {
   return m ? ((Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])) * 1000 + Number((m[4] || '').padEnd(3, '0'))) : null;
 }
 class SoapClient {
-  constructor(controlUrl, { timeoutMs = 15000 } = {}) {
+  constructor(controlUrl, { timeoutMs = 15000, service = SERVICE } = {}) {
     let url; try { url = new URL(controlUrl); } catch { throw error('BAD_ENGINE_CONFIG'); }
     if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || url.username || url.password || url.hash) throw error('BAD_ENGINE_CONFIG');
-    this.url = url; this.timeoutMs = timeoutMs;
+    if (![SERVICE, 'urn:schemas-upnp-org:service:RenderingControl:1'].includes(service)) throw error('BAD_ENGINE_CONFIG');
+    this.url = url; this.timeoutMs = timeoutMs; this.service = service;
   }
   call(action, args = {}) {
     if (!/^[A-Za-z]+$/.test(action)) return Promise.reject(error('BAD_REQUEST'));
-    const body = Buffer.from(`<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:${action} xmlns:u="${SERVICE}">${Object.entries(args).map(([k, v]) => `<${k}>${escape(v)}</${k}>`).join('')}</u:${action}></s:Body></s:Envelope>`);
+    const body = Buffer.from(`<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:${action} xmlns:u="${this.service}">${Object.entries(args).map(([k, v]) => `<${k}>${escape(v)}</${k}>`).join('')}</u:${action}></s:Body></s:Envelope>`);
     return new Promise((resolve, reject) => {
-      const req = http.request(this.url, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset="utf-8"', SOAPAction: `"${SERVICE}#${action}"`, 'Content-Length': body.length } }, res => {
+      const req = http.request(this.url, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset="utf-8"', SOAPAction: `"${this.service}#${action}"`, 'Content-Length': body.length } }, res => {
         const chunks = []; let size = 0;
         res.on('data', chunk => { size += chunk.length; if (size > 256 * 1024) res.destroy(error('ENGINE_ERROR')); else chunks.push(chunk); });
         res.on('error', () => reject(error('ENGINE_UNAVAILABLE')));

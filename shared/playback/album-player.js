@@ -2,11 +2,14 @@
 const { metadata, milliseconds, time, error } = require('./soap');
 
 class AlbumPlayerTransport {
-  constructor({ client, mpd, sm, service, onError = () => {}, pollMs = 500, startupTimeoutMs = 20000 }) {
-    Object.assign(this, { client, mpd, sm, service, onError, pollMs, startupTimeoutMs });
+  constructor({ client, mpd, sm, service, updateSource = service, onError = () => {}, pollMs = 500, startupTimeoutMs = 20000 }) {
+    Object.assign(this, { client, mpd, sm, service, updateSource, onError, pollMs, startupTimeoutMs });
     this.kind = 'album_player'; this.session = null; this.timer = null; this.polling = false;
   }
-  activate() { return this.sm.setConsumeUpdateService(this.service, true, false); }
+  async activate() {
+    await this.sm.setConsumeUpdateService(this.updateSource, true, false);
+    if (this.sm.consumeState) this.sm.consumeState.service = this.service;
+  }
   close() { clearTimeout(this.timer); this.timer = null; this.session = null; }
   owned(session) { return this.session === session && session.valid(); }
   async play(url, track, valid, ownsTrack = valid) {
@@ -68,7 +71,7 @@ class AlbumPlayerTransport {
       }
       await this.sm.syncState({ status, uri: session.track.uri, service: this.service, isStreaming: true,
         seek: status === 'stop' ? session.position : milliseconds(position.RelTime), duration: session.duration / 1000,
-        trackType: session.track.trackType || 'flac' }, this.service);
+        trackType: session.track.trackType || 'flac' }, this.updateSource);
     } catch (e) {
       if (this.owned(session)) { this.close(); this.onError(e); }
     } finally { this.polling = false; }

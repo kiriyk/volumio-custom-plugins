@@ -7,5 +7,8 @@
   },
   "dependencies": {
     "fast-xml-parser": "5.12.0"
+  },
+  "devDependencies": {
+    "kew": "0.7.0"
   }
 }

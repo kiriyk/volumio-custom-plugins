@@ -7,7 +7,7 @@ const Q = require('kew');
 const ApiClient = require('./lib/api-client');
 const Browse = require('./lib/browse');
 const Playback = require('./lib/playback');
-const { createTransportFromFile } = require('./lib/transport');
+const { createTransportWithManager } = require('./lib/transport');
 const { LocalFileInfo } = require('./lib/local-file-info');
 
 function kew(promise) {
@@ -58,6 +58,7 @@ class ControllerYandexMusic {
   }
   onVolumioStart() { return Q.resolve(); }
   getConfigurationFiles() { return ['config.json']; }
+  getPlaybackEngineVersion() { return 1; }
   onStart() {
     if (!this.startPromise) this.startPromise = this.start().finally(() => { this.startPromise = null; });
     return kew(this.startPromise);
@@ -90,7 +91,7 @@ class ControllerYandexMusic {
       const mpd = this.router.pluginManager.getPlugin('music_service', 'mpd');
       const onError = error => { this.notify(error); Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {}); };
       const configFile = this.router.pluginManager.getConfigurationFile?.(this.context, 'transport.json');
-      const transport = createTransportFromFile(configFile, { mpd, sm: this.router.stateMachine, service: 'yandex_music', onError });
+      const transport = createTransportWithManager(configFile, { mpd, sm: this.router.stateMachine, service: 'yandex_music', onError, getManager: () => this.router.pluginManager.getPlugin('audio_interface', 'playback_engines') });
       this.playback = new Playback(api, mpd, this.router.stateMachine, onError, () => this.quality, transport);
       this.playback.onQuality = info => this.router.broadcastMessage('pushYandexQuality', info);
       this.playback.probeQuality = async url => {

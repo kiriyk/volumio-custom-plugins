@@ -10,7 +10,8 @@
  * softvolume → output), whether its effects are on or off: a DSP step, and not bit-perfect either.
  */
 import { create } from 'zustand';
-import '../socket';
+import { on, emit } from '../socket';
+import { playbackEngineView, type PlaybackEngineState } from '../playbackEngine';
 import { askUiConfig, onUiConfig, ALSA_PAGE } from '../uiConfig';
 import { useMultiroom } from './multiroom';
 import { useDsp } from './dsp';
@@ -28,6 +29,7 @@ interface Alsa {
 }
 
 interface SignalStore {
+  engineState: PlaybackEngineState | null;
   device: string;           // the player's own output device
   browser: string | null;   // the stream quality ('aac' | 'flac') while browserPlayback is on
   output: string;           // what the path ends in: the device, or this browser
@@ -56,6 +58,7 @@ const STREAM_STEP: Record<string, string> = { aac: 'AAC 256K', flac: 'FLAC 24 / 
 const outputOf = (device: string, browser: string | null) => (browser ? 'This browser' : device);
 
 export const useSignal = create<SignalStore>((_set, get) => ({
+  engineState: null,
   device: '',
   browser: null,
   output: '',
@@ -64,6 +67,8 @@ export const useSignal = create<SignalStore>((_set, get) => ({
   resample: () => {
     const b = get().browser;
     if (b) { return STREAM_STEP[b] || 'STREAM'; }
+    const managed = playbackEngineView(get().engineState);
+    if (managed) return managed.processing;
     const a = get().alsa;
     if (!a || a.resampling === null) { return ''; }
     if (!a.resampling) { return 'NO RESAMPLE'; }
@@ -72,6 +77,7 @@ export const useSignal = create<SignalStore>((_set, get) => ({
   },
   // FusionDsp's step: what it runs ("15 bands Graphic equalizer · Rock"), or that its effects are off
   dsp: () => {
+    if (get().engineState?.managed) return '';
     const d = useDsp.getState();
     if (!d.available) { return ''; }
     if (d.active === false) { return 'FusionDsp · effects off'; }
@@ -82,6 +88,8 @@ export const useSignal = create<SignalStore>((_set, get) => ({
   bitPerfect: () => !get().notBitPerfect(),
   notBitPerfect: () => {
     if (get().browser) { return 'STREAM'; }
+    const managed = playbackEngineView(get().engineState);
+    if (managed) return managed.processing;
     const a = get().alsa;
     if (!a || a.resampling === null) { return 'UNKNOWN'; }
     if (a.resampling) { return 'RESAMPLING'; }
@@ -115,7 +123,7 @@ onUiConfig((_page, cfg) => {
   const dev = device ? String(device) : useSignal.getState().device;
   useSignal.setState({
     device: dev,
-    output: outputOf(dev, useSignal.getState().browser),
+    output: playbackEngineView(useSignal.getState().engineState)?.output || outputOf(dev, useSignal.getState().browser),
     alsa: {
       i2s,
       resampling: flag(found.resampling),
@@ -133,8 +141,20 @@ useDsp.getState().refresh();   // whether FusionDsp is in the chain (the outputs
 useDsp.subscribe((d, prev) => { if (d.available !== prev.available || d.active !== prev.active || d.kind !== prev.kind || d.preset !== prev.preset) { useSignal.setState({ alsa: useSignal.getState().alsa ? { ...useSignal.getState().alsa! } : null }); } });
 
 useMultiroom.subscribe((m) => {
+  if (useSignal.getState().engineState?.managed) return;
   const o = (m.outputs as any[]).find((x) => x && x.id === 'browserPlayback');
   const browser = o && o.enabled ? String(o.quality || 'aac') : null;
   const cur = useSignal.getState();
   if (browser !== cur.browser) { useSignal.setState({ browser, output: outputOf(cur.device, browser) }); }
 });
+
+// Requery after reconnect; the plugin may have changed while this screen was offline.
+on('pushPlaybackEnginesState', (state: PlaybackEngineState) => {
+  const current = useSignal.getState();
+  const view = playbackEngineView(state);
+  useSignal.setState({ engineState: state, browser: view ? null : current.browser,
+    output: view?.output || outputOf(current.device, current.browser) });
+});
+const askEngine = () => emit('callMethod', { endpoint: 'audio_interface/playback_engines', method: 'getState', data: {} });
+on('connect', askEngine);
+askEngine();

@@ -7,7 +7,7 @@ const Q = require('kew');
 const ApiClient = require('./lib/api-client');
 const Browse = require('./lib/browse');
 const Playback = require('./lib/playback');
-const { createTransportFromFile } = require('./lib/transport');
+const { createTransportWithManager } = require('./lib/transport');
 const nativeQuality = require('./lib/native-quality');
 function kew(p) { const d = Q.defer(); Promise.resolve(p).then(v => d.resolve(v), e => d.reject(e)); return d.promise; }
 
@@ -32,6 +32,7 @@ class ControllerQobuz {
   notify(error) { this.router.pushToastMessage('error', 'Qobuz', this.t(error?.code || error?.message || 'SERVICE_UNAVAILABLE')); }
   onVolumioStart() { return Q.resolve(); }
   getConfigurationFiles() { return ['config.json']; }
+  getPlaybackEngineVersion() { return 1; }
   onStart() {
     if (!this.startPromise) this.startPromise = this.start().finally(() => { this.startPromise = null; });
     return kew(this.startPromise);
@@ -53,7 +54,7 @@ class ControllerQobuz {
       this.browse = new Browse(this.client(), key => this.t(key));
       const mpd = this.router.pluginManager.getPlugin('music_service', 'mpd');
       const onError = error => { this.notify(error); Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {}); };
-      const transport = createTransportFromFile(this.statePath('transport.json'), { mpd, sm: this.router.stateMachine, service: 'qobuz_custom', onError });
+      const transport = createTransportWithManager(this.statePath('transport.json'), { mpd, sm: this.router.stateMachine, service: 'qobuz_custom', onError, getManager: () => this.router.pluginManager.getPlugin('audio_interface', 'playback_engines') });
       this.playback = new Playback(this.client(), mpd, this.router.stateMachine, onError, () => this.quality, transport);
       this.playback.onQuality = info => this.router.broadcastMessage('pushQobuzCustomQuality', info);
       this.started = true;

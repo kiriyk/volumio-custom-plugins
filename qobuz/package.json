@@ -1,7 +1,7 @@
 {
   "name": "qobuz_custom",
   "category": "music_service",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Independent Qobuz source for Volumio 4",
   "main": "index.js",
   "license": "GPL-3.0-or-later",

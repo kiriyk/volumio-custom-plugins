@@ -1,0 +1,26 @@
+[Unit]
+Description=Playback Engines private Album Player renderer
+After=network.target sound.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=forking
+User=volumio
+Group=volumio
+SupplementaryGroups=audio
+WorkingDirectory=@STATE_DIR@/renderer
+Environment=ALSA_CONFIG_PATH=@STATE_DIR@/asound.conf
+ExecStart=@STATE_DIR@/renderer/ap2renderer
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=15
+TimeoutStopSec=10
+KillMode=control-group
+UMask=0077
+ProtectSystem=strict
+ReadWritePaths=@STATE_DIR@
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+RestrictSUIDSGID=true

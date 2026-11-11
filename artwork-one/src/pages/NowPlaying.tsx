@@ -59,6 +59,8 @@ export default function NowPlaying() {
   const zone = useMultiroom(s => s.zones.find(z => z.isSelf)?.name || '');
   const output = useSignal(s => s.output);
   const alsa = useSignal(s => s.alsa);
+  const engineState = useSignal(s => s.engineState);
+  const engineName = engineState?.managed ? (engineState.engine === 'album_player' ? 'Album Player' : 'MPD') : '';
   const resample = useSignal.getState().resample();
   const dsp = useSignal.getState().dsp();
   const bitPerfect = useSignal.getState().bitPerfect();
@@ -290,6 +292,7 @@ export default function NowPlaying() {
               {!ext && view === 'cover' && st.samplerate ? (
                 <div className="np-signalpath mono">
                   <span>SOURCE {signal(st)}</span>
+                  {engineName ? <><span className="np-arrow">→</span><span>{engineName}</span></> : null}
                   {resample ? <><span className="np-arrow">→</span><span>{resample}</span></> : null}
                   {dsp ? <><span className="np-arrow">→</span><span>{/effects off/.test(dsp) ? 'DSP OFF' : 'DSP'}</span></> : null}
                   {output ? <><span className="np-arrow">→</span><span className="np-node-final">{output}</span></> : null}
