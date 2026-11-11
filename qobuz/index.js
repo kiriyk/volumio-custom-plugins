@@ -7,6 +7,7 @@ const Q = require('kew');
 const ApiClient = require('./lib/api-client');
 const Browse = require('./lib/browse');
 const Playback = require('./lib/playback');
+const { createTransportFromFile } = require('./lib/transport');
 const nativeQuality = require('./lib/native-quality');
 function kew(p) { const d = Q.defer(); Promise.resolve(p).then(v => d.resolve(v), e => d.reject(e)); return d.promise; }
 
@@ -50,8 +51,10 @@ class ControllerQobuz {
       if (generation !== this.generation) { await this.service.stop(); return; }
       if (!healthy) throw new Error('SERVICE_UNAVAILABLE');
       this.browse = new Browse(this.client(), key => this.t(key));
-      this.playback = new Playback(this.client(), this.router.pluginManager.getPlugin('music_service', 'mpd'), this.router.stateMachine,
-        error => { this.notify(error); Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {}); }, () => this.quality);
+      const mpd = this.router.pluginManager.getPlugin('music_service', 'mpd');
+      const onError = error => { this.notify(error); Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {}); };
+      const transport = createTransportFromFile(this.statePath('transport.json'), { mpd, sm: this.router.stateMachine, service: 'qobuz_custom', onError });
+      this.playback = new Playback(this.client(), mpd, this.router.stateMachine, onError, () => this.quality, transport);
       this.playback.onQuality = info => this.router.broadcastMessage('pushQobuzCustomQuality', info);
       this.started = true;
       this.router.volumioAddToBrowseSources({ name: 'Qobuz Custom', uri: 'qobuz_custom', plugin_type: 'music_service', plugin_name: 'qobuz_custom', icon: 'fa-music' });
@@ -72,6 +75,7 @@ class ControllerQobuz {
   resume() { return kew(this.playback?.resume()); }
   stop() { return kew(this.playback?.stop()); }
   seek(position) { return kew(this.playback?.seek(position)); }
+  next() { return kew(this.playback?.next()); }
   previous() { return kew(this.playback?.previous()); }
   getPlaybackQuality() {
     return kew((async () => {

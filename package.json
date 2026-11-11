@@ -1,0 +1,11 @@
+{
+  "name": "volumio-custom-plugins-development",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "test": "node --test shared/playback/tests/*.test.js"
+  },
+  "dependencies": {
+    "fast-xml-parser": "5.12.0"
+  }
+}

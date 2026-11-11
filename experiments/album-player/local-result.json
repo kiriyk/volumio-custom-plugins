@@ -1,0 +1,112 @@
+{
+  "before": {
+    "queue_sha256": "8f027d9d1fc40d0e94bfb1e9e694a8314ab13ad79d21ca94164c8c60b674b83f",
+    "status": {
+      "volume": "86",
+      "playlist": "3",
+      "playlistlength": "1",
+      "state": "pause",
+      "song": "0",
+      "songid": "1",
+      "elapsed": "12.109"
+    }
+  },
+  "output": "ALSA null; /dev/snd hidden in private mount namespace",
+  "resolved_format": {
+    "codec": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 24
+  },
+  "version_date": "30.10.2026",
+  "initial_config": {
+    "di_mode": 0,
+    "gapless_mode": true,
+    "volume_enabled": false,
+    "hw_volume": false,
+    "use_conv": false,
+    "enable_dsd": 0,
+    "res44": 0,
+    "res48": 0,
+    "stat_source": "",
+    "stat_output": ""
+  },
+  "set_config_response": {
+    "http_status": 200,
+    "body_bytes": 15
+  },
+  "root_folder_after": "tmp/albumplayer-research",
+  "custom_readback": {
+    "res44": 2,
+    "volume_enabled": true
+  },
+  "bypass_readback_matches": true,
+  "custom_restored": true,
+  "folder_paths": [
+    "/tmp/albumplayer-research",
+    "/tmp/albumplayer-research/aplayer",
+    "/tmp/albumplayer-research/aprenderer",
+    "/tmp/albumplayer-research/music"
+  ],
+  "loaded_albums": {
+    "Albums": [
+      "Daft Punk ft. Pharrell Williams - Get Lucky  [04:07]  flac"
+    ],
+    "Songs": [
+      {
+        "Songs": [
+          "Get Lucky"
+        ],
+        "SongsLen": [
+          247632
+        ]
+      }
+    ]
+  },
+  "radio_album_count": 46,
+  "stream_state": {
+    "Playing": true,
+    "Paused": false,
+    "Freq": 44100,
+    "Bps": 24,
+    "Ch": 2,
+    "Position": 420,
+    "PlayingLen": 35999999,
+    "ProgressVisible": true,
+    "LastError": ""
+  },
+  "stream_output": {
+    "stat_source": "FLAC 24-bit / 44.1 kHz (2116 kbps)",
+    "stat_output": "S32_LE / 44.1 kHz"
+  },
+  "pause_state": {
+    "Playing": true,
+    "Paused": true,
+    "Position": 450,
+    "LastError": ""
+  },
+  "seek_state": {
+    "Playing": true,
+    "Paused": false,
+    "Position": 7199200,
+    "PlayingLen": 35999999,
+    "LastError": ""
+  },
+  "state": {
+    "Playing": false,
+    "Paused": false,
+    "LastError": ""
+  },
+  "after": {
+    "queue_sha256": "8f027d9d1fc40d0e94bfb1e9e694a8314ab13ad79d21ca94164c8c60b674b83f",
+    "status": {
+      "volume": "86",
+      "playlist": "3",
+      "playlistlength": "1",
+      "state": "pause",
+      "song": "0",
+      "songid": "1",
+      "elapsed": "12.109"
+    }
+  },
+  "queue_unchanged": true
+}

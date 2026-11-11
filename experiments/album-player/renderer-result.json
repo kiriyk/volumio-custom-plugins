@@ -1,0 +1,220 @@
+{
+  "before": {
+    "queue_sha256": "8f027d9d1fc40d0e94bfb1e9e694a8314ab13ad79d21ca94164c8c60b674b83f",
+    "status": {
+      "volume": "86",
+      "playlist": "3",
+      "playlistlength": "1",
+      "state": "pause",
+      "song": "0",
+      "songid": "1",
+      "elapsed": "12.109"
+    }
+  },
+  "output": "ALSA null; hardware devices hidden",
+  "config_keys": [
+    "affinity_mode",
+    "asound",
+    "att",
+    "bframes",
+    "bmks",
+    "cards",
+    "ch_scr",
+    "ch_tcp",
+    "conv_db",
+    "conv_desc",
+    "conv_filter",
+    "conv_list",
+    "di_mode",
+    "dop_mode",
+    "enable_dsd",
+    "exists_conv",
+    "filter",
+    "gapless_mode",
+    "hw_index",
+    "hw_list",
+    "hw_volume",
+    "ip_scr",
+    "level",
+    "lock_memory",
+    "mmap",
+    "mode_16bit",
+    "mode_24bit",
+    "multi_mode",
+    "multithread",
+    "nice",
+    "output",
+    "pcm_freq",
+    "pframes",
+    "phase_mode",
+    "pmks",
+    "preload_mode",
+    "priority",
+    "pt_scr",
+    "rate",
+    "ren_name",
+    "res176",
+    "res192",
+    "res352",
+    "res384",
+    "res44",
+    "res48",
+    "res88",
+    "res96",
+    "res_bf44",
+    "server_info",
+    "si_time",
+    "soxr_filter",
+    "soxr_phase",
+    "soxr_quality",
+    "stat_16bit",
+    "stat_24bit",
+    "stat_32bit",
+    "stat_cpus",
+    "stat_dsd32be",
+    "stat_dsd32le",
+    "stat_nice",
+    "stat_output",
+    "stat_playing",
+    "stat_prio",
+    "stat_root",
+    "stat_source",
+    "std_buffer",
+    "swap_mode",
+    "track_img",
+    "track_inf",
+    "use_conv",
+    "volume_enabled"
+  ],
+  "custom_set_response": {
+    "status": 200,
+    "response": "Settings saved!"
+  },
+  "custom_readback": {
+    "res44": 2,
+    "volume_enabled": true
+  },
+  "bypass_readback_matches": true,
+  "bypass_mismatches": {},
+  "custom_restored": true,
+  "renderer_ports": [
+    1175,
+    7779
+  ],
+  "set_uri": {},
+  "play": {},
+  "formats": {
+    "stat_source": "FLAC 24-bit / 44.1 kHz",
+    "stat_output": "S32_LE / 44.1 kHz"
+  },
+  "position": {
+    "TrackDuration": "0:04:07.000",
+    "RelTime": "0:00:00.000"
+  },
+  "position_uri_present": true,
+  "pause_result": {},
+  "paused": {
+    "CurrentTransportState": "PAUSED_PLAYBACK",
+    "CurrentTransportStatus": "OK"
+  },
+  "paused_position": {
+    "TrackDuration": "0:04:07.000",
+    "RelTime": "0:00:00.000"
+  },
+  "seek_result": {},
+  "after_seek": {
+    "TrackDuration": "0:04:07.000",
+    "RelTime": "0:00:30.000"
+  },
+  "resume_result": {},
+  "resumed": {
+    "CurrentTransportState": "PLAYING",
+    "CurrentTransportStatus": "OK"
+  },
+  "resumed_position": {
+    "TrackDuration": "0:04:07.000",
+    "RelTime": "0:00:30.000"
+  },
+  "next_track": {
+    "id": "9140024",
+    "title": "Give Life Back to Music",
+    "duration_ms": 275000
+  },
+  "set_next_result": {},
+  "next_result": {},
+  "manual_next_uri_matches": false,
+  "manual_next_media_uri_present": true,
+  "manual_next_metadata_matches": false,
+  "after_next": {
+    "TrackDuration": "0:04:07.000",
+    "RelTime": "0:00:00.000"
+  },
+  "manual_next_formats": {
+    "stat_source": "",
+    "stat_output": ""
+  },
+  "manual_next_requested_second_stream": false,
+  "manual_next_transport": {
+    "CurrentTransportState": "STOPPED",
+    "CurrentTransportStatus": "OK"
+  },
+  "explicit_stop": {},
+  "explicit_set_uri": {},
+  "explicit_play": {},
+  "explicit_formats": {
+    "stat_source": "FLAC 24-bit / 88.2 kHz",
+    "stat_output": "S32_LE / 88.2 kHz"
+  },
+  "explicit_requested_second_stream": true,
+  "explicit_state": {
+    "CurrentTransportState": "PLAYING",
+    "CurrentTransportStatus": "OK"
+  },
+  "explicit_position": {
+    "TrackDuration": "0:04:34.000",
+    "RelTime": "0:00:00.000"
+  },
+  "automatic_set_next": {},
+  "seek_near_end": {},
+  "automatic_next_uri_matches": false,
+  "automatic_next_metadata_matches": false,
+  "automatic_next_position": {
+    "TrackDuration": "0:04:34.000",
+    "RelTime": "0:00:00.000"
+  },
+  "automatic_next_formats": {
+    "stat_source": "FLAC 24-bit / 88.2 kHz",
+    "stat_output": "S32_LE / 88.2 kHz"
+  },
+  "automatic_next_requested_second_stream": true,
+  "automatic_next_state": {
+    "CurrentTransportState": "STOPPED",
+    "CurrentTransportStatus": "OK"
+  },
+  "http_range_offsets": [
+    "0-",
+    "51475013-",
+    "51472965-",
+    "51473327-",
+    "6156034-",
+    "6051996-",
+    "6058586-",
+    "6077408-",
+    "0-",
+    "0-",
+    "0-"
+  ],
+  "after": {
+    "queue_sha256": "8f027d9d1fc40d0e94bfb1e9e694a8314ab13ad79d21ca94164c8c60b674b83f",
+    "status": {
+      "volume": "86",
+      "playlist": "3",
+      "playlistlength": "1",
+      "state": "pause",
+      "song": "0",
+      "songid": "1",
+      "elapsed": "12.109"
+    }
+  },
+  "queue_unchanged": true
+}

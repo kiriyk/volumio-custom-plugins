@@ -38,5 +38,8 @@
   "queued": "Queued",
   "downloading": "Downloading",
   "cancelled": "Cancelled",
-  "error": "Error"
+  "error": "Error",
+  "ENGINE_ERROR": "Playback engine failed.",
+  "ENGINE_UNAVAILABLE": "Album Player is unavailable.",
+  "BAD_ENGINE_CONFIG": "Invalid playback engine configuration."
 }

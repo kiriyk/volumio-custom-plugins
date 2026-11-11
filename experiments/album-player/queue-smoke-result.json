@@ -1,0 +1,20 @@
+{
+  "isolatedCore": true,
+  "physicalOutput": false,
+  "controls": {
+    "play": true,
+    "pause": true,
+    "resume": true,
+    "seek": 31000,
+    "next": true,
+    "previous": true,
+    "automaticTransitions": 1,
+    "albumEnd": true
+  },
+  "errors": [],
+  "smoke": true,
+  "album": "Random Access Memories",
+  "queueLength": 2,
+  "launchedTrackCount": 4,
+  "passed": true
+}

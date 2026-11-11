@@ -1,7 +1,7 @@
 {
   "name": "qobuz_custom",
   "category": "music_service",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Independent Qobuz source for Volumio 4",
   "main": "index.js",
   "license": "GPL-3.0-or-later",
@@ -15,6 +15,7 @@
     "package": "bash scripts/package.sh"
   },
   "dependencies": {
+    "fast-xml-parser": "5.12.0",
     "kew": "0.7.0"
   },
   "volumio_info": {
@@ -29,6 +30,6 @@
       "bookworm"
     ],
     "details": "Search Qobuz albums and play FLAC with your subscription",
-    "changelog": "Initial version"
+    "changelog": "Optional Album Player transport; MPD remains the default"
   }
 }

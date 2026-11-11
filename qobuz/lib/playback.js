@@ -1,11 +1,13 @@
 'use strict';
+const { createTransport } = require('./transport');
 
 class Playback {
-  constructor(api, mpd, stateMachine, onError, quality = () => '27') {
+  constructor(api, mpd, stateMachine, onError, quality = () => '27', transport) {
     this.api = api; this.mpd = mpd; this.sm = stateMachine; this.onError = onError; this.quality = quality;
     this.generation = 0; this.serial = Promise.resolve(); this.track = null; this.started = false;
     this.lastQuality = null; this.onQuality = () => {};
     this.probeQuality = null;
+    this.transport = transport || createTransport({ mpd, sm: stateMachine });
   }
   current(track = this.track) {
     if (this.sm.isVolatile || this.sm.isUpnp) return false;
@@ -31,16 +33,10 @@ class Playback {
       const url = this.api.streamUrl(result.path, result.codec);
       await this.enqueue(async () => {
         if (!valid()) return;
-        await this.mpd.sendMpdCommand('stop', []);
-        if (!valid()) return;
-        await this.mpd.sendMpdCommand('clear', []);
-        if (!valid()) return;
-        await this.mpd.sendMpdCommand(`add "${url}"`, []);
-        if (!valid()) return;
-        this.sm.currentSongDuration = (track.duration || 0) * 1000;
-        await this.sm.setConsumeUpdateService('mpd', true, false);
-        if (!valid()) return;
-        await this.mpd.sendMpdCommand('play', []);
+        const trackType = { 'flac': 'flac', 'flac-mp4': 'mp4', 'mp3': 'mp3' }[result.codec];
+        const played = await this.transport.play(url, { ...track, trackType }, valid,
+          () => this.track === track && this.current(track));
+        if (!played || !valid()) return;
         this.started = true;
         if (valid()) {
           this.lastQuality = { uri: track.uri, codec: result.codec, sampleRate: result.sampleRate, bitDepth: result.bitDepth };
@@ -64,20 +60,23 @@ class Playback {
     const generation = this.generation;
     return this.enqueue(async () => {
       if (generation !== this.generation || !this.current(track)) return;
-      await this.sm.setConsumeUpdateService('mpd', true, false);
+      await this.transport.activate();
       if (generation !== this.generation || !this.current(track)) return;
-      return this.mpd.stop();
+      return this.transport.stop();
     });
   }
   pause() {
     this.cancel();
     const generation = this.generation;
-    if (!this.started) return Promise.resolve();
+    if (!this.started && !this.track) return Promise.resolve();
+    const wasStarted = this.started;
     return this.enqueue(async () => {
       if (generation !== this.generation || !this.current()) return;
-      await this.sm.setConsumeUpdateService('mpd', true, false);
+      await this.transport.activate();
       if (generation !== this.generation || !this.current()) return;
-      return this.mpd.pause();
+      // A cancelled launch may already have been accepted by the renderer.
+      // Queue cleanup after its pending response instead of leaving it playing.
+      return wasStarted ? this.transport.pause() : this.transport.stop();
     });
   }
   resume() {
@@ -86,9 +85,9 @@ class Playback {
     const generation = this.generation;
     return this.enqueue(async () => {
       if (generation !== this.generation || !this.current()) return;
-      await this.sm.setConsumeUpdateService('mpd', true, false);
+      await this.transport.activate();
       if (generation !== this.generation || !this.current()) return;
-      return this.mpd.resume();
+      return this.transport.resume();
     });
   }
   seek(position) {
@@ -96,10 +95,18 @@ class Playback {
     const generation = this.generation;
     return this.enqueue(async () => {
       if (generation !== this.generation || !this.current()) return;
-      await this.sm.setConsumeUpdateService('mpd', true, false);
+      await this.transport.activate();
       if (generation !== this.generation || !this.current()) return;
-      return this.mpd.seek(position);
+      return this.transport.seek(position);
     });
+  }
+  async next() {
+    this.cancel();
+    const generation = this.generation;
+    if (!this.current()) return;
+    await this.sm.setConsumeUpdateService(undefined);
+    if (generation !== this.generation || !this.current()) return;
+    return this.sm.next();
   }
   async previous() {
     this.cancel();

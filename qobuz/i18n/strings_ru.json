@@ -38,5 +38,8 @@
   "queued": "В очереди",
   "downloading": "Скачивается",
   "cancelled": "Отменено",
-  "error": "Ошибка"
+  "error": "Ошибка",
+  "ENGINE_ERROR": "Ошибка движка воспроизведения.",
+  "ENGINE_UNAVAILABLE": "Движок Album Player недоступен.",
+  "BAD_ENGINE_CONFIG": "Некорректные настройки движка."
 }

@@ -7,6 +7,7 @@ const Q = require('kew');
 const ApiClient = require('./lib/api-client');
 const Browse = require('./lib/browse');
 const Playback = require('./lib/playback');
+const { createTransportFromFile } = require('./lib/transport');
 const { LocalFileInfo } = require('./lib/local-file-info');
 
 function kew(promise) {
@@ -86,11 +87,11 @@ class ControllerYandexMusic {
       if (!healthy) throw new Error('SERVICE_UNAVAILABLE');
       const api = this.client();
       this.browse = new Browse(api, key => this.t(key), code => this.notify(code, 'info'));
-      this.playback = new Playback(api, this.router.pluginManager.getPlugin('music_service', 'mpd'),
-        this.router.stateMachine, error => {
-          this.notify(error);
-          Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {});
-        }, () => this.quality);
+      const mpd = this.router.pluginManager.getPlugin('music_service', 'mpd');
+      const onError = error => { this.notify(error); Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {}); };
+      const configFile = this.router.pluginManager.getConfigurationFile?.(this.context, 'transport.json');
+      const transport = createTransportFromFile(configFile, { mpd, sm: this.router.stateMachine, service: 'yandex_music', onError });
+      this.playback = new Playback(api, mpd, this.router.stateMachine, onError, () => this.quality, transport);
       this.playback.onQuality = info => this.router.broadcastMessage('pushYandexQuality', info);
       this.playback.probeQuality = async url => {
         const { stdout } = await execFile('/usr/bin/ffprobe', ['-v', 'error', '-select_streams', 'a:0',
@@ -167,6 +168,7 @@ class ControllerYandexMusic {
   stop() { return kew(this.playback?.stop()); }
   // Volumio invokes stop() on the music service, while lifecycle uses onStop().
   seek(position) { return kew(this.playback?.seek(position)); }
+  next() { return kew(this.playback?.next()); }
   previous() { return kew(this.playback?.previous()); }
   getUIConfig() { return kew(this.uiConfig()); }
   async uiConfig() {

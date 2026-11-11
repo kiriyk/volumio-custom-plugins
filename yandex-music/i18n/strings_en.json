@@ -42,5 +42,8 @@
   "BAD_REQUEST": "Invalid request.",
   "ACCESS_DENIED": "Access denied.",
   "RATE_LIMITED": "Too many requests. Try again later.",
-  "denied": "Sign-in declined"
+  "denied": "Sign-in declined",
+  "ENGINE_ERROR": "Playback engine failed.",
+  "ENGINE_UNAVAILABLE": "Album Player is unavailable.",
+  "BAD_ENGINE_CONFIG": "Invalid playback engine configuration."
 }

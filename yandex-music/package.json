@@ -1,7 +1,7 @@
 {
   "name": "yandex_music",
   "category": "music_service",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Yandex Music for Volumio 4",
   "main": "index.js",
   "license": "MIT",
@@ -26,9 +26,10 @@
       "bookworm"
     ],
     "details": "Search and play your Yandex Music collection",
-    "changelog": "Initial release"
+    "changelog": "Optional Album Player transport; MPD remains the default"
   },
   "dependencies": {
+    "fast-xml-parser": "5.12.0",
     "kew": "0.7.0",
     "v-conf": "1.4.2"
   }
