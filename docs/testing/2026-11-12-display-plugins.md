@@ -63,3 +63,14 @@ placeholder `/boot/videoconfig.txt`; no display preset applied. Global ALSA conf
 queue SHA256 and native MPD hardware volume 86 match the pre-install snapshot.
 Existing Qobuz/Yandex account, API-key and settings files match their saved hashes.
 Volumio remains active; playback remains stopped.
+
+## Favicon replacement later on 2026-11-12
+
+User supplied `Minimal Hi‑Fi Audio Player Icon.png` (974154 bytes, 1536x1024).
+Trimmed excess white margins and retained the rectangular mark's proportions on
+64x64 white canvas. Optimized indexed PNG is 1094 bytes; ICO fallback is 5978
+bytes. Original download left intact. Icon URLs now use `v=20261112-hifi`.
+TypeScript/Vite build passed. Updated package and checksums. Static UI deployed
+without restarting audio, and live HTTP checks confirmed the new HTML icon URL,
+image/png response and exact 1094-byte installed file. Previous static UI retained
+on Pi as `ui-before-hifi-favicon`.
