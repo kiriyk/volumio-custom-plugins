@@ -79,8 +79,8 @@ img.music-card__extension.tagrow { display: inline; height: 18px; }
 .item__actions { padding-right: 8px; .action-btn { padding: 0 8px; cursor: pointer; }
   /* the base glyph was a 15px FontAwesome ellipsis-v, 3.2px wide: the Material dots keep that layout box and overflow it */
   .action-btn .material-symbols-rounded { display: inline-block; width: 3.2px; height: 15px; line-height: 15px; font-size: 15px; text-align: center; overflow: visible; vertical-align: top; } }
-/* the inherited theme paints the browse chrome white; children set their own ink */
-#browse { color: #fff; }
+/* Browse chrome follows the active theme; children use the same ink ladder. */
+#browse { color: var(--ink-1); }
 label.aw-search, label.aw-filter { color: var(--ink-2); }
 
 @media (max-width: 767px) {

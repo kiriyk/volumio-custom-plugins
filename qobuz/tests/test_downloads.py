@@ -1,11 +1,13 @@
 import asyncio
+import base64
+from unittest.mock import Mock
 import pathlib
 import tempfile
 import unittest
 
 from aiohttp import web
 from aiohttp.test_utils import TestServer
-from mutagen.flac import FLAC
+from mutagen.flac import FLAC, Picture
 
 from service.downloads import Downloads, safe_component
 from service.errors import ServiceError
@@ -27,6 +29,8 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
         self.release = asyncio.Event()
         self.mode = 'ok'
         self.requests = 0
+        self.album_image = None
+        self.audio_data = flac_bytes()
         async def audio(request):
             self.requests += 1
             self.started.set()
@@ -42,7 +46,7 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
                 await response.write(flac_bytes())
                 await self.release.wait()
                 return response
-            return web.Response(body=flac_bytes(), content_type='audio/flac')
+            return web.Response(body=self.audio_data, content_type='audio/flac')
         app = web.Application(); app.router.add_get('/audio', audio)
         self.server = TestServer(app); await self.server.start_server()
         self.url = str(self.server.make_url('/audio'))
@@ -51,7 +55,7 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
             async def call(self, path, params):
                 return {'id': int(params['track_id']), 'title': '../Song\x00', 'track_number': 1,
                         'performer': {'id': 1, 'name': '../Исполнитель'},
-                        'album': {'id': 'abc', 'title': 'Альбом/..', 'artist': {'id': 1, 'name': '../Исполнитель'}}}
+                        'album': {'id': 'abc', 'title': 'Альбом/..', 'image': case.album_image, 'artist': {'id': 1, 'name': '../Исполнитель'}}}
             async def resolve(self, id_, quality):
                 return {'url': case.url, 'codec': 'flac', 'sampleRate': 96000, 'bitDepth': 24}
         def policy(url):
@@ -60,6 +64,7 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
         self.manager = Downloads(Provider(), self.root, mount_check=lambda: self.mounted,
                                  upstream_policy=policy, reserve_bytes=0)
         await self.manager.start()
+        self.image_get = self.manager.cover_session.get
 
     async def asyncTearDown(self):
         self.release.set()
@@ -191,3 +196,136 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
             await self.manager.cancel(job['id'])
         self.assertEqual(self.manager.pending.qsize(), 0)
         await self.manager.cancel(first['id'])
+
+
+    async def cover_server(self, body, status=200, location=None, chunked=False):
+        self.cover_requests = []
+        async def cover_response(request):
+            self.assertNotIn('X-User-Auth-Token', request.headers)
+            self.assertNotIn('Authorization', request.headers)
+            self.assertNotIn('Cookie', request.headers)
+            if chunked:
+                response = web.StreamResponse()
+                await response.prepare(request)
+                await response.write(body)
+                await response.write_eof()
+                return response
+            return web.Response(body=body, status=status,
+                                headers={'Location': location} if location else {})
+        app = web.Application(); app.router.add_get('/cover', cover_response)
+        server = TestServer(app); await server.start_server()
+        self.addAsyncCleanup(server.close)
+        original = self.image_get
+        def redirected_get(url, **kwargs):
+            # Record every image request and route it locally; unsafe requests must never occur.
+            self.cover_requests.append((url, kwargs))
+            return original(str(server.make_url('/cover')), **kwargs)
+        self.manager.cover_session.get = Mock(side_effect=redirected_get)
+
+    @staticmethod
+    def flac_parts(data):
+        offset, streaminfo = 4, None
+        while True:
+            block = data[offset]
+            length = int.from_bytes(data[offset + 1:offset + 4], 'big')
+            contents = data[offset + 4:offset + 4 + length]
+            if block & 127 == 0:
+                streaminfo = contents
+            offset += 4 + length
+            if block & 128:
+                return streaminfo, data[offset:]
+
+    async def test_new_download_embeds_png_without_changing_audio_or_streaminfo(self):
+        png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jB1sAAAAASUVORK5CYII=')
+        await self.cover_server(png)
+        self.album_image = {'large': 'http://static.qobuz.com/cover.png'}
+        self.audio_data += b'\xff\xf8UNCHANGED_AUDIO_BYTES'
+        initial = await self.manager.enqueue('42')
+        job = await self.finished(initial['id'])
+        self.assertEqual(job['state'], 'completed')
+        path = pathlib.Path(job['path'])
+        picture, = FLAC(path).pictures
+        self.assertEqual((picture.type, picture.mime, picture.width, picture.height), (3, 'image/png', 1, 1))
+        self.assertEqual(picture.data, png)
+        self.assertEqual(self.flac_parts(path.read_bytes()), self.flac_parts(self.audio_data))
+        self.assertEqual(self.cover_requests[0][0], 'https://static.qobuz.com/cover.png')
+        self.assertFalse(self.cover_requests[0][1]['allow_redirects'])
+
+    async def test_new_download_embeds_jpeg_from_thumbnail(self):
+        jpeg = (b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00'
+                b'\xff\xc0\x00\x11\x08\x00\x02\x00\x03\x03\x01\x11\x00\x02\x11\x00\x03\x11\x00\xff\xd9')
+        await self.cover_server(jpeg)
+        self.album_image = {'thumbnail': 'https://static.qobuz.com/cover.jpg'}
+        initial = await self.manager.enqueue('42')
+        job = await self.finished(initial['id'])
+        self.assertEqual(job['state'], 'completed')
+        picture, = FLAC(job['path']).pictures
+        self.assertEqual((picture.type, picture.mime), (3, 'image/jpeg'))
+        self.assertEqual((picture.width, picture.height), (3, 2))
+        self.assertEqual(picture.data, jpeg)
+
+    async def test_offhost_credentials_and_non_https_image_urls_never_fetch(self):
+        await self.cover_server(b'not an image')
+        urls = ['https://other.test/cover.jpg', 'https://static.qobuz.com.other.test/a',
+                'https://user:password@static.qobuz.com/a', 'https://static.qobuz.com:444/a',
+                'http://other.test/a', 'file:///etc/passwd']
+        for index, url in enumerate(urls):
+            self.album_image = {'large': url}
+            job = await self.finished((await self.manager.enqueue(str(100 + index)))['id'])
+            self.assertEqual(job['state'], 'completed', url)
+            self.assertEqual(FLAC(job['path']).pictures, [])
+        self.assertEqual(self.cover_requests, [])
+
+    async def test_invalid_oversized_and_error_images_keep_valid_audio_and_tags(self):
+        for index, (body, status) in enumerate([(b'<html>bad</html>', 200), (bytes(2 * 1024**2 + 1), 200), (b'no', 404)]):
+            await self.cover_server(body, status)
+            self.album_image = {'small': 'https://static.qobuz.com/cover.jpg'}
+            job = await self.finished((await self.manager.enqueue(str(100 + index)))['id'])
+            self.assertEqual(job['state'], 'completed')
+            audio = FLAC(job['path'])
+            self.assertEqual(audio.pictures, [])
+            self.assertEqual(audio['album'], ['Альбом/..'])
+
+    async def test_untrusted_cover_redirect_is_not_followed(self):
+        await self.cover_server(b'', 302, 'https://evil.test/secret')
+        self.album_image = {'large': 'https://static.qobuz.com/cover.jpg'}
+        job = await self.finished((await self.manager.enqueue('42'))['id'])
+        self.assertEqual(job['state'], 'completed')
+        self.assertEqual(len(self.cover_requests), 1)
+        self.assertEqual(FLAC(job['path']).pictures, [])
+
+    async def test_existing_front_cover_and_completed_file_are_unchanged(self):
+        source = pathlib.Path(self.tmp.name) / 'source.flac'; source.write_bytes(flac_bytes())
+        audio = FLAC(source)
+        picture = Picture(); picture.type = 3; picture.mime = 'image/png'; picture.data = b'existing-image'
+        audio.add_picture(picture); audio.save()
+        self.audio_data = source.read_bytes()
+        await self.cover_server(b'not needed')
+        self.album_image = {'large': 'https://static.qobuz.com/cover.jpg'}
+        first = await self.finished((await self.manager.enqueue('42'))['id'])
+        self.assertEqual(first['state'], 'completed')
+        path = pathlib.Path(first['path'])
+        self.assertEqual([p.data for p in FLAC(path).pictures], [b'existing-image'])
+        before = path.read_bytes()
+        self.manager.jobs.clear()
+        second = await self.finished((await self.manager.enqueue('42'))['id'])
+        self.assertEqual(second['state'], 'completed')
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(self.cover_requests, [])
+
+
+    async def test_chunked_oversized_image_is_skipped_without_affecting_flac(self):
+        await self.cover_server(bytes(2 * 1024**2 + 1), chunked=True)
+        self.album_image = {'large': 'https://static.qobuz.com/cover.png'}
+        job = await self.finished((await self.manager.enqueue('42'))['id'])
+        self.assertEqual(job['state'], 'completed')
+        self.assertEqual(FLAC(job['path']).pictures, [])
+
+    async def test_artwork_timeout_keeps_audio(self):
+        async def timeout(*args, **kwargs):
+            raise asyncio.TimeoutError()
+        self.manager.cover_session.get = Mock(side_effect=timeout)
+        self.album_image = {'large': 'https://static.qobuz.com/cover.png'}
+        job = await self.finished((await self.manager.enqueue('42'))['id'])
+        self.assertEqual(job['state'], 'completed')
+        self.assertEqual(FLAC(job['path']).pictures, [])

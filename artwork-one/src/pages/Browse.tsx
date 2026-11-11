@@ -1,4 +1,5 @@
 import QobuzDownloads from '../components/browse/QobuzDownloads';
+import { showDownloads, showTrackColumns } from '../core/browsePresentation';
 /**
  * The library page: the landing (with its search), the plain lists (artists, albums, genres,
  * folders, playlists, radio…) with breadcrumb, filter, view toggle, sort and alphabet rail, the
@@ -57,12 +58,8 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
   const artistsPage = uri === 'artists://';
   const lists = b.lists || [];
   const count = (() => { try { return lists[0].items.length; } catch { return 0; } })();
-  // a plain list (Last 100, Favourites, a genre/folder's tracks, search results…) still renders
-  // its rows through MusicRow like an album or playlist, but only actually IS a track listing
-  // when its rows are songs — the same component (and #browse.browsing-list class) also carries
-  // albums/artists/playlists shown as rows instead of cards, which have no "album" field of their
-  // own to put in a column, so the number+album-column treatment only turns on for real tracks
-  const isTrackList = isPlaylist || ((isPlainList || isLandingSearch) && lists[0] && lists[0].items && lists[0].items[0] && lists[0].items[0].type === 'song');
+  const isDownloads = b.isBrowsing && !b.isSearching && showDownloads(uri);
+  const isTrackList = (isPlaylist || isPlainList) && showTrackColumns(lists, { searching: b.isSearching, artist: isArtist, downloads: isDownloads, grid: lists.some(list => b.gridFor(list)) });
 
   // the search page: Volumio's own search box in the head
   // Backspace outside a text field goes back one level, as the frame's browse controllers did
@@ -235,9 +232,9 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
             {isPlainList && artistsPage && !b.showGridView ? <div className="aw-cols aw-cols--artists mono" aria-hidden="true"><span>#</span><span /><span>ARTIST</span><span /></div> : null}
             {isTrackList ? <div className="aw-cols mono aw-cols--fav" aria-hidden="true"><span>#</span><span /><span className="aw-cols__info"><span>TITLE</span><span>ALBUM</span></span><span className="aw-cols__duration">DURATION</span><span /><span /></div> : null}
 
-            <QobuzDownloads enabled={b.sources.some(s=>s.uri==='qobuz_custom')} force={uri==='qobuz_custom/downloads'} />
+            {isDownloads ? <QobuzDownloads /> : null}
             <div id="browse-page">
-              {(b.isBrowsing || b.isSearching) && b.lists && uri !== 'qobuz_custom/downloads' ? (isLandingSearch
+              {(b.isBrowsing || b.isSearching) && b.lists && !isDownloads ? (isLandingSearch
                 ? <SearchResults lists={listsShown} filter="" sortDesc={sortDesc} isArtist={false} artistsPage={false} serviceSearch={false} activeMenu={activeMenu} onMenuOpen={onMenuOpen} />
                 : <BrowseLists lists={listsShown} filter={filter} sortDesc={sortDesc} isArtist={isArtist} artistsPage={artistsPage} serviceSearch={!localFilter} activeMenu={activeMenu} onMenuOpen={onMenuOpen} />) : null}
             </div>

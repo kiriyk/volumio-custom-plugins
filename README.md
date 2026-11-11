@@ -57,7 +57,7 @@ bash /tmp/install.sh --from /tmp/artwork-one.tar.gz --activate
 входят. Доступность FLAC зависит от аккаунта и конкретного трека; API Яндекса
 неофициальный и может измениться.
 
-Для Qobuz аналогично перенести `packages/qobuz_custom-0.2.0.tar.gz`, распаковать
+Для Qobuz аналогично перенести `packages/qobuz_custom-0.2.1.tar.gz`, распаковать
 и выполнить `volumio plugin install` в каталоге `qobuz_custom`, затем включить
 **Qobuz Custom** и пройти вход в его настройках. Обновление: `node scripts/update.js .`;
 полное удаление стирает сессию. Подробности и ограничения — в [README плагина](qobuz/README.md).

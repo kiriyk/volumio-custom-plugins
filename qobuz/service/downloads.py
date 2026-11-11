@@ -6,10 +6,10 @@ import shutil
 import unicodedata
 from collections import OrderedDict
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import aiohttp
-from mutagen.flac import FLAC
+from mutagen.flac import FLAC, Picture
 
 from .errors import ServiceError
 from .provider import artist, identifier
@@ -18,6 +18,7 @@ from .streaming import validate_upstream
 
 DEFAULT_ROOT = '/media/External_HD/qobuz'
 TERMINAL = ('completed', 'cancelled', 'error')
+COVER_LIMIT = 2 * 1024**2
 
 
 def safe_component(value):
@@ -27,6 +28,53 @@ def safe_component(value):
     while len(value.encode('utf-8')) > 160:
         value = value[:-1]
     return value.strip(' .') or 'Unknown'
+
+
+def _cover_url(value):
+    """Only the public Qobuz artwork host may receive anonymous image requests."""
+    parsed = urlsplit(value)
+    if (parsed.hostname != 'static.qobuz.com' or parsed.username is not None
+            or parsed.password is not None):
+        raise ValueError('Untrusted artwork')
+    if parsed.scheme == 'http' and parsed.port in (None, 80):
+        return urlunsplit(('https', 'static.qobuz.com', parsed.path, parsed.query, ''))
+    if parsed.scheme != 'https' or parsed.port not in (None, 443):
+        raise ValueError('Untrusted artwork')
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, ''))
+
+
+def _picture(data):
+    picture = Picture()
+    picture.type, picture.desc, picture.data = 3, 'Front cover', data
+    if data.startswith(b'\x89PNG\r\n\x1a\n') and len(data) >= 33 and data[12:16] == b'IHDR':
+        picture.mime = 'image/png'
+        picture.width = int.from_bytes(data[16:20], 'big')
+        picture.height = int.from_bytes(data[20:24], 'big')
+        picture.depth = data[24] * {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}.get(data[25], 1)
+    elif data.startswith(b'\xff\xd8\xff') and data.endswith(b'\xff\xd9'):
+        picture.mime = 'image/jpeg'
+        offset = 2
+        while offset + 4 <= len(data):
+            if data[offset] != 255:
+                break
+            marker = data[offset + 1]
+            if marker in (0xD9, 0xDA):
+                break
+            if marker in (0x01, 0xD8) or 0xD0 <= marker <= 0xD7:
+                offset += 2
+                continue
+            length = int.from_bytes(data[offset + 2:offset + 4], 'big')
+            if length < 2 or offset + 2 + length > len(data):
+                break
+            if marker in (0xC0, 0xC1, 0xC2) and length >= 8:
+                picture.height = int.from_bytes(data[offset + 5:offset + 7], 'big')
+                picture.width = int.from_bytes(data[offset + 7:offset + 9], 'big')
+                picture.depth = data[offset + 4] * data[offset + 9]
+                break
+            offset += 2 + length
+    else:
+        return None
+    return picture
 
 
 class Downloads:
@@ -41,7 +89,7 @@ class Downloads:
         self.max_bytes, self.reserve_bytes = max_bytes, reserve_bytes
         self.jobs = OrderedDict()
         self.pending = asyncio.Queue(maxsize=queue_limit)
-        self.session = self.worker = self.active = None
+        self.session = self.cover_session = self.worker = self.active = None
         self.active_id = None
         self.closing = False
 
@@ -49,6 +97,9 @@ class Downloads:
         self.session = aiohttp.ClientSession(auto_decompress=False,
             connector=aiohttp.TCPConnector(limit=1),
             timeout=aiohttp.ClientTimeout(total=None, connect=15, sock_read=30))
+        self.cover_session = aiohttp.ClientSession(auto_decompress=False,
+            cookie_jar=aiohttp.DummyCookieJar(), connector=aiohttp.TCPConnector(limit=1),
+            timeout=aiohttp.ClientTimeout(total=10))
         self.worker = asyncio.create_task(self._worker())
 
     def _mounted(self):
@@ -163,6 +214,39 @@ class Downloads:
             url = next_url
         raise ServiceError('UNAVAILABLE', 'Audio redirect failed', 502)
 
+    async def _cover(self, album):
+        image = album.get('image') or {}
+        if not isinstance(image, dict):
+            return None
+        url = image.get('large') or image.get('thumbnail') or image.get('small')
+        if not isinstance(url, str) or not url:
+            return None
+        try:
+            async with asyncio.timeout(10):
+                for _ in range(4):
+                    url = _cover_url(url)
+                    response = await self.cover_session.get(url, allow_redirects=False)
+                    try:
+                        if response.status in (301, 302, 303, 307, 308):
+                            url = urljoin(url, response.headers.get('Location', ''))
+                            continue
+                        if (response.status != 200
+                                or response.headers.get('Content-Encoding', 'identity') != 'identity'
+                                or response.content_length is not None and response.content_length > COVER_LIMIT):
+                            return None
+                        data = bytearray()
+                        async for chunk in response.content.iter_chunked(65536):
+                            if len(data) + len(chunk) > COVER_LIMIT:
+                                return None
+                            data.extend(chunk)
+                        return _picture(bytes(data))
+                    finally:
+                        response.close()
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError):
+            # Artwork is optional. Never expose provider URLs or transfer exceptions.
+            return None
+        return None
+
     def _complete(self, job, path):
         self._safe_path(path)
         audio = FLAC(path)
@@ -223,6 +307,17 @@ class Downloads:
                                'discnumber': data.get('media_number'), 'qobuz_track_id': job['track_id']}.items():
                 if value is not None and value != '':
                     audio[key] = [str(value)]
+            if not any(picture.type == 3 for picture in audio.pictures):
+                picture = await self._cover(album)
+                if picture is not None:
+                    try:
+                        self._space(len(picture.data) + 65536)
+                    except ServiceError as error:
+                        if error.code != 'DISK_FULL':
+                            raise
+                    else:
+                        audio.add_picture(picture)
+            self._safe_path(partial)
             self._mounted()
             audio.save()
             self._safe_path(final)
@@ -276,3 +371,5 @@ class Downloads:
                 pass
         if self.session:
             await self.session.close()
+        if self.cover_session:
+            await self.cover_session.close()

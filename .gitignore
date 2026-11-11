@@ -5,3 +5,12 @@ __pycache__/
 node_modules
 .venv/
 qobuz/dist/
+
+# Private player/account state must never enter source or release archives.
+credentials.json
+api-key
+.env
+.env.local
+.env.*.local
+.playwright-cli/
+qobuz-research/

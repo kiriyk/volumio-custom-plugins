@@ -1,13 +1,15 @@
 body#artwork .aw-search-tools { display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-width: min(520px, 45vw); }
 body#artwork .aw-search-sources { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; }
-body#artwork .aw-search-sources button { border: 1px solid var(--line, #7775); border-radius: 999px; padding: 7px 12px; color: inherit; background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
-body#artwork .aw-search-sources button.active { background: var(--accent, #b9df7b); color: #151815; border-color: transparent; }
+body#artwork .aw-search-sources button { border: 1px solid var(--hairline); border-radius: 999px; padding: 7px 12px; color: var(--ink-2); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+body#artwork .aw-search-sources button.active { background: var(--ink-1); color: var(--on-ink); border-color: transparent; }
 body#artwork .dedicated-search { display: flex; flex-direction: column; width: 100%; align-items: stretch; }
 @media (max-width: 700px) { body#artwork .aw-search-tools { min-width: 0; width: 100%; } }
 
-body#artwork .aw-downloads { margin:18px 24px; padding:18px; border:1px solid #8884; border-radius:14px; }
+body#artwork .aw-downloads { margin:18px 24px; padding:18px; color:var(--ink-1); background:var(--glass-1-fill); border:1px solid var(--hairline); border-radius:14px; }
 body#artwork .aw-downloads h2 { margin:0 0 12px; font-size:16px; }
 body#artwork .aw-download { display:flex; align-items:center; gap:12px; padding:10px 0; }
-body#artwork .aw-download__info { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; font-size:12px; }
-body#artwork .aw-download__info strong { font-size:14px; overflow-wrap:anywhere; }
+body#artwork .aw-download__info { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; font-size:12px; color:var(--ink-muted); }
+body#artwork .aw-download__info strong { color:var(--ink-1); font-size:14px; overflow-wrap:anywhere; }
 body#artwork .aw-download__info progress { width:100%; height:5px; }
+
+body#artwork .aw-download__info [role="alert"] { color:var(--err); }
