@@ -2,6 +2,7 @@
 import asyncio
 import base64
 import hashlib
+import math
 import re
 import time
 from urllib.parse import urlencode
@@ -50,6 +51,17 @@ def artist_links(item):
     return []
 
 
+def recording_quality(item):
+    try:
+        depth = int(item.get('maximum_bit_depth') or 0)
+        rate = float(item.get('maximum_sampling_rate') or 0)
+        if depth not in (16, 24, 32) or not math.isfinite(rate) or not 8 <= rate <= 768:
+            return None
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return {'codec': 'flac', 'bitDepth': depth, 'sampleRate': round(rate * 1000), 'basis': 'catalog'}
+
+
 def map_artist(item):
     return {'type': 'artist', 'id': str(item['id']), 'title': item.get('name', ''),
             'cover_url': cover(item)}
@@ -57,7 +69,8 @@ def map_artist(item):
 
 def map_album(item):
     return {'type': 'album', 'id': str(item['id']), 'title': item.get('title', ''),
-            'artists': [artist(item)], 'artist_links': artist_links(item), 'cover_url': cover(item)}
+            'artists': [artist(item)], 'artist_links': artist_links(item), 'cover_url': cover(item),
+            'recording_quality': recording_quality(item)}
 
 
 def map_track(item, album=None):
@@ -67,6 +80,7 @@ def map_track(item, album=None):
             'artist_links': artist_links(item) if artist(item) else artist_links(album),
             'album': album.get('title', ''), 'album_id': str(album.get('id') or ''),
             'cover_url': cover(album), 'duration_ms': int(item.get('duration') or 0) * 1000,
+            'recording_quality': recording_quality(item),
             'available': bool(item.get('streamable', False))}
 
 

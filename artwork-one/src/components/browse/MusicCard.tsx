@@ -8,6 +8,8 @@ import * as A from '../../core/browseActions';
 import { countText, useArtistCounts } from '../../core/artistCounts';
 import { useLocalFileInfo } from '../../core/store/localFileInfo';
 import { formatLocalQuality } from '../../core/localQuality';
+import { artistCountLabel, formatRecordingQuality } from '../../core/recordingQuality';
+import { useRecordingQuality } from '../../core/store/recordingQuality';
 
 export interface CardProps { item: BrowseItem; list: BrowseItem[]; listIndex: number; itemIndex: number; hidden?: boolean; order?: number; artistCounts?: boolean; onMenuOpen?: (open: boolean) => void }
 
@@ -15,11 +17,14 @@ export default function MusicCard({ item, list, listIndex, itemIndex, hidden, or
   const [menuOpen, setMenuOpen] = useState(false);   // the tile is raised over its later siblings while its menu is open
   const req = useBrowse(s => s.request);
   const ref = useRef<HTMLDivElement>(null);
+  const recording = useRecordingQuality(item, ref);
+  const recordingLabel = formatRecordingQuality(recording);
   const localInfo = useLocalFileInfo(item.uri, item.service === 'mpd' && item.type === 'song', ref);
   const localQuality = localInfo ? formatLocalQuality({ size: localInfo.size ?? null, bitrate: localInfo.bitrate ?? null }) : '';
-  const [countMeta, setCountMeta] = useState('');
+  const [countEntry, setCountMeta] = useState({uri:'',text:''});
+  const countMeta = artistCountLabel(item, !!artistCounts, countEntry);
   // the Artists grid: "7 albums" under the name, asked for as the tile comes into view
-  useArtistCounts(ref, item.uri, !!artistCounts && !item.meta, c => setCountMeta(countText(c)));
+  useArtistCounts(ref, item.uri, !!artistCounts && !item.meta && item.type === 'folder', c => setCountMeta({uri:item.uri,text:countText(c)}));
   const favVisible = A.showPlayButton(item) && (item.type === 'song' || item.type === 'folder-with-favourites') && (req ? req.uri : '') !== 'favourites';
   const noMenu = !A.showHamburgerMenu(item);
   return (
@@ -47,6 +52,7 @@ export default function MusicCard({ item, list, listIndex, itemIndex, hidden, or
         </div>
         {/* an album's year after its artist, when the source says it (the library, Tidal) */}
         <p className="music-card__meta">{[item.meta || countMeta || [item.artist, item.year].filter(Boolean).join(' · '), localQuality].filter(Boolean).join(' · ')}</p>
+        {recordingLabel ? <p className="music-card__recording-quality mono" title={recording?.basis === 'catalog' ? 'Качество записи по каталогу; качество текущего потока показано в плеере' : 'Доступный формат записи; качество текущего потока показано в плеере'}>{recordingLabel}</p> : null}
       </div>
     </div>
   );

@@ -34,6 +34,16 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ServiceError):
             callback_code({})
 
+    def test_catalog_quality_uses_track_values_and_never_invents_album_maximum(self):
+        album = {'id': 'a', 'maximum_bit_depth': 24, 'maximum_sampling_rate': 192}
+        track = {'id': 1, 'maximum_bit_depth': 16, 'maximum_sampling_rate': 44.1}
+        self.assertEqual(map_track(track, album)['recording_quality'],
+            {'codec': 'flac', 'bitDepth': 16, 'sampleRate': 44100, 'basis': 'catalog'})
+        self.assertIsNone(map_track({'id': 2}, album)['recording_quality'])
+        self.assertIsNone(map_track({'id': 3, 'maximum_bit_depth': 'bad',
+                                    'maximum_sampling_rate': -1})['recording_quality'])
+        self.assertEqual(map_album(album)['recording_quality']['sampleRate'], 192000)
+
     def test_private_atomic_storage(self):
         self.assertEqual(self.store.path.stat().st_mode & 0o777, 0o600)
         self.store.save({'access_token': 'replacement'})

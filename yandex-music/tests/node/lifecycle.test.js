@@ -17,6 +17,20 @@ function environment() {
   return { controller: new Controller({ coreCommand: router, logger: { error: () => {} } }, { api, service }), events };
 }
 
+test('recording quality validates track URI and never broadcasts provider URLs', async () => {
+  const { controller } = environment();
+  const pushed = [], calls = [];
+  controller.router.broadcastMessage = (event, data) => pushed.push({ event, data });
+  controller.api = { request: async (method, path) => {
+    calls.push([method,path]);
+    return { recording_quality:{codec:'flac',basis:'available',url:'https://private.test/?token=hidden'} };
+  } };
+  await controller.getRecordingQuality({uri:'yandex_music/track/12%3A34'});
+  await controller.getRecordingQuality({uri:'mnt/USB/test.flac'});
+  assert.deepEqual(calls, [['GET','/v1/tracks/12%3A34/quality']]);
+  assert.deepEqual(pushed, [{event:'pushRecordingQuality',data:{uri:'yandex_music/track/12%3A34',recordingQuality:{codec:'flac',basis:'available'}}}]);
+});
+
 test('signed-out source starts after service readiness and stop removes only itself', async () => {
   const env = environment();
   await env.controller.onStart();

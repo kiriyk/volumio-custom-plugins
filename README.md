@@ -38,7 +38,7 @@ bash scripts/deploy.sh volumio@volumio.local
 Из каталога клонированного репозитория на компьютере:
 
 ```bash
-scp packages/yandex_music-0.2.1.tar.gz packages/artwork-one.tar.gz artwork-one/scripts/install.sh volumio@volumio.local:/tmp/
+scp packages/yandex_music-0.2.2.tar.gz packages/artwork-one.tar.gz artwork-one/scripts/install.sh volumio@volumio.local:/tmp/
 ssh volumio@volumio.local
 ```
 
@@ -46,7 +46,7 @@ ssh volumio@volumio.local
 
 ```bash
 mkdir -p /tmp/yandex-music-install
-tar -xzf /tmp/yandex_music-0.2.1.tar.gz -C /tmp/yandex-music-install
+tar -xzf /tmp/yandex_music-0.2.2.tar.gz -C /tmp/yandex-music-install
 cd /tmp/yandex-music-install/yandex_music
 volumio plugin install
 bash /tmp/install.sh --from /tmp/artwork-one.tar.gz --activate
@@ -57,7 +57,7 @@ bash /tmp/install.sh --from /tmp/artwork-one.tar.gz --activate
 входят. Доступность FLAC зависит от аккаунта и конкретного трека; API Яндекса
 неофициальный и может измениться.
 
-Для Qobuz аналогично перенести `packages/qobuz_custom-0.2.1.tar.gz`, распаковать
+Для Qobuz аналогично перенести `packages/qobuz_custom-0.2.2.tar.gz`, распаковать
 и выполнить `volumio plugin install` в каталоге `qobuz_custom`, затем включить
 **Qobuz Custom** и пройти вход в его настройках. Обновление: `node scripts/update.js .`;
 полное удаление стирает сессию. Подробности и ограничения — в [README плагина](qobuz/README.md).

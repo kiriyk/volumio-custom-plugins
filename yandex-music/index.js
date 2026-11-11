@@ -143,6 +143,23 @@ class ControllerYandexMusic {
       this.router.broadcastMessage('pushLocalFileInfo', info || { uri });
     })());
   }
+  getRecordingQuality(data) {
+    return kew((async () => {
+      const uri = typeof data?.uri === 'string' ? data.uri : '';
+      const match = /^yandex_music\/track\/(\d{1,24}(?:(?:%3A|:)\d{1,24})?)$/i.exec(uri);
+      if (!match) return;
+      let recordingQuality = null;
+      try {
+        const result = await this.client().request('GET', `/v1/tracks/${encodeURIComponent(decodeURIComponent(match[1]))}/quality`);
+        const q = result?.recording_quality;
+        if (q?.basis === 'available' && ['flac', 'mp3'].includes(q.codec)) {
+          recordingQuality = { codec: q.codec, basis: 'available',
+            ...(q.codec === 'mp3' && Number.isFinite(q.bitrate) && q.bitrate > 0 && q.bitrate <= 320 ? { bitrate: q.bitrate } : {}) };
+        }
+      } catch { /* Optional metadata must not interrupt browsing or expose errors. */ }
+      this.router.broadcastMessage('pushRecordingQuality', { uri, recordingQuality });
+    })());
+  }
   explodeUri(uri) { return kew(this.browse ? this.browse.explode(uri) : Promise.reject(new Error('SERVICE_UNAVAILABLE'))); }
   clearAddPlayTrack(track) { return kew(this.playback?.clearAddPlayTrack(track)); }
   pause() { return kew(this.playback?.pause()); }

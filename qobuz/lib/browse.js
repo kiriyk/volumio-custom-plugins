@@ -6,6 +6,7 @@ function track(item) {
     albumart: item.cover_url || '/albumart', duration: (item.duration_ms || 0) / 1000,
     artistLinks: (item.artist_links || []).map(a => ({name:a.name,uri:`qobuz_custom/artist/${enc(a.id)}`})),
     albumUri: item.album_id ? `qobuz_custom/album/${enc(item.album_id)}` : undefined,
+    recordingQuality: item.recording_quality || undefined,
     trackType: 'flac', available: item.available !== false };
 }
 function item(value) {
@@ -15,6 +16,7 @@ function item(value) {
     artist: (value.artists || []).join(', '), albumart: value.cover_url || undefined,
     icon: value.cover_url ? undefined : value.type === 'artist' ? 'fa-user' : 'fa-music',
     disablePlayButton: value.type === 'artist',
+    recordingQuality: value.recording_quality || undefined,
     artistLinks: (value.artist_links || []).map(a => ({ name:a.name,uri:`qobuz_custom/artist/${enc(a.id)}`})) };
 }
 class Browse {

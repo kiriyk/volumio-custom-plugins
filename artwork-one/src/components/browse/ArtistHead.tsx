@@ -13,6 +13,7 @@ import { useCrumbs, goCrumb } from './AlbumHead';
 import { albumart } from '../../core/api';
 import { useBrowse, type BrowseItem, type BrowseList } from '../../core/store/browse';
 import * as A from '../../core/browseActions';
+import { formatRecordingQuality } from '../../core/recordingQuality';
 
 export const norm = (s: any) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -126,6 +127,7 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
                       <button type="button" className="aw-artist-album__play" onClick={(e) => { e.stopPropagation(); A.playRendered(a.item, list, a.itemIndex); }} aria-label="Play"><Icon name="play_arrow" /></button>
                     </div>
                     <div className="aw-artist-album__title">{a.item.title}</div>
+                    {a.item.recordingQuality ? <div className="music-card__recording-quality mono" title="Максимальное качество альбома по каталогу; отдельные треки могут отличаться">{formatRecordingQuality(a.item.recordingQuality)}</div> : null}
                     {a.year || a.tracks ? <div className="aw-artist-album__sub mono">{a.year ? <span>{a.year}</span> : null}{a.year && a.tracks ? <span> · </span> : null}{a.tracks ? <span>{a.tracks} tracks</span> : null}</div> : null}
                   </div>
                 );

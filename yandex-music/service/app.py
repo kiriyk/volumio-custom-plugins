@@ -133,6 +133,9 @@ def create_app(backend=YandexBackend, state_dir=None, api_key=None, upstream_pol
             raise ServiceError('BAD_REQUEST', 'Invalid quality', 400)
         return web.json_response(await streaming.resolve(id_, quality))
 
+    async def track_quality(request):
+        return web.json_response({'recording_quality': await auth.call('track_quality', request.match_info['id'])})
+
     app.router.add_get('/health', health)
     app.router.add_get('/v1/account', account)
     app.router.add_post('/v1/auth/{action}', auth_action)
@@ -145,6 +148,7 @@ def create_app(backend=YandexBackend, state_dir=None, api_key=None, upstream_pol
     app.router.add_get('/v1/artists/{id}/tracks', catalog, name='artist_tracks')
     app.router.add_get('/v1/artists/{id}/albums', catalog, name='artist_albums')
     app.router.add_get('/v1/tracks/{id}', catalog, name='track')
+    app.router.add_get('/v1/tracks/{id}/quality', track_quality)
     app.router.add_post('/v1/playback/resolve', resolve)
     app.router.add_get('/stream/{ticket}', streaming.handle)
     return app

@@ -12,6 +12,8 @@ import { useBrowserLoading } from '../../core/localPlayback';
 import Spinner from '../Spinner';
 import { useLocalFileInfo } from '../../core/store/localFileInfo';
 import { formatLocalQuality } from '../../core/localQuality';
+import { artistCountLabel, formatRecordingQuality } from '../../core/recordingQuality';
+import { useRecordingQuality } from '../../core/store/recordingQuality';
 
 export interface RowProps { item: BrowseItem; list: BrowseItem[]; listIndex: number; itemIndex: number; hidden?: boolean; order?: number; playing?: boolean; paused?: boolean; fav?: boolean; active?: boolean; onMenuOpen?: (open: boolean) => void }
 
@@ -28,12 +30,15 @@ export default function MusicRow({ item, list, listIndex, itemIndex, hidden, ord
   const req = useBrowse(s => s.request);
   const artistsPage = (req ? req.uri : '') === 'artists://';
   const rowRef = useRef<HTMLDivElement>(null);
+  const recording = useRecordingQuality(item, rowRef);
+  const recordingLabel = formatRecordingQuality(recording);
   const localInfo = useLocalFileInfo(item.uri, item.service === 'mpd' && item.type === 'song', rowRef);
   const localQuality = localInfo ? formatLocalQuality({ size: localInfo.size ?? null, bitrate: localInfo.bitrate ?? null }) : '';
   const browserLoading = useBrowserLoading() && !!playing && !paused;
-  const [counts, setCounts] = useState('');
+  const [countEntry, setCounts] = useState({uri:'',text:''});
+  const counts = artistCountLabel(item, artistsPage, countEntry);
   // the Artists list: "7 albums · 64 tracks" under the name, asked for as the row comes into view
-  useArtistCounts(rowRef, item.uri, artistsPage, c => setCounts(countsText(c)));
+  useArtistCounts(rowRef, item.uri, artistsPage && item.type === 'folder', c => setCounts({uri:item.uri,text:countsText(c)}));
   const favVisible = A.showPlayButton(item) && (item.type === 'song' || item.type === 'folder-with-favourites') && (req ? req.uri : '') !== 'favourites';
   const noMenu = !A.showHamburgerMenu(item);
   // a folder of the file browser (USB, NAS, internal storage) is opened, never played from its row:
@@ -59,7 +64,7 @@ export default function MusicRow({ item, list, listIndex, itemIndex, hidden, ord
           <div className={'item__albumart-icon' + (!item.icon ? ' hidden' : '')}><Icon name={A.faIcon(item.icon)} /></div>
         </div>
         <div className="item__info">
-          <div className={'item__title truncate-text ' + titleCls} title={item.title || ''}>{item.title || ''} {item.tagImage ? <img className="music-card__extension tagrow" src={albumart(item.tagImage)} alt="" /> : null}</div>
+          <div className={'item__title truncate-text ' + titleCls} title={item.title || ''}><span className="item__name">{item.title || ''} {item.tagImage ? <img className="music-card__extension tagrow" src={albumart(item.tagImage)} alt="" /> : null}</span>{recordingLabel ? <span className="item__recording-quality mono" title={recording?.basis === 'catalog' ? 'Качество записи по каталогу; качество текущего потока показано в плеере' : 'Доступный формат записи; качество текущего потока показано в плеере'}>{recordingLabel}</span> : null}</div>
           {item.album ? <div className="item__album truncate-text" title={item.album}>{item.album}</div> : null}
           {item.album && item.artist ? <div className="item__info__separator">•</div> : null}
           {item.artist ? <div className="item__artist truncate-text" title={item.artist}>{item.artist}</div> : null}

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 from collections import OrderedDict
 
@@ -44,6 +45,8 @@ class YandexBackend:
     def __init__(self, token=None, client=None):
         self.token, self.client, self.session = token, client, None
         self.cache = OrderedDict()
+        self.quality_cache = OrderedDict()
+        self.quality_lock = asyncio.Lock()
 
     async def _client(self):
         if self.client is None:
@@ -210,6 +213,32 @@ class YandexBackend:
     async def artist_albums(self, id_, cursor=None, limit=50):
         return await self._artist_page(id_, cursor, limit, 'album')
 
+    async def track_quality(self, id_):
+        if not isinstance(id_, str) or not re.fullmatch(r'\d{1,24}(?::\d{1,24})?', id_):
+            raise ServiceError('BAD_REQUEST', 'Invalid track ID', 400)
+        # Separate from playback: no stream tickets, media requests or direct-link calls.
+        async with self.quality_lock:
+            entry = self.quality_cache.get(id_)
+            if entry and entry[0] > time.monotonic():
+                self.quality_cache.move_to_end(id_)
+                return entry[1]
+            client = await self._client()
+            info = value(await client.tracks_file_info(id_, quality='lossless', transport='raw'), 'download_info')
+            if (value(info, 'codec') in ('flac', 'flac-mp4')
+                    and value(info, 'transport') == 'raw' and value(info, 'url')):
+                result = {'codec': 'flac', 'basis': 'available'}
+            else:
+                variants = await client.tracks_download_info(id_)
+                rates = [value(v, 'bitrate_in_kbps', 0) for v in variants or []
+                         if value(v, 'codec') == 'mp3' and not value(v, 'preview', False)]
+                rates = [r for r in rates if isinstance(r, (int, float)) and 0 < r <= 320]
+                result = {'codec': 'mp3', 'bitrate': max(rates), 'basis': 'available'} if rates else None
+            self.quality_cache[id_] = (time.monotonic() + 3600, result)
+            self.quality_cache.move_to_end(id_)
+            while len(self.quality_cache) > 512:
+                self.quality_cache.popitem(last=False)
+            return result
+
     async def resolve(self, id_, quality='auto'):
         client = await self._client()
         if quality not in ('auto', 'lossless', 'mp3'):
@@ -235,3 +264,4 @@ class YandexBackend:
         if self.session:
             await self.session.close()
         self.cache.clear()
+        self.quality_cache.clear()

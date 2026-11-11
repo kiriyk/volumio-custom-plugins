@@ -6,6 +6,36 @@ from service.backend import YandexBackend
 from service.errors import ServiceError
 
 
+@pytest.mark.asyncio
+async def test_recording_quality_is_cached_metadata_without_stream_url():
+    class QualityClient(Client):
+        calls = 0
+        async def tracks_file_info(self, id_, **kwargs):
+            self.calls += 1
+            return Obj(download_info=Obj(codec='flac-mp4', transport='raw',
+                                         url='https://example.test/private', bitrate=0))
+    client = QualityClient()
+    backend = YandexBackend('token', client=client)
+    result = await backend.track_quality('1')
+    assert result == {'codec': 'flac', 'basis': 'available'}
+    assert await backend.track_quality('1') == result
+    assert client.calls == 1
+    with pytest.raises(ServiceError):
+        await backend.track_quality('../bad')
+
+
+@pytest.mark.asyncio
+async def test_recording_quality_mp3_uses_nonpreview_variants_without_getting_links():
+    class QualityClient(Client):
+        async def tracks_file_info(self, id_, **kwargs):
+            return Obj(download_info=Obj(codec='aac', transport='raw'))
+        async def tracks_download_info(self, id_):
+            return [Obj(codec='mp3', preview=True, bitrate_in_kbps=320),
+                    Obj(codec='mp3', preview=False, bitrate_in_kbps=192)]
+    assert await YandexBackend('token', client=QualityClient()).track_quality('1') == {
+        'codec': 'mp3', 'bitrate': 192, 'basis': 'available'}
+
+
 def track(id_, available=True):
     return Obj(id=id_, title=f'Track {id_}', available=available, albums=[], artists=[])
 

@@ -13,3 +13,9 @@ body#artwork .aw-download__info strong { color:var(--ink-1); font-size:14px; ove
 body#artwork .aw-download__info progress { width:100%; height:5px; }
 
 body#artwork .aw-download__info [role="alert"] { color:var(--err); }
+
+body#artwork .item__recording-quality,
+body#artwork .music-card__recording-quality { color:var(--ink-2); font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
+body#artwork .item__name { display:block; overflow:hidden; text-overflow:ellipsis; }
+body#artwork .item__recording-quality { display:block; font-weight:400; white-space:normal; }
+body#artwork .music-card__recording-quality { margin:4px 0 0; }

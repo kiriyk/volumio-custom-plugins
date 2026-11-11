@@ -17,6 +17,9 @@ class FakeBackend:
     async def search(self, text, kind, cursor=None, limit=50):
         return {'items': [{'type': kind, 'id': '42', 'title': text}], 'next_cursor': None}
 
+    async def track_quality(self, id_):
+        return {'codec': 'flac', 'basis': 'available'}
+
     async def close(self):
         pass
 
@@ -46,6 +49,8 @@ async def test_login_search_logout_and_private_token_storage(tmp_path, serve):
                 assert 'private-token' not in await response.text()
             async with session.get(url + '/v1/search', params={'q': 'Тест', 'type': 'track'}) as response:
                 assert (await response.json())['items'][0]['title'] == 'Тест'
+            async with session.get(url + '/v1/tracks/42/quality') as response:
+                assert (await response.json())['recording_quality'] == {'codec':'flac','basis':'available'}
             async with session.get(url + '/v1/library/tracks', params={'limit': '0'}) as response:
                 assert response.status == 400
             async with session.post(url + '/v1/auth/logout') as response:
