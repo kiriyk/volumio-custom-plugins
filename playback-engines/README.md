@@ -48,3 +48,5 @@ Automated tests cover profile mapping, stable device identity, exact ALSA parame
 negotiation, file containment/ranges, output switching, rollback, volume blocking
 and source cancellation. Physical USB DAC hotplug and FiiO BTA30 Pro formats still
 require a connected device. Null-output testing establishes control flow only.
+
+Порядок проверки фактического вывода: [VERIFYING-AUDIO.md](VERIFYING-AUDIO.md).

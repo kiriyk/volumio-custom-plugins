@@ -5,6 +5,8 @@
  * and lands on its own page — never on an open settings form.
  */
 import { on, emit } from './socket';
+import { pageKey } from './pluginPageKey';
+export { pageKey } from './pluginPageKey';
 
 type Listener = (page: string | null, cfg: any) => void;
 interface Ask { page: string; wizard: boolean; resolve: (cfg: any) => void; timer?: number }
@@ -14,7 +16,7 @@ const listeners: Listener[] = [];
 const TIMEOUT = 8000;
 
 // 'audio_interface-alsa_controller' and 'audio_interface/alsa_controller' name the same page
-export const pageKey = (p: string) => String(p || '').replace('-', '/');
+
 
 function pump() {
   if (inFlight || !waiting.length) { return; }

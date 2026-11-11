@@ -8,7 +8,7 @@ STAGING=$(mktemp -d)
 trap 'rm -rf "$STAGING"' EXIT
 mkdir -p "$STAGING/playback_engines/lib/engines"
 files=(package.json package-lock.json index.js config.json lib service systemd scripts/install_renderer.py scripts/update.js install.sh uninstall.sh)
-for item in UIConfig.json i18n README.md LICENSE NOTICE; do
+for item in UIConfig.json i18n README.md VERIFYING-AUDIO.md LICENSE NOTICE; do
   if [ -e "$item" ]; then files+=("$item"); fi
 done
 tar --exclude='__pycache__' --exclude='*.pyc' --exclude='node_modules' --exclude='tests' \
