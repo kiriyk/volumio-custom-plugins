@@ -7,12 +7,13 @@ const Q = require('kew');
 const ApiClient = require('./lib/api-client');
 const Browse = require('./lib/browse');
 const Playback = require('./lib/playback');
+const nativeQuality = require('./lib/native-quality');
 function kew(p) { const d = Q.defer(); Promise.resolve(p).then(v => d.resolve(v), e => d.reject(e)); return d.promise; }
 
 class ControllerQobuz {
   constructor(context, dependencies = {}) {
     this.context = context; this.router = context.coreCommand; this.logger = context.logger;
-    this.api = dependencies.api; this.started = false; this.generation = 0; this.quality = '27';
+    this.api = dependencies.api; this.started = false; this.generation = 0; this.quality = '27'; this.completedDownloads = new Set(); this.indexRetries=0;
     this.service = dependencies.service || {
       start: () => execFile('/usr/bin/sudo', ['-n', '/bin/systemctl', 'start', 'volumio-qobuz-custom.service']),
       stop: () => execFile('/usr/bin/sudo', ['-n', '/bin/systemctl', 'stop', 'volumio-qobuz-custom.service'])
@@ -58,7 +59,7 @@ class ControllerQobuz {
   }
   onStop() { return kew(this.shutdown()); }
   async shutdown() {
-    this.generation++; this.started = false; clearTimeout(this.timer);
+    this.generation++; this.started = false; clearTimeout(this.timer); clearTimeout(this.downloadTimer);
     this.router.volumioRemoveToBrowseSources('Qobuz Custom');
     if (this.playback?.current()) await this.playback.stop(); else this.playback?.cancel();
     this.browse = null; this.playback = null; await this.service.stop();
@@ -72,7 +73,61 @@ class ControllerQobuz {
   stop() { return kew(this.playback?.stop()); }
   seek(position) { return kew(this.playback?.seek(position)); }
   previous() { return kew(this.playback?.previous()); }
-  getPlaybackQuality() { this.router.broadcastMessage('pushQobuzCustomQuality', this.playback?.current() ? this.playback.lastQuality || {} : {}); return Q.resolve(); }
+  getPlaybackQuality() {
+    return kew((async () => {
+      const state = this.router.stateMachine.getTrack?.(this.router.stateMachine.currentPosition) || this.router.stateMachine.getState?.();
+      const uri = state?.uri;
+      let info = /^qobuz_custom\/track\/\d+$/.test(uri || '') ? this.playback?.lastQuality : null;
+      if (info?.uri !== uri) info = null;
+      if (!info && !this.playback?.track && /^qobuz_custom\/track\/\d+$/.test(uri || '')) {
+        try { info = await nativeQuality(this.router.pluginManager.getPlugin('music_service','mpd'),uri); } catch {}
+      }
+      this.router.broadcastMessage('pushQobuzCustomQuality',info || {});
+    })());
+  }
+  getDownloads() { this.indexRetries=0; return kew(this.refreshDownloads()); }
+  async refreshDownloads() {
+    if (this.downloadPoll) return this.downloadPoll;
+    this.downloadPoll = (async () => {
+      const data = await this.client().request('GET','/v1/downloads');
+      this.router.broadcastMessage('pushQobuzDownloads',data);
+      const completed = (data.items || []).filter(job => job.state === 'completed' && !this.completedDownloads.has(job.id));
+      let retryIndex=false;
+      if (completed.length) {
+        try {
+          await this.router.pluginManager.getPlugin('music_service','mpd').sendMpdCommand('update',['USB/External_HD/qobuz']);
+          completed.forEach(job=>this.completedDownloads.add(job.id));this.indexRetries=0;
+        } catch { retryIndex=++this.indexRetries<=3; }
+      }
+      if (this.started && ((data.items || []).some(j => ['queued','downloading'].includes(j.state)) || retryIndex) && !this.downloadTimer) {
+        this.downloadTimer=setTimeout(()=>{this.downloadTimer=null;this.refreshDownloads().catch(e=>this.notify(e));},2000);
+        this.downloadTimer.unref?.();
+      }
+      return data;
+    })().finally(()=>{this.downloadPoll=null;});
+    return this.downloadPoll;
+  }
+  downloadTrack(data) {
+    return kew((async () => {
+      try {
+        const match=/^qobuz_custom\/track\/(\d+)$/.exec(data?.uri || '');
+        if (!match) throw new Error('BAD_REQUEST');
+        await this.client().request('POST','/v1/downloads',{track_id:match[1],quality:this.quality});
+        this.router.pushToastMessage('info','Qobuz',this.t('downloadQueued'));
+        return await this.refreshDownloads();
+      } catch(e) { this.notify(e); }
+    })());
+  }
+  cancelDownload(data) {
+    return kew((async () => {
+      try {
+        if (!/^[a-f0-9]{24}$/.test(data?.id || '')) throw new Error('BAD_REQUEST');
+        await this.client().request('POST',`/v1/downloads/${data.id}/cancel`,{});
+        return await this.refreshDownloads();
+      } catch(e) { this.notify(e); }
+    })());
+  }
+
   getUIConfig() { return kew(this.ui()); }
   async ui() {
     const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'UIConfig.json'), 'utf8'));

@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import { on, emit } from '../socket';
 import type { PlayerState } from '../format';
-import { actualYandexQuality as actualStreamQuality } from '../yandexQuality';
+import { customService, playbackQualityState } from '../customNavigation';
 
 const TICK = 250;
 
@@ -90,14 +90,12 @@ function startClock() {
 }
 
 on('pushState', (data: PlayerState) => {
-  const st = { ...(data || {}) };
-  if (['yandex_music', 'qobuz_custom'].includes(st.service || '') && st.uri) {
-    delete st.bitrate;
-    if (streamQuality?.uri === st.uri) {
-      Object.assign(st, actualStreamQuality(streamQuality));
-    } else if (qualityRequestUri !== st.uri) {
+  const st = playbackQualityState(data || {}, streamQuality);
+  const service = customService(st.uri);
+  if (service && st.uri) {
+    if (streamQuality?.uri !== st.uri && qualityRequestUri !== st.uri) {
       qualityRequestUri = st.uri;
-      emit('callMethod', { endpoint: `music_service/${st.service}`, method: 'getPlaybackQuality' });
+      emit('callMethod', { endpoint: `music_service/${service}`, method: 'getPlaybackQuality' });
     }
   } else { qualityRequestUri = ''; streamQuality = null; }
   st.disableUi = !!st.disableUiControls || st.service === 'analogin';
@@ -114,9 +112,9 @@ on('pushState', (data: PlayerState) => {
 function acceptStreamQuality(info: any, service: string) {
   if (!info || typeof info.uri !== 'string' || !['flac', 'flac-mp4', 'mp3'].includes(info.codec)) { return; }
   const state = usePlayer.getState().state;
-  if (state.service !== service || state.uri !== info.uri) { return; }
+  if (customService(state.uri) !== service || state.uri !== info.uri) { return; }
   streamQuality = { uri: info.uri, codec: info.codec, sampleRate: info.sampleRate, bitDepth: info.bitDepth };
-  usePlayer.setState({ state: { ...state, ...actualStreamQuality(info) } });
+  usePlayer.setState({ state: playbackQualityState(state, info) });
 }
 on('pushYandexQuality', (info: any) => acceptStreamQuality(info, 'yandex_music'));
 on('pushQobuzCustomQuality', (info: any) => acceptStreamQuality(info, 'qobuz_custom'));

@@ -38,7 +38,7 @@ function trim(src: string): Promise<string> {
 
 export default function SourceGlyph({ source }: { source: BrowseItem }) {
   const glyph = sourceGlyph(source.uri);
-  const src = source.uri === 'qobuz_custom' ? '/app/assets-common/format-icons/qobuz.svg' : source.uri === 'yandex_music' ? '/yandex-music.svg' : source.albumart && !glyph ? albumart(source.albumart) : '';
+  const src = source.uri === 'qobuz_custom' ? '/qobuz.svg' : source.uri === 'yandex_music' ? '/yandex-music.svg' : source.albumart && !glyph ? albumart(source.albumart) : '';
   const [mask, setMask] = useState(() => (src && trimmed.get(src)) || '');
   const [failed, setFailed] = useState(false);
   useEffect(() => {

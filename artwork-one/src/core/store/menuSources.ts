@@ -12,7 +12,7 @@ import type { BrowseItem } from './browse';
 const KEY = 'aw-menu';
 const ORDER_KEY = 'aw-menu-order';
 // shown until someone switches them off: the rail's own entries before there was a choice
-export const MENU_DEFAULT = ['playlists', 'favourites'];
+export const MENU_DEFAULT = ['playlists', 'favourites', 'qobuz_custom'];
 
 type Writer = (patch: { menu?: Record<string, boolean>; menuOrder?: string[] }) => void;
 

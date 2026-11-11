@@ -133,6 +133,8 @@ export function shufflePlay(item: BrowseItem): void {
 // Volumio's items carry a FontAwesome class for their glyph; the theme draws Material symbols
 export function faIcon(icon?: string): string {
   const s = String(icon || '');
+  if (/download/.test(s)) { return 'download'; }
+  if (/chevron-right/.test(s)) { return 'chevron_right'; }
   if (/folder-open/.test(s)) { return 'folder_open'; }
   if (/folder/.test(s)) { return 'folder'; }
   if (/microphone/.test(s)) { return 'mic'; }

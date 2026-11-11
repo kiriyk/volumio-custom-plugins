@@ -37,7 +37,7 @@ function Shell() {
   const nav = useNavigate();
   // ⌘K / Ctrl+K: the library's search, from anywhere
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') { e.preventDefault(); useBrowse.getState().backHome(); useUi.setState({ searchFocus: true }); nav('/browse'); const el = document.getElementById('aw-search-input') as HTMLInputElement | null; if (el) { el.focus(); el.select(); } } };
+    const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') { e.preventDefault(); useBrowse.getState().setDedicated(true); useUi.setState({ searchFocus: true }); nav('/search'); const el = document.getElementById('aw-search-input') as HTMLInputElement | null; if (el) { el.focus(); el.select(); } } };
     document.addEventListener('keydown', key);
     return () => document.removeEventListener('keydown', key);
   }, [nav]);

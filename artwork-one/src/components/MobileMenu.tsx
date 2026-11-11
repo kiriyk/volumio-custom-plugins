@@ -52,6 +52,7 @@ export default function MobileMenu() {
         </div>
         <div className="aw-mm__eyebrow mono">LIBRARY</div>
         <div className="aw-mm__list">
+          <a className={'aw-mm__item' + (at('/search') ? ' active' : '')} onClick={() => { useBrowse.getState().setDedicated(true); go('/search'); const q = useBrowse.getState().searchField; if (q.length >= 2) useBrowse.getState().search(q); }}><Icon name="search" /><span className="aw-mm__label">Поиск</span></a>
           <a className={'aw-mm__item' + (at('/home') ? ' active' : '')} onClick={() => go('/home')}><Icon name="home" /><span className="aw-mm__label">Home</span></a>
           <a className={'aw-mm__item' + (at('/browse') && !inMenu.some(s => isSource(s.uri)) ? ' active' : '')} onClick={() => { useBrowse.getState().home(); go('/browse'); }}>
             <Icon name="album" /><span className="aw-mm__label">Music</span>{sources.length ? <span className="aw-mm__value mono">{sources.length}</span> : null}</a>

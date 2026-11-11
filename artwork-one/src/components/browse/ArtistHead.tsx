@@ -19,6 +19,7 @@ export const norm = (s: any) => String(s || '').toLowerCase().normalize('NFD').r
 // the artist's lists by kind, keyed on item types (never on the translated list titles)
 export function artistLists(lists: BrowseList[] | null, kind: 'songs' | 'albums'): { l: BrowseList; i: number }[] {
   return (lists || []).map((l, i) => ({ l, i })).filter(({ l }) => {
+    if (l.awNavigation) return false;
     const items = l.items || []; const songs = items.filter(it => it.type === 'song').length;
     return kind === 'songs' ? (items.length && songs === items.length) : (items.length && songs === 0);
   });
@@ -91,13 +92,13 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
             </div>
           ) : null}
         </div>
-        <div className="aw-artist__actions">
+        {info.disablePlayButton !== true ? <div className="aw-artist__actions">
           <button type="button" className="aw-artist__play" onClick={() => A.playItemsList(info as BrowseItem)}><Icon name="play_arrow" /><span>Play</span></button>
           <button type="button" className="aw-artist__shuffle" onClick={() => A.shufflePlay(info as BrowseItem)}><Icon name="shuffle" /><span>Shuffle</span></button>
           <button type="button" className="aw-artist__iconbtn" onClick={() => A.addToQueue(info as BrowseItem)} aria-label="Add to queue" title="Add to queue"><Icon name="queue_music" /></button>
           <Dropdown className="hamburgerMenu aw-artist__menu" toggleClass="aw-artist__iconbtn" toggle={<Icon name="more_horiz" />}
             entries={[{ icon: 'play_arrow', label: 'Play', onClick: () => A.playItemsList(info as BrowseItem) }, { icon: 'queue_music', label: 'Add to queue', onClick: () => A.addToQueue(info as BrowseItem) }]} />
-        </div>
+        </div> : null}
       </div>
 
       {groups.map((g, gi) => {

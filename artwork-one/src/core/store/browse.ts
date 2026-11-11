@@ -137,7 +137,7 @@ export const useBrowse = create<BrowseStore>((set, get) => ({
     if (item.uri === 'cd') { return; }
     const scroll = { ...get().scroll };
     if (!back) { delete scroll[item.uri]; }
-    set({ request: item, currentUri: String(item.uri || ''), loading: true, isBrowsing: item.static ? get().isBrowsing : true, scroll });
+    set({ request: item, currentUri: String(item.uri || ''), loading: true, isSearching: false, isBrowsing: item.static ? get().isBrowsing : true, scroll });
     emit('browseLibrary', { uri: item.uri });
   },
   // a service's genre filter or sort order (Qobuz: New Releases): the same page asked for again under
@@ -166,7 +166,7 @@ export const useBrowse = create<BrowseStore>((set, get) => ({
     set({ searchField: value });
     if (searchTimer) { window.clearTimeout(searchTimer); searchTimer = null; }
     if (value && value.length >= 2) {
-      set({ isSearching: true });
+      set({ isSearching: true, isBrowsing: false, info: null, request: null, loading: true });
       searchTimer = window.setTimeout(() => {
         const sc = get().searchScope;
         // one source: that source's own search (as the field on its pages does); every source: Volumio's, plus the playlists' tracks
@@ -207,12 +207,17 @@ export const useBrowse = create<BrowseStore>((set, get) => ({
   showGridViewSelector: () => { const l = get().lists || []; return l.some(x => get().canShowGridView(x)); },
 }));
 
-on('pushBrowseSources', (data: BrowseItem[]) => useBrowse.setState({ sources: Array.isArray(data) ? data : [] }));
+on('pushBrowseSources', (data: BrowseItem[]) => useBrowse.setState({ sources: Array.isArray(data) ? data.map(s => s.uri === 'qobuz_custom' ? { ...s, name: 'Qobuz' } : s) : [] }));
 on('pushBrowseLibrary', (data: any) => {
   if (!data || !data.navigation) { return; }
   const st = useBrowse.getState();
   // plugins that dress titles as HTML for Volumio's Angular interfaces (Bandcamp, …): plain text here, as Nova shows them
-  const raw: BrowseList[] = plainLists(data.navigation.lists || []);
+  let raw: BrowseList[] = plainLists(data.navigation.lists || []);
+  if (st.isSearching && !st.isBrowsing && st.searchScope) {
+    const selected = st.searchScope.service || st.searchScope.plugin_name;
+    raw = raw.map(list => ({...list,items:(list.items || []).filter(item => item.service === selected)})).filter(list => list.items.length);
+    if (!raw.length && (data.navigation.lists || []).some((list:any)=>list.items?.length)) return;
+  }
   const lists: BrowseList[] = st.request && st.request.uri === 'Last_100' ? oncePerFile(raw) : raw;
   // a search's answer: what was typed joins the recent searches; the playlists' matches are added as one more list once they are in
   if (st.isSearching && !st.isBrowsing) { useRecentSearches.getState().add(st.searchField); }

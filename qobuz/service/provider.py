@@ -43,15 +43,29 @@ def cover(item):
     return url if isinstance(url, str) and url.startswith('https://') else ''
 
 
+def artist_links(item):
+    value = item.get('performer') or item.get('artist') or {}
+    if isinstance(value, dict) and value.get('id') and value.get('name'):
+        return [{'id': str(value['id']), 'name': value['name']}]
+    return []
+
+
+def map_artist(item):
+    return {'type': 'artist', 'id': str(item['id']), 'title': item.get('name', ''),
+            'cover_url': cover(item)}
+
+
 def map_album(item):
     return {'type': 'album', 'id': str(item['id']), 'title': item.get('title', ''),
-            'artists': [artist(item)], 'cover_url': cover(item)}
+            'artists': [artist(item)], 'artist_links': artist_links(item), 'cover_url': cover(item)}
 
 
 def map_track(item, album=None):
     album = item.get('album') or album or {}
     return {'type': 'track', 'id': str(item['id']), 'title': item.get('title', ''),
-            'artists': [artist(item) or artist(album)], 'album': album.get('title', ''),
+            'artists': [artist(item) or artist(album)],
+            'artist_links': artist_links(item) if artist(item) else artist_links(album),
+            'album': album.get('title', ''), 'album_id': str(album.get('id') or ''),
             'cover_url': cover(album), 'duration_ms': int(item.get('duration') or 0) * 1000,
             'available': bool(item.get('streamable', False))}
 
@@ -178,12 +192,12 @@ class Provider:
             self.on_change()
 
     async def search(self, query, kind, offset=0, limit=50):
-        if kind not in ('track', 'album') or not isinstance(query, str) or not query.strip() or len(query) > 300:
+        if kind not in ('track', 'album', 'artist') or not isinstance(query, str) or not query.strip() or len(query) > 300:
             raise ServiceError('BAD_REQUEST', 'Invalid search', 400)
         data = await self.call('/catalog/search', {'query': query, 'type': kind + 's', 'offset': offset, 'limit': limit})
         result = data.get(kind + 's') or {}
         return page(result.get('items') or [], int(result.get('total') or 0), offset,
-                    map_track if kind == 'track' else map_album)
+                    {'track': map_track, 'album': map_album, 'artist': map_artist}[kind])
 
     async def album(self, id_, offset=0, limit=50):
         data = await self.call('/album/get', {'album_id': identifier(id_), 'offset': offset, 'limit': limit})
@@ -192,6 +206,20 @@ class Provider:
                       lambda item: map_track(item, data))
         result['title'] = data.get('title', 'Qobuz')
         return result
+
+    async def artist(self, id_, offset=0, limit=50):
+        data = await self.call('/artist/get', {'artist_id': identifier(id_, numeric=True),
+            'extra': 'albums', 'offset': offset, 'limit': limit})
+        albums = data.get('albums') or {}
+        result = page(albums.get('items') or [], int(albums.get('total') or 0), offset, map_album)
+        result['title'] = data.get('name', 'Qobuz')
+        result['artist'] = {'id': str(data['id']), 'name': data.get('name', ''), 'cover_url': cover(data)}
+        return result
+
+    async def library_artists(self, offset=0, limit=50):
+        data = await self.call('/favorite/getUserFavorites', {'type': 'artists', 'offset': offset, 'limit': limit})
+        result = data.get('artists') or {}
+        return page(result.get('items') or [], int(result.get('total') or 0), offset, map_artist)
 
     async def library(self, offset=0, limit=50):
         data = await self.call('/favorite/getUserFavorites', {'type': 'albums', 'offset': offset, 'limit': limit})

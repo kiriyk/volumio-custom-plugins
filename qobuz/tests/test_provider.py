@@ -3,7 +3,7 @@ import pathlib
 import tempfile
 import unittest
 
-from service.provider import Provider, callback_code
+from service.provider import Provider, callback_code, map_album, map_track
 from service.storage import CredentialStore
 from service.errors import ServiceError
 
@@ -107,3 +107,61 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ServiceError): await task
         self.assertTrue(self.provider.account()['authenticated'])
         self.assertEqual(self.store.load()['access_token'], 'new-token')
+
+
+    async def test_artist_search_maps_id_name_and_safe_cover(self):
+        self.responses['/catalog/search'] = {'artists': {'total': 2, 'items': [
+            {'id': 123, 'name': 'Artist', 'image': {'large': 'https://images.test/artist.jpg'}}]}}
+        result = await self.provider.search('Artist', 'artist', 0, 1)
+        self.assertEqual(self.calls[-1], ('/catalog/search',
+            {'query': 'Artist', 'type': 'artists', 'offset': 0, 'limit': 1}))
+        self.assertEqual(result, {'items': [{'type': 'artist', 'id': '123', 'title': 'Artist',
+            'cover_url': 'https://images.test/artist.jpg'}], 'next_cursor': '1'})
+
+    def test_album_and_track_preserve_navigable_artist_and_album_ids(self):
+        album = {'id': 'abc123', 'title': 'Album', 'artist': {'id': 123, 'name': 'Album Artist'}}
+        self.assertEqual(map_album(album)['artist_links'], [{'id': '123', 'name': 'Album Artist'}])
+        track = map_track({'id': 42, 'performer': {'id': 456, 'name': 'Performer'}}, album)
+        self.assertEqual(track['artist_links'], [{'id': '456', 'name': 'Performer'}])
+        self.assertEqual(track['artists'], ['Performer'])
+        self.assertEqual(track['album_id'], 'abc123')
+        fallback = map_track({'id': 43}, album)
+        self.assertEqual(fallback['artist_links'], [{'id': '123', 'name': 'Album Artist'}])
+        self.assertEqual(map_track({'id': 44})['artist_links'], [])
+        self.assertEqual(map_track({'id': 44})['album_id'], '')
+        self.assertEqual(map_album({'id': 'x', 'artist': {'name': 'No id'}})['artist_links'], [])
+
+    async def test_artist_page_contains_paginated_albums_and_artist_metadata(self):
+        self.responses['/artist/get'] = {'id': 123, 'name': 'Artist',
+            'image': {'large': 'https://images.test/artist.jpg'},
+            'albums': {'total': 4, 'items': [{'id': 'abc123', 'title': 'Album',
+                'artist': {'id': 123, 'name': 'Artist'}}]}}
+        result = await self.provider.artist('123', 2, 1)
+        self.assertEqual(self.calls[-1], ('/artist/get',
+            {'artist_id': '123', 'extra': 'albums', 'offset': 2, 'limit': 1}))
+        self.assertEqual(result['title'], 'Artist')
+        self.assertEqual(result['artist'], {'id': '123', 'name': 'Artist',
+            'cover_url': 'https://images.test/artist.jpg'})
+        self.assertEqual(result['items'][0]['id'], 'abc123')
+        self.assertEqual(result['items'][0]['type'], 'album')
+        self.assertEqual(result['next_cursor'], '3')
+
+    async def test_artist_page_empty_and_invalid_identifiers(self):
+        self.responses['/artist/get'] = {'id': 123, 'name': 'Artist',
+            'image': {'large': 'http://unsafe.test/image'}, 'albums': {'total': 99, 'items': []}}
+        result = await self.provider.artist('123', 50, 50)
+        self.assertIsNone(result['next_cursor'])
+        self.assertEqual(result['artist']['cover_url'], '')
+        with self.assertRaises(ServiceError):
+            await self.provider.artist('../bad')
+
+    async def test_library_artists_preserves_album_library(self):
+        self.responses['/favorite/getUserFavorites'] = {
+            'artists': {'total': 1, 'items': [{'id': 123, 'name': 'Artist'}]},
+            'albums': {'total': 1, 'items': [{'id': 'abc123', 'title': 'Album'}]}}
+        artists = await self.provider.library_artists(0, 50)
+        self.assertEqual(self.calls[-1][1]['type'], 'artists')
+        self.assertEqual(artists['items'][0], {'type': 'artist', 'id': '123', 'title': 'Artist', 'cover_url': ''})
+        albums = await self.provider.library(0, 50)
+        self.assertEqual(self.calls[-1][1]['type'], 'albums')
+        self.assertEqual(albums['items'][0]['type'], 'album')

@@ -1,3 +1,4 @@
+import { downloadQobuz } from '../../core/store/qobuzDownloads';
 /** The track actions sheet (⋯ on Now Playing): shuffle / repeat / favourite / playlist, credits and stories, go to artist / album, tweet. */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -42,8 +43,8 @@ export default function TrackActionsSheet() {
   // Volumio's goTo: the library search for the artist / album
   // the library's own pages for the artist and the album (as a tap in the library opens them); other services go through the player's goTo
   const goTo = (type: 'artist' | 'album') => {
-    if (type === 'artist' && st.service === 'yandex_music' && /^yandex_music\/track\/\d+(?:%3A\d+)?$/i.test(String(st.uri || ''))) {
-      useBrowse.getState().open({ uri: st.uri, title: st.title, type: 'folder', service: 'yandex_music' }, true);
+    if (['yandex_music','qobuz_custom'].includes(String(st.service)) && /^(yandex_music|qobuz_custom)\/track\/\d+(?:%3A\d+)?$/i.test(String(st.uri || ''))) {
+      useBrowse.getState().open({ uri: st.uri, title: st.title, type: 'folder', service: st.service }, true);
       nav('/browse'); close(); return;
     }
     if (String(st.service || '') === 'mpd' && st.artist) {
@@ -88,6 +89,7 @@ export default function TrackActionsSheet() {
         <button type="button" className="aw-track__tile" onClick={() => { close(); addToPlaylist({ uri: String(st.uri || ''), service: st.service, type: 'song', title: st.title, artist: st.artist, album: st.album, albumart: st.albumart }); }} title="Add to Playlist" disabled={!!st.disableUi}><Icon name="playlist_add" /></button>
       </div>
       <div className="aw-track__rows">
+        {/^qobuz_custom\/track\/\d+$/.test(st.uri || '') ? row('download','download','Скачать на внешний диск',()=>{downloadQobuz(st.uri);close();}) : null}
         {row('credits', 'info', 'Album credits', () => ask('credits', { mode: 'creditsAlbum', artist: st.artist, album: st.album }, st.album, true))}
         {row('album', 'album', 'Album story', () => ask('album', { mode: 'storyAlbum', artist: st.artist, album: st.album }, st.album))}
         {row('artist', 'groups', 'Artist story', () => ask('artist', { mode: 'storyArtist', artist: st.artist }, st.artist))}

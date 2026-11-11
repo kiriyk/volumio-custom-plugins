@@ -6,8 +6,8 @@
 
 - [Яндекс Музыка](yandex-music/README.md): авторизация, поиск, коллекция,
   плейлисты, страницы исполнителей и воспроизведение MP3 или FLAC.
-- [Qobuz Custom](qobuz/README.md): независимый плагин 0.1.0, браузерный вход,
-  поиск треков и альбомов, любимые альбомы и воспроизведение FLAC. Нужна подписка Qobuz.
+- [Qobuz Custom](qobuz/README.md): независимый плагин 0.2.0, браузерный вход,
+  поиск треков, альбомов и исполнителей, дискография, воспроизведение и скачивание FLAC на внешний диск. Нужна подписка Qobuz.
 - [Artwork One](artwork-one/README.md): тема на основе проекта
   [michaltamas/volumio-artwork-one](https://github.com/michaltamas/volumio-artwork-one)
   с поиском и навигацией Яндекса/Qobuz, крошками и данными качества аудио.
@@ -57,7 +57,7 @@ bash /tmp/install.sh --from /tmp/artwork-one.tar.gz --activate
 входят. Доступность FLAC зависит от аккаунта и конкретного трека; API Яндекса
 неофициальный и может измениться.
 
-Для Qobuz аналогично перенести `packages/qobuz_custom-0.1.0.tar.gz`, распаковать
+Для Qobuz аналогично перенести `packages/qobuz_custom-0.2.0.tar.gz`, распаковать
 и выполнить `volumio plugin install` в каталоге `qobuz_custom`, затем включить
 **Qobuz Custom** и пройти вход в его настройках. Обновление: `node scripts/update.js .`;
 полное удаление стирает сессию. Подробности и ограничения — в [README плагина](qobuz/README.md).

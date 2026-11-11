@@ -10,15 +10,17 @@ from pathlib import Path
 
 from aiohttp import web
 
+from .downloads import DEFAULT_ROOT, Downloads
 from .errors import ServiceError, public_error
 from .provider import Provider, callback_code, identifier
 from .storage import CredentialStore
 from .streaming import Streaming, validate_upstream
 
 STREAMING = web.AppKey('streaming', Streaming)
+DOWNLOADS = web.AppKey('downloads', Downloads)
 
 
-def create_apps(provider, state_dir, api_key, upstream_policy=None):
+def create_apps(provider, state_dir, api_key, upstream_policy=None, download_root=None, mount_check=None):
     pending = {'login': None}
 
     @web.middleware
@@ -55,13 +57,18 @@ def create_apps(provider, state_dir, api_key, upstream_policy=None):
     streaming = Streaming(Bridge(), upstream_policy or validate_upstream)
     provider.on_change = streaming.invalidate
     api[STREAMING] = streaming
+    downloads = Downloads(provider, download_root or os.environ.get('QOBUZ_DOWNLOAD_ROOT', DEFAULT_ROOT),
+                          mount_check=mount_check, upstream_policy=upstream_policy or validate_upstream)
+    api[DOWNLOADS] = downloads
 
     async def lifecycle(app):
         await provider.start()
         await streaming.start()
+        await downloads.start()
         try:
             yield
         finally:
+            await downloads.close()
             await streaming.close()
             await provider.close()
     api.cleanup_ctx.append(lifecycle)
@@ -104,6 +111,7 @@ def create_apps(provider, state_dir, api_key, upstream_policy=None):
     async def logout(request):
         pending['login'] = None
         streaming.invalidate()
+        await downloads.cancel_all()
         await provider.logout()
         return web.json_response({'authenticated': False})
 
@@ -120,11 +128,27 @@ def create_apps(provider, state_dir, api_key, upstream_policy=None):
     async def album(request):
         return web.json_response(await provider.album(identifier(request.match_info['id']), *paging(request)))
 
+    async def artist(request):
+        return web.json_response(await provider.artist(identifier(request.match_info['id'], numeric=True), *paging(request)))
+
+    async def library_artists(request):
+        return web.json_response(await provider.library_artists(*paging(request)))
+
     async def library(request):
         return web.json_response(await provider.library(*paging(request)))
 
     async def track(request):
         return web.json_response(await provider.track(request.match_info['id']))
+
+    async def download_list(request):
+        return web.json_response(downloads.list())
+
+    async def download_enqueue(request):
+        data = await request.json()
+        return web.json_response(await downloads.enqueue(data.get('track_id', ''), data.get('quality', '27')), status=202)
+
+    async def download_cancel(request):
+        return web.json_response(await downloads.cancel(request.match_info['id']))
 
     async def resolve(request):
         data = await request.json()
@@ -136,9 +160,14 @@ def create_apps(provider, state_dir, api_key, upstream_policy=None):
     api.router.add_post('/v1/auth/logout', logout)
     api.router.add_get('/v1/search', search)
     api.router.add_get('/v1/albums/{id}', album)
+    api.router.add_get('/v1/artists/{id}', artist)
     api.router.add_get('/v1/tracks/{id}', track)
     api.router.add_get('/v1/library/albums', library)
+    api.router.add_get('/v1/library/artists', library_artists)
     api.router.add_post('/v1/playback/resolve', resolve)
+    api.router.add_get('/v1/downloads', download_list)
+    api.router.add_post('/v1/downloads', download_enqueue)
+    api.router.add_post('/v1/downloads/{id}/cancel', download_cancel)
     api.router.add_get('/stream/{ticket}', streaming.handle)
     callback.router.add_get('/oauth/{nonce}/', oauth)
     return api, callback

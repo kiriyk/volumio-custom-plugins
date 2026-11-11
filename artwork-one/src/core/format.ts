@@ -67,7 +67,7 @@ export function quality(o: any): '' | 'radio' | 'dsd' | 'hires' | 'lossless' | '
 // "FLAC", or "FLAC · QOBUZ" when it comes from a streaming service
 export function format(st: PlayerState): string {
   const fmt = String(st.trackType || st.stream || '').toUpperCase();
-  const svc = String(st.service || '').toUpperCase();
+  const svc = ({ qobuz_custom: 'QOBUZ', yandex_music: 'ЯНДЕКС МУЗЫКА' } as Record<string,string>)[String(st.service || '')] || String(st.service || '').toUpperCase();
   if (!svc || svc === 'MPD' || svc === fmt) { return fmt; }
   return fmt ? `${fmt} · ${svc}` : svc;
 }

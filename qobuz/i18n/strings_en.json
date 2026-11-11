@@ -25,5 +25,18 @@
   "RATE_LIMITED": "Qobuz request limit reached. Try again later.",
   "UPSTREAM_TIMEOUT": "Qobuz connection timed out.",
   "QUEUE_LIMIT": "The queue operation is limited to 2000 tracks.",
-  "searchAlbums": "Albums"
+  "searchAlbums": "Albums",
+  "artists": "Favourite artists",
+  "searchArtists": "Artists",
+  "downloads": "Downloads",
+  "downloadQueued": "Queued for download to external disk",
+  "DISK_UNAVAILABLE": "Connect the external disk External_HD.",
+  "DISK_FULL": "The external disk is full.",
+  "DOWNLOAD_FAILED": "Download failed.",
+  "QUEUE_FULL": "Download queue is full.",
+  "completed": "Saved",
+  "queued": "Queued",
+  "downloading": "Downloading",
+  "cancelled": "Cancelled",
+  "error": "Error"
 }

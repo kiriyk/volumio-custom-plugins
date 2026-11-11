@@ -48,6 +48,7 @@ export default function Rail() {
       </div>
       <ul className="main-menu-list">
         <Item icon="home" label="Home" open={open} active={at('/home')} onClick={() => nav('/home')} />
+        <Item icon="search" label="Поиск" open={open} active={at('/search')} onClick={() => { useBrowse.getState().setDedicated(true); nav('/search'); const q = useBrowse.getState().searchField; if (q.length >= 2) useBrowse.getState().search(q); }} />
         <Item icon="album" label="Music" open={open} active={at('/browse') && !inMenu.some(s => sourceActive(s.uri))} onClick={goMusic} />
         {/* the library's sources switched on in Appearance → Menu (Playlists and Favourites unless switched off) */}
         {inMenu.map(s => <Item key={s.uri} mark={<SourceGlyph source={s} />} label={String(s.name || s.title || s.uri)} open={open} active={sourceActive(s.uri)} onClick={() => goSource(s)} />)}

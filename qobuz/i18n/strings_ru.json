@@ -25,5 +25,18 @@
   "RATE_LIMITED": "Слишком много запросов к Qobuz. Попробуй позднее.",
   "UPSTREAM_TIMEOUT": "Qobuz не ответил вовремя.",
   "QUEUE_LIMIT": "За одну операцию можно добавить не более 2000 треков.",
-  "searchAlbums": "Альбомы"
+  "searchAlbums": "Альбомы",
+  "artists": "Любимые исполнители",
+  "searchArtists": "Исполнители",
+  "downloads": "Загрузки",
+  "downloadQueued": "Добавлено в очередь загрузки на внешний диск",
+  "DISK_UNAVAILABLE": "Подключи внешний диск External_HD.",
+  "DISK_FULL": "На внешнем диске недостаточно места.",
+  "DOWNLOAD_FAILED": "Не удалось скачать трек.",
+  "QUEUE_FULL": "Очередь загрузок заполнена.",
+  "completed": "Сохранено",
+  "queued": "В очереди",
+  "downloading": "Скачивается",
+  "cancelled": "Отменено",
+  "error": "Ошибка"
 }

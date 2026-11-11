@@ -100,3 +100,82 @@ class AppTests(unittest.IsolatedAsyncioTestCase):
         for url in ['http://streaming-qobuz-std.akamaized.net/file', 'https://127.0.0.1/file',
                     'https://streaming-qobuz-std.akamaized.net.attacker.test/file']:
             with self.assertRaises(ServiceError): validate_upstream(url)
+
+
+    async def test_artist_endpoint_validates_id_and_cursor(self):
+        calls = []
+        async def artist(id_, offset, limit):
+            calls.append((id_, offset, limit))
+            return {'title': 'Artist', 'artist': {'id': id_, 'name': 'Artist', 'cover_url': ''},
+                    'items': [], 'next_cursor': None}
+        self.provider.artist = artist
+        response = await self.client.get('/v1/artists/123?cursor=50', headers=self.headers)
+        self.assertEqual(response.status, 200)
+        self.assertEqual((await response.json())['artist']['id'], '123')
+        self.assertEqual(calls, [('123', 50, 50)])
+        for path in ['/v1/artists/bad-id', '/v1/artists/123?cursor=-1']:
+            self.assertEqual((await self.client.get(path, headers=self.headers)).status, 400)
+        self.assertEqual((await self.client.get('/v1/artists/123')).status, 401)
+
+    async def test_favorite_artist_endpoint_returns_artist_page(self):
+        calls = []
+        async def library_artists(offset, limit):
+            calls.append((offset, limit))
+            return {'items': [{'type': 'artist', 'id': '123', 'title': 'Artist', 'cover_url': ''}],
+                    'next_cursor': None}
+        self.provider.library_artists = library_artists
+        response = await self.client.get('/v1/library/artists?cursor=50', headers=self.headers)
+        self.assertEqual(response.status, 200)
+        self.assertEqual((await response.json())['items'][0]['type'], 'artist')
+        self.assertEqual(calls, [(50, 50)])
+
+    async def test_download_api_rejects_absent_disk_and_invalid_input(self):
+        from service.app import DOWNLOADS
+        downloads = self.client.server.app[DOWNLOADS]
+        downloads.mount_check = lambda: False
+        response = await self.client.post('/v1/downloads', json={'track_id': '42'}, headers=self.headers)
+        self.assertEqual(response.status, 409)
+        self.assertEqual((await response.json())['error']['code'], 'DISK_UNAVAILABLE')
+        for data in ({'track_id': '../bad'}, {'track_id': '42', 'quality': '5'}):
+            self.assertEqual((await self.client.post('/v1/downloads', json=data, headers=self.headers)).status, 400)
+        self.assertEqual((await self.client.get('/v1/downloads')).status, 401)
+        self.assertEqual((await self.client.get('/v1/downloads', headers=self.headers)).status, 200)
+        response = await self.client.post('/v1/downloads/missing/cancel', headers=self.headers)
+        self.assertEqual(response.status, 404)
+
+    async def test_download_api_enqueue_list_and_cancel(self):
+        from service.app import DOWNLOADS
+        downloads = self.client.server.app[DOWNLOADS]
+        downloads.mount_check = lambda: True
+        entered = asyncio.Event()
+        async def metadata(path, params):
+            entered.set()
+            await asyncio.Event().wait()
+        self.provider.call = metadata
+        response = await self.client.post('/v1/downloads', json={'track_id': '42', 'quality': '6'}, headers=self.headers)
+        self.assertEqual(response.status, 202)
+        job = await response.json()
+        self.assertEqual(job['track_id'], '42')
+        await entered.wait()
+        listing = await self.client.get('/v1/downloads', headers=self.headers)
+        self.assertEqual((await listing.json())['items'][0]['id'], job['id'])
+        cancelled = await self.client.post('/v1/downloads/' + job['id'] + '/cancel', headers=self.headers)
+        self.assertEqual(cancelled.status, 200)
+        self.assertEqual((await cancelled.json())['state'], 'cancelled')
+
+
+    async def test_logout_cancels_active_and_queued_downloads(self):
+        from service.app import DOWNLOADS
+        downloads = self.client.server.app[DOWNLOADS]
+        downloads.mount_check = lambda: True
+        entered = asyncio.Event()
+        async def metadata(path, params):
+            entered.set()
+            await asyncio.Event().wait()
+        self.provider.call = metadata
+        first = await downloads.enqueue('42')
+        await entered.wait()
+        second = await downloads.enqueue('43')
+        response = await self.client.post('/v1/auth/logout', headers=self.headers)
+        self.assertEqual(response.status, 200)
+        self.assertEqual([job['state'] for job in downloads.list()['items']], ['cancelled', 'cancelled'])

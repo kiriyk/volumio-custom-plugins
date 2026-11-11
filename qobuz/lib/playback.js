@@ -11,7 +11,7 @@ class Playback {
     if (this.sm.isVolatile || this.sm.isUpnp) return false;
     const state = typeof this.sm.getTrack === 'function'
       ? this.sm.getTrack(this.sm.currentPosition) : this.sm.getState();
-    return !!state && state.service === 'qobuz_custom' && (!state.uri || state.uri === track?.uri);
+    return !!state && (state.service === 'qobuz_custom' || /^qobuz_custom\/track\//.test(state.uri || '')) && (!state.uri || state.uri === track?.uri);
   }
   cancel() { this.generation++; }
   enqueue(operation) {

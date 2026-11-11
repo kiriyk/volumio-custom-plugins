@@ -1,3 +1,4 @@
+import { emit } from '../../core/socket';
 /** The theme's own sections on Volumio's Appearance page, as the page's cards: the theme switch, and the ambient display rows with their Save. */
 import React, { useEffect, useState } from 'react';
 import Icon from '../Icon';
@@ -20,6 +21,7 @@ export default function AppearanceSlot() {
   const ambient = useAmbient();
   const transparency = useTransparency(s => s.on);
   const sources = useBrowse(s => s.sources);
+  useEffect(() => { emit('getBrowseSources'); }, []);
   useMenuSources(s => s.choices);   // a switch redraws the card
   const menuOrder = useMenuSources(s => s.order);
   const menuList = orderedSources(sources, menuOrder);

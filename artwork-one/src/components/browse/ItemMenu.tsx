@@ -1,3 +1,4 @@
+import { downloadQobuz } from '../../core/store/qobuzDownloads';
 /**
  * The row / tile context menu (mockup "Context menu"): a header with the item, then Volumio's
  * real actions with Material glyphs — the same conditions as the core browse-hamburger-menu.
@@ -46,13 +47,17 @@ export function menuEntries(item: BrowseItem): MenuEntry[] {
   if (goArtist || goAlbum) { sep(); }
   if (goAlbum) { out.push({ icon: 'album', label: 'Go to album', onClick: () => A.goToAlbum(item) }); }
   if (goArtist) { out.push({ icon: 'person', label: 'Go to artist', onClick: () => A.goToArtist(item) }); }
-  if (item.service === 'yandex_music' && Array.isArray(item.artistLinks)) {
+  if (['yandex_music','qobuz_custom'].includes(String(item.service)) && Array.isArray(item.artistLinks)) {
     for (const artist of item.artistLinks) {
-      if (typeof artist?.uri === 'string' && /^yandex_music\/artist\/\d+$/.test(artist.uri)) {
+      if (typeof artist?.uri === 'string' && /^(yandex_music|qobuz_custom)\/artist\/\d+$/.test(artist.uri)) {
         out.push({ icon: 'person', label: `К исполнителю: ${artist.name || ''}`,
-          onClick: () => b.fetch({ uri: artist.uri, title: artist.name, type: 'folder', service: 'yandex_music' }) });
+          onClick: () => b.fetch({ uri: artist.uri, title: artist.name, type: 'folder', service: item.service }) });
       }
     }
+  }
+  if (/^qobuz_custom\/track\/\d+$/.test(item.uri || '')) {
+    out.push({icon:'download',label:'Скачать на внешний диск',onClick:()=>downloadQobuz(item.uri)});
+    if (item.albumUri) out.push({icon:'album',label:'К альбому',onClick:()=>b.fetch({uri:item.albumUri,title:item.album,type:'folder',service:'qobuz_custom'})});
   }
   if (playable) { sep(); out.push({ icon: 'playlist_remove', label: 'Clear and play', danger: true, onClick: () => A.replaceAndPlay(item) }); }
   return out;

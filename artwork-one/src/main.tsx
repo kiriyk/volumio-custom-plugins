@@ -1,3 +1,4 @@
+import './styles/custom-music.scss';
 import './core/insets';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

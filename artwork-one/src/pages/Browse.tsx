@@ -1,3 +1,4 @@
+import QobuzDownloads from '../components/browse/QobuzDownloads';
 /**
  * The library page: the landing (with its search), the plain lists (artists, albums, genres,
  * folders, playlists, radio…) with breadcrumb, filter, view toggle, sort and alphabet rail, the
@@ -50,7 +51,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
   // Spotify reports its playlists as info.type 'album' too: a playlist is a playlist, never an album
   const isAlbum = !!info && !isPlaylist && (info.type === 'album' || info.type === 'cd');
   const isArtist = !!info && info.type === 'artist';
-  const hideInfo = dedicated;
+  const hideInfo = dedicated && !b.isBrowsing;
   const isPlainList = !!(b.isBrowsing && !b.isSearching && (!info || needsCustomMusicListHead(uri, info.type)) && listTitle);
   const isLandingSearch = !!(b.isSearching && !b.isBrowsing);
   const artistsPage = uri === 'artists://';
@@ -179,10 +180,10 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
     <div id="browse" className={cls}>
       {showAlbumBg && artRoot ? createPortal(<div className="aw-albumhead__bg" aria-hidden="true"><img src={albumart(info!.albumart)} alt="" /></div>, artRoot) : null}
       <div className="panel panel-default">
-        <div className={'body-content new-browse' + (dedicated ? ' with-search-header' : '')}>
+        <div className={'body-content new-browse' + (dedicated && !b.isBrowsing ? ' with-search-header' : '')}>
           <div id="browseTablesWrapper" ref={scroller} onScroll={onScroll}>
 
-            {dedicated ? (
+            {dedicated && !b.isBrowsing ? (
               <PageHead variant="search" nav={<div className="dedicated-search"><div className="search-container">
                 <form action="." id="searchForm" onSubmit={(e) => { e.preventDefault(); (document.activeElement as HTMLElement)?.blur(); }}>
                   <input type="search" id="search-input-form" ref={searchInput} className="form-control" value={b.searchField} onChange={(e) => b.search(e.target.value)} placeholder="Search ..." title="Search" spellCheck={false} />
@@ -234,8 +235,9 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
             {isPlainList && artistsPage && !b.showGridView ? <div className="aw-cols aw-cols--artists mono" aria-hidden="true"><span>#</span><span /><span>ARTIST</span><span /></div> : null}
             {isTrackList ? <div className="aw-cols mono aw-cols--fav" aria-hidden="true"><span>#</span><span /><span className="aw-cols__info"><span>TITLE</span><span>ALBUM</span></span><span className="aw-cols__duration">DURATION</span><span /><span /></div> : null}
 
+            <QobuzDownloads enabled={b.sources.some(s=>s.uri==='qobuz_custom')} force={uri==='qobuz_custom/downloads'} />
             <div id="browse-page">
-              {(b.isBrowsing || b.isSearching) && b.lists ? (isLandingSearch
+              {(b.isBrowsing || b.isSearching) && b.lists && uri !== 'qobuz_custom/downloads' ? (isLandingSearch
                 ? <SearchResults lists={listsShown} filter="" sortDesc={sortDesc} isArtist={false} artistsPage={false} serviceSearch={false} activeMenu={activeMenu} onMenuOpen={onMenuOpen} />
                 : <BrowseLists lists={listsShown} filter={filter} sortDesc={sortDesc} isArtist={isArtist} artistsPage={artistsPage} serviceSearch={!localFilter} activeMenu={activeMenu} onMenuOpen={onMenuOpen} />) : null}
             </div>
