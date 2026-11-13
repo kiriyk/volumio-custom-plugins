@@ -16,6 +16,7 @@ import { usePlayer } from '../core/store/player';
 import { useQueue } from '../core/store/queue';
 import { useMultiroom } from '../core/store/multiroom';
 import { useSignal } from '../core/store/signal';
+import { playbackEngineView } from '../core/playbackEngine';
 import { useUi, isQueueDocked, canDockQueue } from '../core/store/ui';
 import { albumart } from '../core/api';
 import { quality, format, signal, rateLine, shownTitle } from '../core/format';
@@ -60,7 +61,7 @@ export default function NowPlaying() {
   const output = useSignal(s => s.output);
   const alsa = useSignal(s => s.alsa);
   const engineState = useSignal(s => s.engineState);
-  const engineName = engineState?.managed ? (engineState.engine === 'album_player' ? 'Album Player' : 'MPD') : '';
+  const engineName = playbackEngineView(engineState)?.engineLabel || '';
   const resample = useSignal.getState().resample();
   const dsp = useSignal.getState().dsp();
   const bitPerfect = useSignal.getState().bitPerfect();

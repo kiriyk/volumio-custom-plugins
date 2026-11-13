@@ -6,6 +6,7 @@ const Runtime = require('./runtime');
 const {writeJson, fail} = Runtime;
 const {defaults, validateSettings, effectiveProfile, albumPatch, albumPayload, rewriteMpdConfig} = require('./profiles');
 const LocalStream = require('./local-stream');
+const {observe,compareFormat}=require('./observation');
 const engines = require(fs.existsSync(path.join(__dirname,'engines/index.js')) ? './engines' : '../../shared/playback');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function kew(value) { const d = Q.defer(); Promise.resolve(value).then(v => d.resolve(v),e => d.reject(e)); return d.promise; }
@@ -33,7 +34,7 @@ class Manager {
     this.runtime=runtime || new Runtime({stateDir}); this.localStream=localStream || new LocalStream();
     this.settings=defaults();this.devices=[];this.active=null;this.ready=false;this.error=null;
     this.chain=Promise.resolve();this.hooks=[];this.facades=new Set();this.closed=false;this.closing=false;this.generation=0;this.localGeneration=0;
-    this.original={};this.volume=0;this.muted=false;this.mpdDirty=false;
+    this.inputFormat=null;this.original={};this.volume=0;this.muted=false;this.mpdDirty=false;
   }
   async start() {
     try {this.settings=validateSettings(JSON.parse(fs.readFileSync(path.join(this.stateDir,'settings.json'),'utf8')));}
@@ -53,7 +54,20 @@ class Manager {
   status() {
     const available=!!this.devices.find(d=>d.key===this.settings.device?.key);
     return {managed:this.settings.managed,engine:this.settings.engine,mode:this.settings.modes[this.settings.engine],device:this.settings.device,devices:this.devices,available,
-      ready:this.ready && (!this.settings.managed || available),error:this.error,volumeEnabled:this.settings.managed && effectiveProfile(this.settings).volumeEnabled,bitPerfectVerified:false};
+      observation:this.observation(),ready:this.ready && (!this.settings.managed || available),error:this.error,volumeEnabled:this.settings.managed && effectiveProfile(this.settings).volumeEnabled,bitPerfectVerified:false};
+  }
+  observation(){
+    if(!this.settings.managed)return{state:'unmanaged',actualEngine:null,routeMatches:null,pcm:null,checkedAt:Date.now()};
+    const device=this.devices.find(d=>d.key===this.settings.device?.key);
+    const result=observe(device,this.settings.engine);
+    if(this.inputFormat){
+      result.inputFormat=this.inputFormat;
+      if(result.pcm&&this.settings.modes[this.settings.engine]==='bypass'){
+        result.formatMatches=compareFormat(result.pcm,this.inputFormat);
+        if(result.formatMatches===false)result.state='mismatch';
+      }
+    }
+    return result;
   }
   publish(){this.router.broadcastMessage?.('pushPlaybackEnginesState',this.status());}
   async refreshDevices() {
@@ -105,7 +119,7 @@ class Manager {
       if(inactiveOnly && (wasReady || !next.managed)){writeJson(path.join(this.stateDir,'settings.json'),next);this.settings=next;this.publish();return this.status();}
       const device=next.managed?this.device(next):null;
       await this.stopPlayback();await this.runtime.stopRenderer();
-      this.settings=next;this.ready=false;this.error=null;this.publish();
+      this.settings=next;this.inputFormat=null;this.ready=false;this.error=null;this.publish();
       try {
         if(next.managed)await this.prepare(next,device);else await this.regenerate();
         writeJson(path.join(this.stateDir,'settings.json'),next);this.ready=true;this.publish();return this.status();
@@ -125,7 +139,10 @@ class Manager {
     const operation=this.chain.then(()=>{
       const generation=this.generation;
       const current=()=>!this.closed&&!this.closing&&generation===this.generation&&valid();
-      return this.playNow(facade,url,track,current,owns);
+      return this.playNow(facade,url,track,current,owns).catch(e=>{
+        if(generation===this.generation&&!this.closing&&!this.closed){this.error=e.code||'ENGINE_ERROR';this.publish();}
+        throw e;
+      });
     });
     this.chain=operation.catch(()=>{});return operation;
   }
@@ -134,13 +151,18 @@ class Manager {
     if(this.closed)throw fail('ENGINE_UNAVAILABLE');
     if(this.settings.managed && !this.status().ready)throw fail(this.error||'DEVICE_UNAVAILABLE');
     if(this.active)await this.active.stop();if(!valid())return false;
+    this.inputFormat=null;
     if(this.settings.managed){
       const device=this.device();
       await this.original.stop();if(!valid())return false;
       if(this.settings.modes[this.settings.engine]==='bypass') {
-        const format=await this.runtime.probe(url);if(!valid())return false;
+        // Native Album Player retains its exclusive PCM handle even after Stop.
+        // Release that process before opening the device for exact-format preflight.
+        if(this.settings.engine==='album_player')await this.runtime.stopRenderer();
+        if(!valid())return false;
+        const format=await this.runtime.probe(url);if(!valid())return false;this.inputFormat=format;
         const deadline=Date.now()+3000;
-        for(;;){try{await this.runtime.check(device,format);break;}catch(e){if(Date.now()>=deadline)throw fail('UNSUPPORTED_FORMAT');await sleep(150);}}
+        for(;;){try{await this.runtime.check(device,format);break;}catch(e){if(e.code!=='PCM_BUSY')throw e;if(Date.now()>=deadline)throw fail('DEVICE_BUSY');await sleep(150);}}
       }
       if(this.settings.engine==='mpd') {
         const profile=effectiveProfile(this.settings);
@@ -158,7 +180,7 @@ class Manager {
     // MPD methods may be inherited from a prototype, so bind those explicitly.
     if(facade.delegate.kind==='mpd')facade.delegate.mpd=this.nativeMpd();
     this.active=facade;
-    try {const played=await facade.delegate.play(url,track,valid,owns);if(!played && this.active===facade)this.active=null;return played;}
+    try {const played=await facade.delegate.play(url,track,valid,owns);if(played&&this.active===facade){this.error=null;this.publish();}if(!played && this.active===facade)await facade.stop();return played;}
     catch(e){if(this.active===facade){facade.close();this.error=e.code||'ENGINE_ERROR';this.publish();}throw e;}
   }
   nativeMpd(){return{stop:this.original.stop,pause:this.original.pause,resume:this.original.resume,seek:this.original.seek,sendMpdCommand:this.mpd.sendMpdCommand.bind(this.mpd)};}

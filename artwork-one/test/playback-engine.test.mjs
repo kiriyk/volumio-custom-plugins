@@ -10,3 +10,15 @@ test('unavailable output is explicit and unmanaged state restores native display
   assert.equal(playbackEngineView({managed:true,engine:'mpd',mode:'bypass',ready:false,device:{label:'FiiO'}}).output,'FiiO · недоступно');
   assert.equal(playbackEngineView({managed:false}),null);assert.equal(playbackEngineView(null),null);
 });
+
+test('labels distinguish a selected engine from kernel-confirmed playback',()=>{
+ const base={managed:true,engine:'album_player',mode:'bypass',ready:true,device:{label:'FiiO'}};
+ assert.match(playbackEngineView({...base,observation:{state:'idle',actualEngine:null,routeMatches:null}}).engineLabel,/Выбран Album Player/);
+ assert.equal(playbackEngineView({...base,observation:{state:'running',actualEngine:'album_player',routeMatches:true}}).engineLabel,'Album Player · ALSA');
+ assert.match(playbackEngineView({...base,observation:{state:'mismatch',actualEngine:'mpd',routeMatches:false}}).engineLabel,/MPD.*выбран Album Player/);
+});
+
+test('matching process cannot hide a mismatched hardware format',()=>{
+ const view=playbackEngineView({managed:true,engine:'album_player',mode:'bypass',ready:true,observation:{state:'mismatch',actualEngine:'album_player',routeMatches:true}});
+ assert.match(view.engineLabel,/несовпадение/i);assert.equal(view.processing,'OUTPUT MISMATCH');
+});

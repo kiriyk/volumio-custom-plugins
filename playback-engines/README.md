@@ -50,3 +50,18 @@ and source cancellation. Physical USB DAC hotplug and FiiO BTA30 Pro formats sti
 require a connected device. Null-output testing establishes control flow only.
 
 Порядок проверки фактического вывода: [VERIFYING-AUDIO.md](VERIFYING-AUDIO.md).
+
+## Version 0.1.1
+
+Album Player keeps its PCM handle after Stop/natural end. In bypass the plugin
+now stops the owned renderer before exact-format preflight, then starts it with
+the saved profile. This prevents the second-track stall; process startup may add
+a pause between tracks. A busy device is reported separately from an unsupported
+format. Cancelling a launch after native Play acknowledgement also stops it.
+
+The “Фактический аудиовывод” section and “Проверить тракт” button read ALSA state,
+owner PID/process and hardware format. Artwork One distinguishes the selected
+engine from a kernel-observed running engine, and exposes mismatches. This is
+route/format evidence, not a bit-perfect sample comparison. Without a USB serial
+number the saved identity includes the USB port; moving the DAC to another port
+requires selecting its available entry again. No automatic fallback is performed.

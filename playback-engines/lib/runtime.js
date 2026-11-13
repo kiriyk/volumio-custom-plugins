@@ -68,7 +68,8 @@ class Runtime {
   async check(device, format) {
     pcmParts(device.pcm);
     if (!format || ![16,24,32].includes(format.bits) || !Number.isInteger(format.rate) || !Number.isInteger(format.channels)) throw fail('UNSUPPORTED_FORMAT');
-    return this.helperCall(['check', device.pcm, String(format.rate), String(format.bits), String(format.channels)]);
+    try{return await this.helperCall(['check', device.pcm, String(format.rate), String(format.bits), String(format.channels)]);}
+    catch(e){if(e.code==='PCM busy')throw fail('PCM_BUSY');if(e.code==='Hardware does not support exact PCM parameters')throw fail('UNSUPPORTED_FORMAT');throw fail('AUDIO_PREFLIGHT_FAILED');}
   }
   async systemctl(action) {
     try { return await this.run('/usr/bin/sudo', ['-n', '/bin/systemctl', action, UNIT], { timeout: 45000, maxBuffer: 65536 }); }

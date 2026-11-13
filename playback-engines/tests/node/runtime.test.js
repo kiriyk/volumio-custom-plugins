@@ -50,3 +50,8 @@ test('renderer rejects HTTP success when native configuration was not saved',asy
   const runtime=new Runtime({stateDir:'/unused'});runtime.endpoints={apiUrl:`http://127.0.0.1:${server.address().port}/`};
   await assert.rejects(runtime.requestConfig({volume_enabled:false}),{code:'PROFILE_SAVE_FAILED'});
 });
+
+test('preflight reports exclusive PCM busy separately from an unsupported format',async()=>{
+ const runtime=new Runtime({stateDir:'/unused',run:async()=>{throw{stdout:JSON.stringify({error:'PCM busy'})};}});
+ await assert.rejects(runtime.check({pcm:'hw:CARD=PRO,DEV=0'},{rate:44100,bits:16,channels:2}),{code:'PCM_BUSY'});
+});

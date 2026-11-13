@@ -83,3 +83,11 @@ test('disable waits for startup before shutting down the manager',async()=>{
   await new Promise(setImmediate);assert.deepEqual(lifecycle,[]);
   release();await starting;await stopping;assert.deepEqual(lifecycle,['shutdown']);assert.equal(controller.enabled,false);assert.equal(controller.started,false);
 });
+
+test('audio diagnostic section distinguishes a selected profile from an actually open PCM',async()=>{
+ const{controller,manager}=setup();manager.settings.managed=true;manager.settings.engine='album_player';
+ manager.status=()=>({managed:true,ready:true,devices:manager.devices,observation:{state:'idle',actualEngine:null,routeMatches:null,pcm:null}});
+ const idle=(await controller.ui()).sections.find(s=>s.id==='actualOutput');assert.ok(idle);assert.match(idle.description,/закрыто/);assert.match(idle.description,/не подтвержд/);
+ manager.status=()=>({managed:true,ready:true,devices:manager.devices,observation:{state:'running',actualEngine:'album_player',routeMatches:true,pcm:{state:'RUNNING',ownerProcess:'ap2renderer',ownerPid:123,format:'S32_LE',rate:44100,channels:2}}});
+ const running=(await controller.ui()).sections.find(s=>s.id==='actualOutput');assert.match(running.description,/ap2renderer/);assert.match(running.description,/44100/);assert.match(running.description,/S32_LE/);assert.match(running.description,/bit-perfect не проверен/);
+});

@@ -3,7 +3,7 @@ const fs=require('node:fs');const path=require('node:path');const Q=require('kew
 const Manager=require('./lib/manager');const {defaults,validateSettings}=require('./lib/profiles');
 const ENDPOINT='audio_interface/playback_engines';
 const names={mpd:'MPD',album_player:'Album Player'};
-const errors={PLUGIN_DISABLED:'Сначала включите плагин Playback Engines.',DEVICE_UNAVAILABLE:'Выбранное аудиоустройство недоступно. Подключите его или выберите другой выход.',UNSUPPORTED_FORMAT:'Устройство не поддерживает исходный формат без преобразования. Выберите пользовательский режим или другой выход.',BAD_SETTINGS:'Проверьте значения настроек.',PROFILE_SAVE_FAILED:'Движок не подтвердил сохранение профиля.',MPD_CONFIG_ERROR:'Не удалось настроить MPD.',MPD_UNAVAILABLE:'MPD не отвечает.',RENDERER_UNAVAILABLE:'Album Player не готов.',RENDERER_SERVICE_ERROR:'Не удалось запустить или остановить Album Player.',ROLLBACK_FAILED:'Не удалось восстановить прежнюю конфигурацию. Воспроизведение остановлено.',OUTDATED_SOURCES:'Обновите плагины Яндекса и Qobuz для управления движком.',VOLUME_UNAVAILABLE:'Программная громкость движка недоступна.'};
+const errors={DEVICE_BUSY:'Аудиовыход занят другим процессом. Закройте другое воспроизведение и попробуйте снова.',AUDIO_PREFLIGHT_FAILED:'Не удалось проверить параметры аудиовыхода. Проверьте подключение устройства.',PLUGIN_DISABLED:'Сначала включите плагин Playback Engines.',DEVICE_UNAVAILABLE:'Выбранное аудиоустройство недоступно. Подключите его или выберите другой выход.',UNSUPPORTED_FORMAT:'Устройство не поддерживает исходный формат без преобразования. Выберите пользовательский режим или другой выход.',BAD_SETTINGS:'Проверьте значения настроек.',PROFILE_SAVE_FAILED:'Движок не подтвердил сохранение профиля.',MPD_CONFIG_ERROR:'Не удалось настроить MPD.',MPD_UNAVAILABLE:'MPD не отвечает.',RENDERER_UNAVAILABLE:'Album Player не готов.',RENDERER_SERVICE_ERROR:'Не удалось запустить или остановить Album Player.',ROLLBACK_FAILED:'Не удалось восстановить прежнюю конфигурацию. Воспроизведение остановлено.',OUTDATED_SOURCES:'Обновите плагины Яндекса и Qobuz для управления движком.',VOLUME_UNAVAILABLE:'Программная громкость движка недоступна.'};
 function kew(p){const d=Q.defer();Promise.resolve(p).then(v=>d.resolve(v),e=>d.reject(e));return d.promise;}
 const unwrap=v=>v&&typeof v==='object'?v.value:v;
 function select(id,label,value,options){return{id,element:'select',label,options,value:options.find(o=>o.value===value)||{value:value??'',label:'Выберите…'}};}
@@ -12,6 +12,17 @@ function toggle(id,label,value){return{id,element:'switch',label,value};}
 function section(id,label,method,content,description){return{id,element:'section',label,description,content,onSave:{type:'controller',endpoint:ENDPOINT,method},saveButton:{label:'Применить',data:content.map(x=>x.id)}};}
 const modes=[{value:'bypass',label:'Всё отключено'},{value:'custom',label:'Пользовательские настройки'}];
 const rates=[{value:0,label:'Исходная частота'},...[44100,48000,88200,96000,176400,192000,352800,384000].map(value=>({value,label:(value/1000)+' кГц'}))];
+
+function actualOutput(status){
+  const o=status.observation;
+  if(!status.managed)return 'Управление выводом остаётся у Volumio. Фактический поток плагином не подтверждён.';
+  if(!o)return 'Фактический вывод ещё не проверен.';
+  const messages={idle:'Выбранное ALSA-устройство закрыто. Активный движок не подтверждён.',unavailable:'Выбранный выход недоступен. Если ЦАП переставлен в другой USB-порт, выберите его заново.',unconfirmed:'Процесс аудиовывода не подтверждён.',mismatch:'Несовпадение выбранного движка или исходного формата с фактическим потоком.',running:'Процесс аудиовывода подтверждён по ALSA.',open:'Устройство открыто, но поток сейчас не RUNNING.'};
+  const pcm=o.pcm;
+  const details=pcm?` ${pcm.ownerProcess||'неизвестный процесс'} · PID ${pcm.ownerPid||'?'} · ${pcm.state} · ${pcm.rate||'?'} Гц · ${pcm.format||'?'} · ${pcm.channels||'?'} канала.`:'';
+  const source=o.inputFormat?` Источник: ${o.inputFormat.rate} Гц · ${o.inputFormat.bits} бит · ${o.inputFormat.channels} канала.`:'';
+  return(messages[o.state]||'Фактический вывод не подтверждён.')+details+source+' Это проверка маршрута и формата; bit-perfect не проверен.';
+}
 
 class ControllerPlaybackEngines{
   constructor(context,dependencies={}){this.context=context;this.router=context.coreCommand;this.manager=dependencies.manager;this.startPromise=null;this.started=false;this.enabled=false;this.polling=false;this.timer=null;this.lastUi=0;}
@@ -62,7 +73,7 @@ class ControllerPlaybackEngines{
       select('engine','Движок воспроизведения',s.engine,Object.entries(names).map(([value,label])=>({value,label}))),
       select('device','Аудиоустройство',s.device?.key,options),
       select('mpdMode','Обработка MPD',s.modes.mpd,modes),select('albumMode','Обработка Album Player',s.modes.album_player,modes)
-    ],status.error?errors[status.error]||'Движок недоступен.':!s.managed?'Текущий вывод Volumio сохранён. Выберите устройство и нажмите «Применить».':`${names[s.engine]} · ${s.modes[s.engine]==='bypass'?'обработка отключена':'пользовательская обработка'} · ${status.ready?'готов':'не готов'}`);
+    ],status.error?errors[status.error]||'Движок недоступен.':!s.managed?'Текущий вывод Volumio сохранён. Выберите устройство и нажмите «Применить».':`${names[s.engine]} · ${s.modes[s.engine]==='bypass'?'обработка отключена':'пользовательская обработка'} · ${status.ready?'профиль применён':'вывод не готов'}`);
     const mp=s.custom.mpd,ap=s.custom.album_player;
     const mpd=section('mpdCustom','Пользовательские настройки MPD','saveMpd',[
       toggle('volumeEnabled','Программная регулировка громкости',mp.volumeEnabled),input('volume','Программная громкость, %',mp.volume,0,100),
@@ -77,7 +88,8 @@ class ControllerPlaybackEngines{
       select('dsdMode','Вывод DSD в пользовательском режиме',ap.dsdMode,[{value:0,label:'PCM'},{value:1,label:'DoP'},{value:2,label:'Native DSD'}])
     ],'Профиль хранится отдельно. Форматы DSD требуют поддержки аудиоустройства.');
     selected.content.push({id:'refreshDevices',element:'button',label:'Обновить устройства',onClick:{type:'emit',message:'callMethod',data:{endpoint:ENDPOINT,method:'refreshDevices',data:{}}}});
-    return{page:{label:'Движки воспроизведения'},sections:[selected,{id:'notice',element:'section',label:'Без обработки',description:'Переключение останавливает воспроизведение. Аппаратная громкость не меняется. Отключение программного ослабления может увеличить уровень сигнала. Совпадение настроек не является проверкой bit-perfect.',content:[]},mpd,album]};
+    const actual={id:'actualOutput',element:'section',label:'Фактический аудиовывод',description:actualOutput(status),content:[{id:'inspectOutput',element:'button',label:'Проверить тракт',onClick:{type:'emit',message:'callMethod',data:{endpoint:ENDPOINT,method:'refreshDevices',data:{}}}}]};
+    return{page:{label:'Движки воспроизведения'},sections:[selected,actual,{id:'notice',element:'section',label:'Без обработки',description:'Переключение останавливает воспроизведение. Аппаратная громкость не меняется. Отключение программного ослабления может увеличить уровень сигнала. Совпадение настроек не является проверкой bit-perfect.',content:[]},mpd,album]};
   }
   async refresh(){const ui=await this.ui();this.router.broadcastMessage('pushUiConfig',ui);return ui;}
   refreshDevices(){return kew(this.refresh());}

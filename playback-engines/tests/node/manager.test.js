@@ -163,3 +163,49 @@ test('waits for native MPD async file write even when its callback fires early',
   await e.manager.apply(next);await new Promise(resolve=>setTimeout(resolve,80));
   assert.match(fs.readFileSync(e.conf,'utf8'),/name "Playback Engines"/);
 });
+
+test('Album Player bypass releases its retained PCM before checking the next track',async t=>{
+  const http=require('node:http');const e=environment(t);let held=false,config={};
+  const server=http.createServer(async(req,res)=>{
+    for await(const chunk of req){}const action=req.headers.soapaction.split('#')[1].replace('"','');
+    if(action==='Play')held=true; // Native Stop and natural end both retain the PCM handle.
+    let fields='';if(action==='GetTransportInfo')fields='<CurrentTransportState>PLAYING</CurrentTransportState><CurrentTransportStatus>OK</CurrentTransportStatus>';
+    if(action==='GetPositionInfo')fields='<RelTime>0:00:01.000</RelTime><TrackDuration>0:03:00.000</TrackDuration>';
+    res.end(`<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:${action}Response xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">${fields}</u:${action}Response></s:Body></s:Envelope>`);
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>{server.closeAllConnections();server.close();});
+  e.manager.runtime.stopRenderer=async()=>{held=false;};
+  e.manager.runtime.startRenderer=async()=>{e.manager.runtime.endpoints={controlUrl:`http://127.0.0.1:${server.address().port}/control`};};
+  e.manager.runtime.requestConfig=async value=>{if(value)config={...value};return{...config};};
+  e.manager.runtime.probe=async()=>({rate:44100,bits:16,channels:2});
+  e.manager.runtime.check=async()=>{if(held)throw Object.assign(Error('busy'),{code:'PCM_BUSY'});};
+  e.sm.consumeState={};e.sm.setConsumeUpdateService=async source=>{e.sm.consumeState.service=source;};e.sm.syncState=async()=>{};
+  await e.manager.start();t.after(()=>e.manager.close());
+  const next=defaults();next.managed=true;next.device={key:e.card.key,label:e.card.label};next.engine='album_player';await e.manager.apply(next);
+  const transport=e.manager.createTransport('qobuz_custom');
+  assert.equal(await transport.play('http://127.0.0.1/first.wav',{uri:'qobuz_custom/track/1',duration:180},()=>true),true);
+  await transport.stop();assert.equal(held,true);
+  assert.equal(await transport.play('http://127.0.0.1/second.wav',{uri:'qobuz_custom/track/2',duration:180},()=>true),true);
+});
+
+test('preflight failures appear in engine status and a later successful track clears them',async t=>{
+ const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
+ const next=defaults();next.managed=true;next.device={key:e.card.key,label:e.card.label};next.modes.mpd='bypass';await e.manager.apply(next);
+ e.manager.runtime.probe=async()=>{throw Object.assign(Error('unsupported'),{code:'UNSUPPORTED_FORMAT'});};
+ const transport=e.manager.createTransport('qobuz_custom');
+ await assert.rejects(transport.play('http://127.0.0.1/file',{},()=>true),{code:'UNSUPPORTED_FORMAT'});
+ assert.equal(e.manager.status().error,'UNSUPPORTED_FORMAT');
+ e.manager.runtime.probe=async()=>({rate:44100,bits:16,channels:2});e.manager.runtime.check=async()=>{};e.sm.setConsumeUpdateService=async()=>{};
+ assert.equal(await transport.play('http://127.0.0.1/file',{},()=>true),true);assert.equal(e.manager.status().error,null);
+});
+
+test('cancelling a launch after Album Player accepts Play still stops that renderer',async t=>{
+ const http=require('node:http');const e=environment(t);let valid=true,config={};const actions=[];
+ const server=http.createServer(async(req,res)=>{for await(const _ of req){}const action=req.headers.soapaction.split('#')[1].replace('"','');actions.push(action);if(action==='Play')valid=false;res.end(`<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:${action}Response xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"/></s:Body></s:Envelope>`);});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>{server.closeAllConnections();server.close();});
+ e.manager.runtime.startRenderer=async()=>{e.manager.runtime.endpoints={controlUrl:`http://127.0.0.1:${server.address().port}/control`};};e.manager.runtime.requestConfig=async value=>{if(value)config={...value};return{...config};};
+ e.sm.consumeState={};e.sm.setConsumeUpdateService=async source=>{e.sm.consumeState.service=source;};
+ await e.manager.start();t.after(()=>e.manager.close());const next=defaults();next.managed=true;next.engine='album_player';next.modes.album_player='custom';next.device={key:e.card.key,label:e.card.label};await e.manager.apply(next);
+ assert.equal(await e.manager.createTransport('qobuz_custom').play('http://127.0.0.1/file',{duration:1},()=>valid),false);
+ assert.equal(actions.at(-1),'Stop');assert.equal(e.manager.active,null);
+});

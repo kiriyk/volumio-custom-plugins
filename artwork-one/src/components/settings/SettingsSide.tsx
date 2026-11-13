@@ -40,7 +40,7 @@ export default function SettingsSide() {
           {resampling !== null && why !== 'UNKNOWN' ? <div className="aw-badge"><span className={'aw-badge__dot' + (why ? ' aw-badge__dot--warn' : '')} /><span className="mono">{why || 'BIT PERFECT'}</span></div> : null}
           <ol className="aw-path">
             {source ? <li><div className="aw-path__name">Source</div><div className="aw-path__val mono">{source}</div></li> : null}
-            {engine ? <li><div className="aw-path__name">Engine</div><div className="aw-path__val mono">{engine.engine} · {engine.processing}</div></li> : null}
+            {engine ? <li><div className="aw-path__name">Engine</div><div className="aw-path__val mono">{engine.engineLabel} · {engine.processing}</div></li> : null}
             {!engine && resampling !== null ? <li><div className="aw-path__name">Resampling</div><div className="aw-path__val mono">{resampling ? (alsa && alsa.resamplingTarget ? 'ON · ' + alsa.resamplingTarget : 'ON') : 'NONE · PASSTHROUGH'}</div></li> : null}
             {dsp ? <li><div className="aw-path__name">DSP</div><div className="aw-path__val mono">{dsp}</div></li> : null}
             {!engine && mixer ? <li><div className="aw-path__name">Volume</div><div className="aw-path__val mono">{mixer}</div></li> : null}
