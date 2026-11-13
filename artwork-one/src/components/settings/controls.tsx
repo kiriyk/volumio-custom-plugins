@@ -15,7 +15,7 @@ const optVal = (o: Option) => typeof o === 'string' ? o : (o.value !== undefined
 const eq = (a: any, b: any) => a === b || (a !== null && b !== null && a !== undefined && b !== undefined && typeof a !== 'object' && typeof b !== 'object' && String(a) === String(b));
 export function same(v: any, o: Option): boolean { if (eq(v, o)) { return true; } if (v && typeof v === 'object' && v.value !== undefined && typeof o === 'object') { return eq(v.value, o.value); } return typeof o !== 'object' ? eq(v, o) : false; }
 
-export function Select({ value, options, onChange, label, className, placeholder, byLabel }: { value: any; options: Option[]; onChange: (o: Option) => void; label?: string; className?: string; placeholder?: string; byLabel?: boolean }) {
+export function Select({ value, options, onChange, label, className, placeholder, byLabel, disablePlaceholder }: { value: any; options: Option[]; onChange: (o: Option) => void; label?: string; className?: string; placeholder?: string; byLabel?: boolean; disablePlaceholder?: boolean }) {
   // The value says which option is chosen; when several share it ("Audio Jack" and "HDMI Out"), the label picks among them.
   // A field whose value does not tell the options apart at all says so with byLabel: the I2S DAC saves its overlay, which
   // "R-PI DAC" and "BassFly-uHAT" share, and an option's own value ("bassfly") is not what is saved. Its label is the truth.
@@ -29,7 +29,7 @@ export function Select({ value, options, onChange, label, className, placeholder
       <select value={idx < 0 ? '' : String(idx)} onChange={(e) => onChange(options[Number(e.target.value)])} aria-label={label}>
         {/* a value none of the options carries (a filter named with $samplerate$, a file since removed):
             its own label, as Volumio's interfaces show it; the placeholder only when it has none */}
-        {idx < 0 ? <option value="">{lab !== undefined && lab !== null && String(lab) !== '' ? String(lab) : (placeholder || '')}</option> : null}
+        {idx < 0 ? <option value="" disabled={disablePlaceholder}>{lab !== undefined && lab !== null && String(lab) !== '' ? String(lab) : (placeholder || '')}</option> : null}
         {options.map((o, i) => <option key={i} value={i}>{optLabel(o)}</option>)}
       </select>
       <span className="caret" />

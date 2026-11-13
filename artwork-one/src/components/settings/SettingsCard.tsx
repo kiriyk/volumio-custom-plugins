@@ -41,6 +41,10 @@ export interface RowView {
   label: string;
   hint?: ReactNode;
   hintMono?: boolean;
+  options?: any[];
+  selectValue?: any;
+  placeholder?: string;
+  forceSelect?: boolean;
   button?: string;      // the button's own text when it says more than the row's label
   changed?: boolean;    // its value differs from what the player sent
 }
@@ -76,10 +80,12 @@ function Control({ row, onChange, onButton }: { row: RowView; onChange: () => vo
   if (item.element === 'select') {
     // two or three choices as a segment, but only for a value one of them carries: a segment cannot
     // show anything else, the select shows the value's own label (as Volumio does)
-    const seg = item.options && item.options.length > 1 && item.options.length <= 3 && item.options.some((o: any) => same(item.value, o) || (item.value && typeof item.value === 'object' && o && typeof o === 'object' && o.label === item.value.label));
+    const options = row.options || item.options || [];
+    const value = 'selectValue' in row ? row.selectValue : item.value;
+    const seg = !row.forceSelect && options.length > 1 && options.length <= 3 && options.some((o: any) => same(value, o) || (value && typeof value === 'object' && o && typeof o === 'object' && o.label === value.label));
     return seg
-      ? <Segment value={item.value} options={item.options} onChange={(o) => { item.value = o; onChange(); }} label={row.label} />
-      : <Select value={item.value} options={item.options || []} onChange={(o) => { item.value = o; onChange(); }} label={row.label} placeholder="Введите адрес…" byLabel={item.id === 'i2sid'} />;
+      ? <Segment value={value} options={options} onChange={(o) => { item.value = o; onChange(); }} label={row.label} />
+      : <Select value={value} options={options} onChange={(o) => { item.value = o; onChange(); }} label={row.label} placeholder={row.placeholder || "Введите адрес…"} disablePlaceholder={row.forceSelect} byLabel={item.id === 'i2sid'} />;
   }
   if (item.element === 'button') {
     const c = item.onClick || {};

@@ -19,6 +19,7 @@ import { buildDay } from '../core/format';
 import { CORE } from '../components/settings/CoreSections';
 import AppearanceSlot from '../components/settings/AppearanceSlot';
 import Spinner from '../components/Spinner';
+import { audioPresentation, audioSectionVisible, audioFieldVisible } from '../core/audioPresentation';
 import { AUDIO_PAGE, ENGINE_PAGE, audioSettingsConfig, engineSettingsEnabled } from '../core/audioSettings';
 
 function visible(item: any, section: any): boolean {
@@ -53,6 +54,7 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
   const isAudio = pageKey(pluginName) === AUDIO_PAGE && !wizard;
   const isEngine = pageKey(pluginName) === ENGINE_PAGE && !wizard;
   useEffect(() => { if (isEngine && engineEnabled) { nav('/plugin/audio_interface-alsa_controller', { replace: true }); } }, [isEngine, engineEnabled, nav]);
+  const [advancedOutputs, setAdvancedOutputs] = useState(false);
   const [obj, setObj] = useState<any>(null);
   const [show, setShow] = useState(false);
   const [answered, setAnswered] = useState(false);   // the ask came back empty
@@ -67,7 +69,7 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
   const rerender = () => bump(n => n + 1);
   useEffect(() => {
     useSettings.setState({ route: { name: 'volumio.plugin', pluginName } });
-    setObj(null); setShow(false);
+    setObj(null); setShow(false); setAdvancedOutputs(false);
     let alive = true;
     setAnswered(false);
     const take = (data: any) => {
@@ -137,7 +139,8 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
   const page = obj.page || {};
   const copy = pageCopy(pluginName);
   const help = helpItem(obj);
-  const sections: any[] = (obj.sections || []).filter((s: any) => !s.hidden && !(s.coreSection && (copy.dropCore || []).indexOf(s.coreSection) > -1));
+  const audio = isAudio && engineEnabled ? audioPresentation(obj, advancedOutputs) : null;
+  const sections: any[] = (obj.sections || []).filter((s: any) => !s.hidden && (!audio || audioSectionVisible(audio, s.id)) && !(s.coreSection && (copy.dropCore || []).indexOf(s.coreSection) > -1));
   const order = copy.first || [];
   const rank = (s: any) => { const i = order.indexOf(s.id); return i < 0 ? order.length : i; };
   sections.sort((a, b) => rank(a) - rank(b));   // stable: the rest keep the player's order
@@ -154,11 +157,20 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
     const sc = (copy.sections || {})[section.id];
     const rows: RowView[] = [];
     (section.content || []).forEach((item: any) => {
+      if (audio && !audioFieldVisible(audio, section.id, item.id)) { return; }
       if (!visible(item, section) || item === help) { return; }
       const ic = itemCopy(sc && sc.items ? sc.items[item.id] : undefined, String(item.label ?? ''));
       const btn = item.button_label !== undefined && !same(item.button_label, item.label) ? String(item.button_label) : undefined;
       const row: RowView = { item, label: ic.label, hint: ic.hint || hintOf(item, ic.label), button: ic.button || btn };
       if (pluginName === 'system_controller-system' && item.id === 'update' && systemInfo && systemInfo.systemversion) { row.hint = 'INSTALLED ' + systemInfo.systemversion + (systemInfo.builddate ? ' · ' + buildDay(systemInfo.builddate) : ''); row.hintMono = true; }
+      if (audio && section.id === 'selection' && item.id === 'device') {
+        row.options = audio.options; row.forceSelect = true;
+        if (audio.unavailable) {
+          row.selectValue = null; row.placeholder = 'Выберите аудиовыход';
+          row.hint = 'Сохранённый выход: ' + audio.unavailable + '. Выберите подключённое устройство и нажмите «Применить».';
+        }
+        if (audio.hasAdvanced) { row.hint = <>{row.hint ? <span>{row.hint}</span> : null}<button type="button" className="aw-sc__cancel" style={{display: 'block', marginTop: 8}} aria-expanded={advancedOutputs} onClick={() => setAdvancedOutputs(v => !v)}>{advancedOutputs ? 'Скрыть дополнительные выходы' : 'Дополнительные выходы'}</button></>; }
+      }
       const own = (copy.ownCard || {})[item.id];
       if (own) { moved.push({ section, card: { key: own.id, id: own.id, label: own.label, icon: own.icon, danger: own.danger, rows: [row] } }); return; }
       rows.push(row);

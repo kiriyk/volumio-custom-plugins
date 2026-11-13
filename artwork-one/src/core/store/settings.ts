@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { on, emit } from '../socket';
 import { askUiConfig, onUiConfig } from '../uiConfig';
 import { rest } from '../api';
+import { audioPresentation, audioSectionVisible, audioFieldVisible } from '../audioPresentation';
 import { usePlugins } from './plugins';
 import { AUDIO_PAGE, ENGINE_PAGE, engineSettingsEnabled, settingsRequestPage } from '../audioSettings';
 import { usePlayer } from './player';
@@ -18,6 +19,8 @@ export interface Alsa { output: string; mixerType: string; mixer: string; resamp
 export interface SearchResult { kind: 'page' | 'section' | 'row'; title: string; sub: string; eyebrow: string; item: MenuItem; section?: string; row?: string; key: string }
 
 interface SettingsStore {
+  audioConfig: any;
+  savedAudioConfig: any;
   network: any[] | null;
   stats: any;
   alsa: Alsa | null;
@@ -45,12 +48,17 @@ const THEME_SECTIONS: Record<string, Section[]> = { 'miscellanea/appearance': [{
 const norm = (v: any) => String(v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 export const useSettings = create<SettingsStore>((_set, get) => ({
-  network: null, stats: null, alsa: null, searchIndex: {}, extraPages: null, asking: null, searchQuery: '', searchFocus: 0, route: { name: '', pluginName: '' },
+  audioConfig: null, savedAudioConfig: null, network: null, stats: null, alsa: null, searchIndex: {}, extraPages: null, asking: null, searchQuery: '', searchFocus: 0, route: { name: '', pluginName: '' },
   setSearch: (q) => { _set({ searchQuery: q, searchFocus: 0 }); if (q.trim()) { get().askMissing(); } },
   menu: () => useMenu.getState().items.filter(i => i && i.id !== 'my-volumio'),
   allPages: () => get().menu().concat(get().extraPages || []),
   pluginPages: () => get().allPages().filter(i => i && i.state === 'volumio.plugin' && i.params && i.params.pluginName),
-  sectionsOf: (pn) => (get().searchIndex[pn] || []).concat(THEME_SECTIONS[pn] || []),
+  sectionsOf: (pn) => {
+    const st = get();
+    const editingAudio = st.route.name === 'volumio.plugin' && st.route.pluginName.replace('-', '/') === AUDIO_PAGE;
+    const cfg = editingAudio ? st.audioConfig : st.savedAudioConfig;
+    return (pn === AUDIO_PAGE && cfg ? sectionsOfCfg(pn, cfg) : (st.searchIndex[pn] || [])).concat(THEME_SECTIONS[pn] || []);
+  },
   searchSettings: (q) => {
     const needle = norm(q).trim();
     if (!needle) { return []; }
@@ -148,14 +156,15 @@ function readAlsa(cfg: any) {
 // an item moved to a card of its own under that card
 function sectionsOfCfg(page: string, cfg: any): Section[] {
   const copy = pageCopy(String(page).replace('/', '-'));
+  const audio = page === AUDIO_PAGE && engineSettingsEnabled(usePlugins.getState().installed) ? audioPresentation(cfg) : null;
   const out: Section[] = [];
   const own: Section[] = [];
   (cfg.sections || []).forEach((s: any) => {
-    if (!s || s.hidden || !s.id) { return; }
+    if (!s || s.hidden || !s.id || (audio && !audioSectionVisible(audio, s.id))) { return; }
     const sc = (copy.sections || {})[s.id];
     const sec: Section = { id: String(s.id), label: sectionLabel(sc, String(s.label || '')), rows: [] };
     (s.content || []).forEach((c: any) => {
-      if (!c || c.hidden || !c.id || !c.label) { return; }
+      if (!c || c.hidden || !c.id || !c.label || (audio && !audioFieldVisible(audio, s.id, c.id))) { return; }
       const row = { id: String(c.id), label: itemCopy(sc && sc.items ? sc.items[c.id] : undefined, String(c.label)).label };
       const o = (copy.ownCard || {})[c.id];
       if (o) { own.push({ id: o.id, label: o.label, rows: [row] }); return; }
@@ -175,18 +184,22 @@ function indexUiConfig(page: string | null, cfg: any) {
     if (key === AUDIO_PAGE) { return; }
     if (key === ENGINE_PAGE) { key = AUDIO_PAGE; }
   }
-  useSettings.setState({ searchIndex: { ...st.searchIndex, [key]: sectionsOfCfg(key, cfg) } });
+  useSettings.setState({ ...(key === AUDIO_PAGE ? {audioConfig: cfg, savedAudioConfig: JSON.parse(JSON.stringify(cfg))} : {}), searchIndex: { ...st.searchIndex, [key]: sectionsOfCfg(key, cfg) } });
 }
 
 on('pushInfoNetwork', (d: any) => useSettings.setState({ network: Array.isArray(d) ? d : (d ? [d] : null) }));
 onUiConfig((page, cfg) => { readAlsa(cfg); indexUiConfig(page, cfg); });
+let indexedEngineEnabled = false;
 on('pushInstalledPlugins', (list: any) => {
+  const enabled = engineSettingsEnabled(Array.isArray(list) ? list : []);
+  const sourceChanged = enabled !== indexedEngineEnabled;
+  indexedEngineEnabled = enabled;
   const parent = useSettings.getState().menu().find(i => i && i.state === 'volumio.plugin-manager');
   const extra = (Array.isArray(list) ? list : []).filter(pl => pl && pl.name && pl.category && !(pl.category === 'audio_interface' && pl.name === 'playback_engines') && (pl.enabled === true || pl.enabled === 'true'))
     .map(pl => ({ name: String(pl.prettyName || pl.name), state: 'volumio.plugin', params: { pluginName: pl.category + '/' + pl.name }, group: parent ? String(parent.name) : 'Плагины', installed: true } as any));
   const searchIndex = { ...useSettings.getState().searchIndex };
-  delete searchIndex[AUDIO_PAGE]; // controller enable/disable changes the sections behind Audio
-  useSettings.setState({ extraPages: extra, searchIndex });
+  if (sourceChanged) { delete searchIndex[AUDIO_PAGE]; }
+  useSettings.setState({ extraPages: extra, searchIndex, ...(sourceChanged ? {audioConfig: null, savedAudioConfig: null} : {}) });
   if (useSettings.getState().asking === '*installed') { useSettings.setState({ asking: null }); askNext(); }
 });
 emit('getInfoNetwork');
