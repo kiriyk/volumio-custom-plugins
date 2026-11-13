@@ -28,14 +28,14 @@ export default function ConnectionLost() {
   if (!lost) { return null; }
   const secs = Math.max(0, Math.round((now - since) / 1000));
   return (
-    <div className="aw-connlost" role="alertdialog" aria-live="assertive" aria-label="Connection lost">
+    <div className="aw-connlost" role="alertdialog" aria-live="assertive" aria-label="Соединение потеряно">
       <div className="aw-connlost__card">
         <Spinner size={28} />
-        <h2 className="aw-connlost__title">Connection lost</h2>
-        <p className="aw-connlost__text">Trying to reconnect to Volumio…</p>
+        <h2 className="aw-connlost__title">Соединение потеряно</h2>
+        <p className="aw-connlost__text">Повторное подключение к Volumio…</p>
         <p className="aw-connlost__seen mono">LAST SEEN {ago(secs).toUpperCase()} AGO</p>
-        <p className="aw-connlost__hint">If the device is restarting or updating, this can take a couple of minutes.</p>
-        {secs >= RELOAD_AFTER ? <button type="button" className="aw-btn aw-btn--primary" onClick={() => window.location.reload()}><span>Reload</span></button> : null}
+        <p className="aw-connlost__hint">Перезапуск или обновление устройства может занять несколько минут.</p>
+        {secs >= RELOAD_AFTER ? <button type="button" className="aw-btn aw-btn--primary" onClick={() => window.location.reload()}><span>Перезагрузить страницу</span></button> : null}
       </div>
     </div>
   );

@@ -14,12 +14,12 @@ export default function PowerSheet() {
       </div>
       <div className="aw-power__actions">
         <button type="button" id="powerOffBtn" className="aw-power__row aw-power__row--primary" onClick={() => { emit('shutdown'); close(); }}>
-          <Icon name="power_settings_new" /><span className="aw-power__label">Power off</span>
+          <Icon name="power_settings_new" /><span className="aw-power__label">Выключить</span>
         </button>
         <button type="button" id="rebootBtn" className="aw-power__row" onClick={() => { emit('reboot'); close(); }}>
-          <Icon name="restart_alt" /><span className="aw-power__label">Reboot</span>
+          <Icon name="restart_alt" /><span className="aw-power__label">Перезагрузить</span>
         </button>
-        <button type="button" className="aw-power__cancel" onClick={close}><span>Cancel</span></button>
+        <button type="button" className="aw-power__cancel" onClick={close}><span>Отмена</span></button>
       </div>
     </div>
   );

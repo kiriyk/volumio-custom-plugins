@@ -7,6 +7,8 @@ import { create } from 'zustand';
 import { on, emit } from '../socket';
 import { askUiConfig, onUiConfig } from '../uiConfig';
 import { rest } from '../api';
+import { usePlugins } from './plugins';
+import { AUDIO_PAGE, ENGINE_PAGE, engineSettingsEnabled, settingsRequestPage } from '../audioSettings';
 import { usePlayer } from './player';
 import { useMenu, itemKey, type MenuItem } from './menu';
 import { pageCopy, sectionLabel, itemCopy } from '../settingsCopy';
@@ -102,8 +104,12 @@ function askNext() {
   if (!next) { useSettings.setState({ asking: null }); return; }
   const pn = next.params!.pluginName!;
   useSettings.setState({ asking: pn });
-  askUiConfig(pn).then(cfg => {
+  const requestedPage = settingsRequestPage(pn, engineSettingsEnabled(usePlugins.getState().installed));
+  askUiConfig(requestedPage).then(cfg => {
     if (useSettings.getState().asking !== pn) { return; }
+    if (requestedPage !== settingsRequestPage(pn, engineSettingsEnabled(usePlugins.getState().installed))) {
+      useSettings.setState({ asking: null }); askNext(); return;
+    }
     const secs = cfg && Array.isArray(cfg.sections) ? sectionsOfCfg(pn, cfg) : [];
     useSettings.setState({ searchIndex: { ...useSettings.getState().searchIndex, [pn]: secs }, asking: null });
     askNext();
@@ -163,8 +169,12 @@ function sectionsOfCfg(page: string, cfg: any): Section[] {
 function indexUiConfig(page: string | null, cfg: any) {
   if (!cfg || !Array.isArray(cfg.sections)) { return; }
   const st = useSettings.getState();
-  const key = page ? page.replace('-', '/') : (st.route.name === 'volumio.plugin' && st.route.pluginName ? st.route.pluginName.replace('-', '/') : null);
+  let key = page ? (page.includes('/') ? page : page.replace('-', '/')) : (st.route.name === 'volumio.plugin' && st.route.pluginName ? st.route.pluginName.replace('-', '/') : null);
   if (!key) { return; }
+  if (engineSettingsEnabled(usePlugins.getState().installed)) {
+    if (key === AUDIO_PAGE) { return; }
+    if (key === ENGINE_PAGE) { key = AUDIO_PAGE; }
+  }
   useSettings.setState({ searchIndex: { ...st.searchIndex, [key]: sectionsOfCfg(key, cfg) } });
 }
 
@@ -172,9 +182,11 @@ on('pushInfoNetwork', (d: any) => useSettings.setState({ network: Array.isArray(
 onUiConfig((page, cfg) => { readAlsa(cfg); indexUiConfig(page, cfg); });
 on('pushInstalledPlugins', (list: any) => {
   const parent = useSettings.getState().menu().find(i => i && i.state === 'volumio.plugin-manager');
-  const extra = (Array.isArray(list) ? list : []).filter(pl => pl && pl.name && pl.category && (pl.enabled === true || pl.enabled === 'true'))
-    .map(pl => ({ name: String(pl.prettyName || pl.name), state: 'volumio.plugin', params: { pluginName: pl.category + '/' + pl.name }, group: parent ? String(parent.name) : 'Plugins', installed: true } as any));
-  useSettings.setState({ extraPages: extra });
+  const extra = (Array.isArray(list) ? list : []).filter(pl => pl && pl.name && pl.category && !(pl.category === 'audio_interface' && pl.name === 'playback_engines') && (pl.enabled === true || pl.enabled === 'true'))
+    .map(pl => ({ name: String(pl.prettyName || pl.name), state: 'volumio.plugin', params: { pluginName: pl.category + '/' + pl.name }, group: parent ? String(parent.name) : 'Плагины', installed: true } as any));
+  const searchIndex = { ...useSettings.getState().searchIndex };
+  delete searchIndex[AUDIO_PAGE]; // controller enable/disable changes the sections behind Audio
+  useSettings.setState({ extraPages: extra, searchIndex });
   if (useSettings.getState().asking === '*installed') { useSettings.setState({ asking: null }); askNext(); }
 });
 emit('getInfoNetwork');

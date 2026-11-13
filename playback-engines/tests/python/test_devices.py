@@ -69,6 +69,51 @@ class DevicesTests(unittest.TestCase):
         self.card(0, usb=False)
         self.assertEqual(devices.enumerate_devices(self.proc, self.sys)[0]['key'], 'alsa:DAC:0')
 
+    def test_pi_outputs_have_friendly_labels_without_changing_pcm_identity(self):
+        for index, alsa_id, driver in [(4, 'b1', 'bcm2835-audio'),
+                                       (7, 'Headphones', 'bcm2835-audio'),
+                                       (2, 'vc4hdmi0', 'vc4_hdmi'),
+                                       (9, 'vc4hdmi1', 'vc4_hdmi')]:
+            card = self.card(index, usb=False)
+            (card / 'id').write_text(alsa_id)
+            hardware = (self.sys / 'class/sound' / ('card%d' % index)).resolve()
+            (hardware / 'device').mkdir()
+            (hardware / 'device/driver').symlink_to('/sys/bus/platform/drivers/' + driver)
+            if alsa_id == 'b1':
+                (card / 'pcm1p').mkdir()
+        (self.proc / 'asound/cards').write_text(
+            ' 4 [b1             ]: bcm2835_hdmi - bcm2835 HDMI 1\n'
+            '                      bcm2835 HDMI 1\n'
+            ' 7 [Headphones     ]: bcm2835_headpho - bcm2835 Headphones\n'
+            ' 2 [vc4hdmi0       ]: vc4-hdmi - vc4-hdmi-0\n'
+            ' 9 [vc4hdmi1       ]: vc4-hdmi - vc4-hdmi-1\n')
+        result = {item['pcm']: item for item in devices.enumerate_devices(self.proc, self.sys)}
+        expected = {
+            'hw:CARD=b1,DEV=0': ('HDMI выход 1 (совместимый)', 'alsa:b1:0', 4, 0),
+            'hw:CARD=b1,DEV=1': ('HDMI выход 2 (совместимый)', 'alsa:b1:1', 4, 1),
+            'hw:CARD=Headphones,DEV=0': ('Jack 3,5 мм', 'alsa:Headphones:0', 7, 0),
+            'hw:CARD=vc4hdmi0,DEV=0': ('HDMI выход 1', 'alsa:vc4hdmi0:0', 2, 0),
+            'hw:CARD=vc4hdmi1,DEV=0': ('HDMI выход 2', 'alsa:vc4hdmi1:0', 9, 0),
+        }
+        self.assertEqual(set(result), set(expected))
+        for pcm, values in expected.items():
+            self.assertEqual(tuple(result[pcm][key] for key in ('label', 'key', 'index', 'device')), values)
+            self.assertFalse(result[pcm]['usb'])
+
+    def test_usb_product_name_is_preserved_and_multiple_endpoints_distinguished(self):
+        card = self.card(3)
+        hardware = (self.sys / 'class/sound/card3').resolve()
+        (hardware.parents[2] / 'product').write_text('FiiO BTA30 PRO')
+        self.assertEqual(devices.enumerate_devices(self.proc, self.sys)[0]['label'], 'FiiO BTA30 PRO')
+        (card / 'pcm3p').mkdir()
+        self.assertEqual([item['label'] for item in devices.enumerate_devices(self.proc, self.sys)],
+                         ['FiiO BTA30 PRO (выход 1)', 'FiiO BTA30 PRO (выход 4)'])
+
+    def test_unknown_card_id_is_preserved_without_guessing_pi_output(self):
+        card = self.card(0, usb=False)
+        (card / 'id').write_text('b1')
+        self.assertEqual(devices.enumerate_devices(self.proc, self.sys)[0]['label'], 'b1')
+
     def test_invalid_cli_arguments_return_bounded_json(self):
         for argv in [['check', 'hw:0;touch /tmp/oops', '44100', '24', '2'], ['check', 'default', '44100', '24', '2'], ['discover', '../1'], ['check', 'hw:CARD=DAC,DEV=0', '0', '24', '2'], ['unknown'], ['check']]:
             output = io.StringIO()

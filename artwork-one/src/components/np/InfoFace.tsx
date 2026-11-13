@@ -53,16 +53,16 @@ export default function InfoFace() {
             {artistSub ? <span className="np-about__sub">{artistSub}</span> : null}
           </div>
           {artist && artist.extract ? <p className="np-about__text">{artist.extract}</p> : null}
-          {artist && artist.extract && artist.url && !KIOSK ? <a className="np-about__src mono" href={artist.url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>BIO · WIKIPEDIA</a> : null}
-          {artist && artist.extract && (!artist.url || KIOSK) ? <span className="np-about__src mono">BIO · WIKIPEDIA</span> : null}
+          {artist && artist.extract && artist.url && !KIOSK ? <a className="np-about__src mono" href={artist.url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>БИОГРАФИЯ · WIKIPEDIA</a> : null}
+          {artist && artist.extract && (!artist.url || KIOSK) ? <span className="np-about__src mono">БИОГРАФИЯ · WIKIPEDIA</span> : null}
           {artist && artist.related && artist.related.length ? (
             <div className="np-about__related">
-              <span className="np-about__role mono">RELATED</span>
-              <div className="np-about__chips">{artist.related.map(r => <button type="button" className="np-about__chip" key={r.mbid} onClick={(e) => findArtist(e, r.name)} title={'Search for ' + r.name}>{r.name}</button>)}</div>
+              <span className="np-about__role mono">ПОХОЖИЕ</span>
+              <div className="np-about__chips">{artist.related.map(r => <button type="button" className="np-about__chip" key={r.mbid} onClick={(e) => findArtist(e, r.name)} title={'Найти: ' + r.name}>{r.name}</button>)}</div>
             </div>
           ) : null}
         </div>
-        {canGo ? <button type="button" className="np-about__go" aria-label="Open the artist"><span>Artist</span><Icon name="chevron_right" /></button> : null}
+        {canGo ? <button type="button" className="np-about__go" aria-label="Открыть исполнителя"><span>Исполнитель</span><Icon name="chevron_right" /></button> : null}
       </div>
       {st.album ? (
         <div className={'np-about__row np-about__row--album' + (canGo ? ' is-link' : '')} onClick={goAlbum}>
@@ -73,7 +73,7 @@ export default function InfoFace() {
             {album && album.extract ? <p className="np-about__text np-about__text--album">{album.extract}</p> : null}
             {album && album.credits && album.credits.length ? creditRows(album.credits) : null}
           </div>
-          {canGo ? <button type="button" className="np-about__go" aria-label="Open the album"><span>Album</span><Icon name="chevron_right" /></button> : null}
+          {canGo ? <button type="button" className="np-about__go" aria-label="Открыть альбом"><span>Альбом</span><Icon name="chevron_right" /></button> : null}
         </div>
       ) : null}
       {track && track.credits.length ? (
@@ -81,7 +81,7 @@ export default function InfoFace() {
           <div className="np-about__img np-about__img--track"><Icon name="music_note" /></div>
           <div className="np-about__body">
             <div className="np-about__name">{st.title}</div>
-            <div className="np-about__sub">This track</div>
+            <div className="np-about__sub">Этот трек</div>
             {creditRows(track.credits)}
           </div>
         </div>

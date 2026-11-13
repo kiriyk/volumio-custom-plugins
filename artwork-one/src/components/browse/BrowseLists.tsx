@@ -60,7 +60,7 @@ export default function BrowseLists({ lists, filter, sortDesc, isArtist, artists
                     return cell(li, ii, items, asGrid, hidden, rank ? rank[key] : undefined);
                   })}
                   {asGrid ? placeholders : null}
-                  {items.length === 0 ? <h3 className="text-center panel-title">No items</h3> : null}
+                  {items.length === 0 ? <h3 className="text-center panel-title">Нет элементов</h3> : null}
                 </div>
               )}
           </div>

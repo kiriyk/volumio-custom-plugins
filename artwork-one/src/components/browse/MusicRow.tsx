@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import Icon from '../Icon';
 import ItemMenu from './ItemMenu';
 import { albumart } from '../../core/api';
+import { librarySectionArtwork } from '../../core/libraryArtwork';
 import { type BrowseItem, useBrowse } from '../../core/store/browse';
 import { usePlayer } from '../../core/store/player';
 import { quality, signal } from '../../core/format';
@@ -41,6 +42,8 @@ export default function MusicRow({ item, list, listIndex, itemIndex, hidden, ord
   useArtistCounts(rowRef, item.uri, artistsPage && item.type === 'folder', c => setCounts({uri:item.uri,text:countsText(c)}));
   const favVisible = A.showPlayButton(item) && (item.type === 'song' || item.type === 'folder-with-favourites') && (req ? req.uri : '') !== 'favourites';
   const noMenu = !A.showHamburgerMenu(item);
+  const libraryCover = librarySectionArtwork(item);
+  const cover = libraryCover || albumart(item.albumart);
   // a folder of the file browser (USB, NAS, internal storage) is opened, never played from its row:
   // no play button and no number (albums://, playlists and genres keep both)
   const isDir = /^(folder|remdisk|internal-folder)$/.test(String(item.type || '')) && /^music-library(\/|$)/.test(String(item.uri || ''));
@@ -59,9 +62,9 @@ export default function MusicRow({ item, list, listIndex, itemIndex, hidden, ord
           <button type="button" className="ghost-btn play-btn" onClick={playBtnClick}><Icon name={playing ? 'pause' : 'play_arrow'} className="play-btn__icon" /></button>
         </div>
         <div className="item__number">{item.tracknumber || (itemIndex + 1)}<span className="item__number-dot">.</span>{browserLoading ? <Spinner size={16} className="aw-loading-spin" /> : null}</div>
-        <div className={'item__image' + (!item.albumart && !item.icon ? ' hidden' : '')}>
-          <div className={'item__albumart' + (!item.albumart ? ' hidden' : '')}><img className="item__image__img" src={albumart(item.albumart)} alt="" /></div>
-          <div className={'item__albumart-icon' + (!item.icon ? ' hidden' : '')}><Icon name={A.faIcon(item.icon)} /></div>
+        <div className={'item__image' + (!cover && !item.icon ? ' hidden' : '')}>
+          <div className={'item__albumart' + (!cover ? ' hidden' : '')}><img className="item__image__img" src={cover} alt="" /></div>
+          <div className={'item__albumart-icon' + (!item.icon || libraryCover ? ' hidden' : '')}><Icon name={A.faIcon(item.icon)} /></div>
         </div>
         <div className="item__info">
           <div className={'item__title truncate-text ' + titleCls} title={item.title || ''}><span className="item__name">{item.title || ''} {item.tagImage ? <img className="music-card__extension tagrow" src={albumart(item.tagImage)} alt="" /> : null}</span>{recordingLabel ? <span className="item__recording-quality mono" title={recording?.basis === 'catalog' ? 'Качество записи по каталогу; качество текущего потока показано в плеере' : 'Доступный формат записи; качество текущего потока показано в плеере'}>{recordingLabel}</span> : null}</div>

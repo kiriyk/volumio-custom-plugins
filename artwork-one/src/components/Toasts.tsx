@@ -24,7 +24,7 @@ export default function Toasts() {
             {t.title ? <div className="toast-title">{t.title}</div> : null}
             {t.message ? <div className="toast-message">{t.message}</div> : null}
           </div>
-          {t.sticky ? <button type="button" className="toast-close-button" onClick={() => useToasts.getState().close(t.key)} aria-label="Close" /> : null}
+          {t.sticky ? <button type="button" className="toast-close-button" onClick={() => useToasts.getState().close(t.key)} aria-label="Закрыть" /> : null}
           {!t.sticky ? <Bar timeout={t.timeout} born={t.born} /> : null}
         </div>
       ))}

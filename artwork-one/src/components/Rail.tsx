@@ -1,3 +1,4 @@
+import { sourceLabel } from './navigationLabels';
 /** The rail (spec §5.1): Home, Music, the library's own sources, Now Playing; MyVolumio, zones and
  *  settings below. Icons only, or icons with labels — the toggle at the foot switches, per browser. */
 import React, { useEffect } from 'react';
@@ -47,27 +48,27 @@ export default function Rail() {
         <span className="rail__label rail__label--brand">Volumio</span>
       </div>
       <ul className="main-menu-list">
-        <Item icon="home" label="Home" open={open} active={at('/home')} onClick={() => nav('/home')} />
+        <Item icon="home" label="Главная" open={open} active={at('/home')} onClick={() => nav('/home')} />
         <Item icon="search" label="Поиск" open={open} active={at('/search')} onClick={() => { useBrowse.getState().setDedicated(true); nav('/search'); const q = useBrowse.getState().searchField; if (q.length >= 2) useBrowse.getState().search(q); }} />
-        <Item icon="album" label="Music" open={open} active={at('/browse') && !inMenu.some(s => sourceActive(s.uri))} onClick={goMusic} />
+        <Item icon="album" label="Музыка" open={open} active={at('/browse') && !inMenu.some(s => sourceActive(s.uri))} onClick={goMusic} />
         {/* the library's sources switched on in Appearance → Menu (Playlists and Favourites unless switched off) */}
-        {inMenu.map(s => <Item key={s.uri} mark={<SourceGlyph source={s} />} label={String(s.name || s.title || s.uri)} open={open} active={sourceActive(s.uri)} onClick={() => goSource(s)} />)}
-        <Item icon="graphic_eq" label="Now Playing" open={open} active={at('/playback')} onClick={() => nav('/playback')} />
+        {inMenu.map(s => <Item key={s.uri} mark={<SourceGlyph source={s} />} label={sourceLabel(s)} open={open} active={sourceActive(s.uri)} onClick={() => goSource(s)} />)}
+        <Item icon="graphic_eq" label="Сейчас играет" open={open} active={at('/playback')} onClick={() => nav('/playback')} />
       </ul>
       <ul className="main-menu-bottom">
         {scanning ? (
           <li className="rail__scan">
-            <a onClick={() => nav('/plugin/miscellanea-my_music')} aria-label="Updating library" title={open ? undefined : 'Updating library'}>
-              <span className="rail__scan-icon"><Spinner size={20} /></span><span className="rail__label">Updating library</span>
+            <a onClick={() => nav('/plugin/miscellanea-my_music')} aria-label="Обновление медиатеки" title={open ? undefined : 'Обновление медиатеки'}>
+              <span className="rail__scan-icon"><Spinner size={20} /></span><span className="rail__label">Обновление медиатеки</span>
             </a>
           </li>
         ) : null}
         {myVolumio && <Item icon="person" label="MyVolumio" open={open} active={loc.pathname.startsWith('/myvolumio')} onClick={() => goToMyVolumio(nav)} />}
-        <Item icon="speaker" label="Zones" open={open} active={at('/multi-room')} onClick={() => nav('/multi-room')} />
-        <Item icon="tune" label="Settings" open={open} active={loc.pathname.startsWith('/settings') || loc.pathname.startsWith('/plugin')} onClick={() => nav('/settings')} />
+        <Item icon="speaker" label="Зоны" open={open} active={at('/multi-room')} onClick={() => nav('/multi-room')} />
+        <Item icon="tune" label="Настройки" open={open} active={loc.pathname.startsWith('/settings') || loc.pathname.startsWith('/plugin')} onClick={() => nav('/settings')} />
         <li className="rail__toggle">
-          <a onClick={() => useUi.getState().toggleRail()} aria-label={open ? 'Collapse menu' : 'Expand menu'} title={open ? undefined : 'Expand menu'} aria-expanded={open}>
-            <Icon name={open ? 'left_panel_close' : 'left_panel_open'} /><span className="rail__label">Collapse</span>
+          <a onClick={() => useUi.getState().toggleRail()} aria-label={open ? 'Свернуть меню' : 'Развернуть меню'} title={open ? undefined : 'Развернуть меню'} aria-expanded={open}>
+            <Icon name={open ? 'left_panel_close' : 'left_panel_open'} /><span className="rail__label">Свернуть</span>
           </a>
         </li>
       </ul>

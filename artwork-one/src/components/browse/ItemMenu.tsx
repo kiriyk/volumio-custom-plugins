@@ -21,32 +21,32 @@ export function menuEntries(item: BrowseItem): MenuEntry[] {
   const out: MenuEntry[] = [];
   const sep = () => out.push({ label: '-', onClick: () => {} });
   const playable = A.showPlayButton(item), queueable = A.showAddToQueueButton(item);
-  if (playable) { out.push({ icon: 'play_arrow', label: 'Play now', title: 'Play', onClick: () => A.play(item) }); }
+  if (playable) { out.push({ icon: 'play_arrow', label: 'Воспроизвести сейчас', title: 'Воспроизвести', onClick: () => A.play(item) }); }
   if (queueable) {
-    out.push({ icon: 'playlist_play', label: 'Play next', title: 'Play next', onClick: () => A.playNext(item) });
-    out.push({ icon: 'queue_music', label: 'Play last', title: 'Add to queue', badge: q ? q : undefined, onClick: () => A.playLast(item) });
+    out.push({ icon: 'playlist_play', label: 'Воспроизвести следующим', title: 'Воспроизвести следующим', onClick: () => A.playNext(item) });
+    out.push({ icon: 'queue_music', label: 'В конец очереди', title: 'В очередь', badge: q ? q : undefined, onClick: () => A.playLast(item) });
   }
   const t = item.type;
   const collect = A.showAddToPlaylist(item) || pins.canPin(item) || t === 'song' || t === 'folder-with-favourites' || t === 'webradio' || t === 'mywebradio' || t === 'playlist';
   if ((playable || queueable) && collect) { sep(); }
-  if ((t === 'song' || t === 'folder-with-favourites') && req.uri !== 'favourites' && !item.favourite) { out.push({ icon: 'favorite', label: 'Add to Favorites', onClick: () => { pl.addToFavourites(item); b.favouritesChanged(); } }); }
-  if (req.uri === 'favourites' || item.favourite) { out.push({ icon: 'heart_broken', label: 'Remove from Favorites', onClick: () => { pl.removeFromFavourites(item); b.favouritesChanged(); } }); }
-  if (A.showAddToPlaylist(item)) { out.push({ icon: 'playlist_add', label: 'Add to Playlist…', onClick: () => A.addToPlaylist(item) }); }
-  if (pins.canPin(item)) { out.push({ icon: 'push_pin', label: pins.isPinned(item) ? 'Unpin' : 'Pin to Home', title: 'Pin to Home', onClick: () => { if (pins.isPinned(item)) { pins.unpin(item); } else { pins.pin(item); } } }); }
-  if (req.type === 'playlist') { out.push({ icon: 'playlist_remove', label: 'Remove from Playlist', onClick: () => pl.removeFromPlaylist(item, req.title || '') }); }
-  if (t === 'playlist') { out.push({ icon: 'delete', label: 'Delete Playlist', danger: true, onClick: () => pl.deletePlaylist(item.title || '') }); }
-  if (t === 'remdisk') { out.push({ icon: 'eject', label: 'Safe Remove Media', onClick: () => A.safeRemoveDrive(item.title || '') }); }
-  if ((t === 'folder' && String(item.uri).indexOf('music-library/') === 0) || t === 'internal-folder') { out.push({ icon: 'sync', label: 'Update Folder', onClick: () => A.updateFolder(item.uri) }); }
-  if (t === 'internal-folder') { out.push({ icon: 'delete', label: 'Delete Folder', danger: true, onClick: () => A.deleteFolder(req.uri, item) }); }
-  if (t === 'mywebradio-category') { out.push({ icon: 'add', label: 'Add Webradio', onClick: () => A.addWebRadio() }); }
-  if (t === 'mywebradio') { out.push({ icon: 'edit', label: 'Edit Webradio', onClick: () => A.addWebRadio(item) }); }
-  if (t === 'mywebradio' && req.uri === 'radio/myWebRadio') { out.push({ icon: 'delete', label: 'Delete Webradio', danger: true, onClick: () => pl.deleteWebRadio(item) }); }
-  if (t === 'webradio' || t === 'mywebradio') { out.push({ icon: 'favorite', label: 'Add to Radio Favorites', onClick: () => pl.addToFavourites(item) }); }
-  if (req.uri === 'radio/favourites' && (t === 'webradio' || t === 'mywebradio')) { out.push({ icon: 'heart_broken', label: 'Remove from Radio Favorites', onClick: () => pl.removeFromFavourites(item) }); }
+  if ((t === 'song' || t === 'folder-with-favourites') && req.uri !== 'favourites' && !item.favourite) { out.push({ icon: 'favorite', label: 'В избранное', onClick: () => { pl.addToFavourites(item); b.favouritesChanged(); } }); }
+  if (req.uri === 'favourites' || item.favourite) { out.push({ icon: 'heart_broken', label: 'Удалить из избранного', onClick: () => { pl.removeFromFavourites(item); b.favouritesChanged(); } }); }
+  if (A.showAddToPlaylist(item)) { out.push({ icon: 'playlist_add', label: 'В плейлист…', onClick: () => A.addToPlaylist(item) }); }
+  if (pins.canPin(item)) { out.push({ icon: 'push_pin', label: pins.isPinned(item) ? 'Открепить' : 'Закрепить на главной', title: 'Закрепить на главной', onClick: () => { if (pins.isPinned(item)) { pins.unpin(item); } else { pins.pin(item); } } }); }
+  if (req.type === 'playlist') { out.push({ icon: 'playlist_remove', label: 'Удалить из плейлиста', onClick: () => pl.removeFromPlaylist(item, req.title || '') }); }
+  if (t === 'playlist') { out.push({ icon: 'delete', label: 'Удалить плейлист', danger: true, onClick: () => pl.deletePlaylist(item.title || '') }); }
+  if (t === 'remdisk') { out.push({ icon: 'eject', label: 'Безопасно извлечь носитель', onClick: () => A.safeRemoveDrive(item.title || '') }); }
+  if ((t === 'folder' && String(item.uri).indexOf('music-library/') === 0) || t === 'internal-folder') { out.push({ icon: 'sync', label: 'Обновить папку', onClick: () => A.updateFolder(item.uri) }); }
+  if (t === 'internal-folder') { out.push({ icon: 'delete', label: 'Удалить папку', danger: true, onClick: () => A.deleteFolder(req.uri, item) }); }
+  if (t === 'mywebradio-category') { out.push({ icon: 'add', label: 'Добавить радиостанцию', onClick: () => A.addWebRadio() }); }
+  if (t === 'mywebradio') { out.push({ icon: 'edit', label: 'Изменить радиостанцию', onClick: () => A.addWebRadio(item) }); }
+  if (t === 'mywebradio' && req.uri === 'radio/myWebRadio') { out.push({ icon: 'delete', label: 'Удалить радиостанцию', danger: true, onClick: () => pl.deleteWebRadio(item) }); }
+  if (t === 'webradio' || t === 'mywebradio') { out.push({ icon: 'favorite', label: 'В избранные радиостанции', onClick: () => pl.addToFavourites(item) }); }
+  if (req.uri === 'radio/favourites' && (t === 'webradio' || t === 'mywebradio')) { out.push({ icon: 'heart_broken', label: 'Удалить из избранных радиостанций', onClick: () => pl.removeFromFavourites(item) }); }
   const goArtist = A.canGoToArtist(item), goAlbum = A.canGoToAlbum(item);
   if (goArtist || goAlbum) { sep(); }
-  if (goAlbum) { out.push({ icon: 'album', label: 'Go to album', onClick: () => A.goToAlbum(item) }); }
-  if (goArtist) { out.push({ icon: 'person', label: 'Go to artist', onClick: () => A.goToArtist(item) }); }
+  if (goAlbum) { out.push({ icon: 'album', label: 'К альбому', onClick: () => A.goToAlbum(item) }); }
+  if (goArtist) { out.push({ icon: 'person', label: 'К исполнителю', onClick: () => A.goToArtist(item) }); }
   if (['yandex_music','qobuz_custom'].includes(String(item.service)) && Array.isArray(item.artistLinks)) {
     for (const artist of item.artistLinks) {
       if (typeof artist?.uri === 'string' && /^(yandex_music|qobuz_custom)\/artist\/\d+$/.test(artist.uri)) {
@@ -59,7 +59,7 @@ export function menuEntries(item: BrowseItem): MenuEntry[] {
     out.push({icon:'download',label:'Скачать на внешний диск',onClick:()=>downloadQobuz(item.uri)});
     if (item.albumUri) out.push({icon:'album',label:'К альбому',onClick:()=>b.fetch({uri:item.albumUri,title:item.album,type:'folder',service:'qobuz_custom'})});
   }
-  if (playable) { sep(); out.push({ icon: 'playlist_remove', label: 'Clear and play', danger: true, onClick: () => A.replaceAndPlay(item) }); }
+  if (playable) { sep(); out.push({ icon: 'playlist_remove', label: 'Очистить и воспроизвести', danger: true, onClick: () => A.replaceAndPlay(item) }); }
   return out;
 }
 

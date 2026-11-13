@@ -34,20 +34,20 @@ export default function NpEmpty() {
     <div className="np-empty">
       <div className="np-empty__intro">
         <div className="np-empty__icon"><img src={albumart(IDLE_ART)} alt="Volumio" /></div>
-        <h1 className="np-empty__title">Nothing playing yet</h1>
-        <p className="np-empty__text">Pick an album, a playlist or a station and it shows up here.</p>
+        <h1 className="np-empty__title">Пока ничего не играет</h1>
+        <p className="np-empty__text">Выберите альбом, плейлист или радиостанцию.</p>
         <div className="np-empty__actions">
-          <button type="button" className="aw-btn aw-btn--primary" onClick={browse}><Icon name="library_music" /><span>Browse</span></button>
-          <button type="button" className="aw-btn" onClick={search}><Icon name="search" /><span>Search</span></button>
-          {queued ? <button type="button" className="aw-btn" onClick={() => usePlayer.getState().play()}><Icon name="queue_music" /><span>Play the queue</span></button> : null}
+          <button type="button" className="aw-btn aw-btn--primary" onClick={browse}><Icon name="library_music" /><span>Обзор</span></button>
+          <button type="button" className="aw-btn" onClick={search}><Icon name="search" /><span>Поиск</span></button>
+          {queued ? <button type="button" className="aw-btn" onClick={() => usePlayer.getState().play()}><Icon name="queue_music" /><span>Воспроизвести очередь</span></button> : null}
         </div>
       </div>
       {recent.length ? (
         <div className="np-empty__recent">
-          <div className="np-empty__eyebrow mono">RECENTLY PLAYED</div>
+          <div className="np-empty__eyebrow mono">НЕДАВНО ПРОСЛУШАНО</div>
           <div className="np-empty__list">
             {recent.map((t, i) => (
-              <button key={t.uri + i} type="button" className="np-empty__row" onClick={() => replaceAndPlay(t)} title={'Play ' + (t.title || '')}>
+              <button key={t.uri + i} type="button" className="np-empty__row" onClick={() => replaceAndPlay(t)} title={'Воспроизвести: ' + (t.title || '')}>
                 <span className="np-empty__art">{t.albumart ? <img src={albumart(t.albumart)} alt="" loading="lazy" /> : <Icon name="music_note" />}<Icon name="play_arrow" className="np-empty__play" /></span>
                 <span className="np-empty__meta">
                   <span className="np-empty__name">{t.title}</span>

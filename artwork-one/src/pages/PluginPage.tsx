@@ -19,6 +19,7 @@ import { buildDay } from '../core/format';
 import { CORE } from '../components/settings/CoreSections';
 import AppearanceSlot from '../components/settings/AppearanceSlot';
 import Spinner from '../components/Spinner';
+import { AUDIO_PAGE, ENGINE_PAGE, audioSettingsConfig, engineSettingsEnabled } from '../core/audioSettings';
 
 function visible(item: any, section: any): boolean {
   if (item.hidden) { return false; }
@@ -46,8 +47,12 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
   const { pluginName = '' } = useParams();
   // a plugin's page without its own settings entry (FusionDsp, Spotify, …) sits under Plugins: its crumb and its back lead there
   const underPlugins = useSettings(st => !!pluginName && st.menu().length > 0 && !st.inMenu(pluginName));
-  const parent = underPlugins ? { path: '/plugin-manager', label: 'Plugins', trail: [{ title: 'Plugins', uri: '/plugin-manager' } as any] } : { path: '/settings', label: 'Settings', trail: undefined };
+  const parent = underPlugins ? { path: '/plugin-manager', label: 'Плагины', trail: [{ title: 'Плагины', uri: '/plugin-manager' } as any] } : { path: '/settings', label: 'Настройки', trail: undefined };
   const nav = useNavigate();
+  const engineEnabled = usePlugins(st => engineSettingsEnabled(st.installed));
+  const isAudio = pageKey(pluginName) === AUDIO_PAGE && !wizard;
+  const isEngine = pageKey(pluginName) === ENGINE_PAGE && !wizard;
+  useEffect(() => { if (isEngine && engineEnabled) { nav('/plugin/audio_interface-alsa_controller', { replace: true }); } }, [isEngine, engineEnabled, nav]);
   const [obj, setObj] = useState<any>(null);
   const [show, setShow] = useState(false);
   const [answered, setAnswered] = useState(false);   // the ask came back empty
@@ -75,12 +80,14 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
       else { useModal.getState().open('password', { message: pp.message || '', pluginName, resolve: (ok: boolean) => { if (ok) { setShow(true); } else { nav('/playback'); } } }); }
     };
     // the answer to this page's ask, and afterwards the player's own pushes (after a save) for it
-    const off = onUiConfig((page, cfg) => { if (page === null || page === pageKey(pluginName)) { take(cfg); } });
+    const requestPage = isAudio && engineEnabled ? ENGINE_PAGE : pageKey(pluginName);
+    const receive = (cfg: any) => take(isAudio ? audioSettingsConfig(cfg, cfg, engineEnabled) : cfg);
+    const off = onUiConfig((page, cfg) => { if (page === requestPage) { receive(cfg); } });
     // the route names the page with a dash; the player wants category/name
-    takeRef.current = take;
-    askUiConfig(pageKey(pluginName), wizard).then(take);
+    takeRef.current = receive;
+    askUiConfig(requestPage, wizard).then(receive);
     return () => { alive = false; off(); useSettings.setState({ route: { name: '', pluginName: '' } }); };
-  }, [pluginName, wizard]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pluginName, wizard, engineEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveSection = async (section: any) => {
     if (!section.onSave) { return; }   // nothing to call: never an empty callMethod
@@ -108,7 +115,7 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
     if (c.askForConfirm) { if (!(await useModal.getState().confirm({ ...c.askForConfirm, danger: item.id === 'factory' }))) { return; } if (c.type === 'emit') { emit(c.message, c.data); } else { emit('callMethod', c); } return; }
     run();
   };
-  const back = <PageHead variant="settings" back={() => nav(parent.path)} backLabel={parent.label} nav={<Crumbs root="Settings" trail={parent.trail} onCrumb={() => nav('/plugin-manager')} current={obj && show ? ((obj.page && obj.page.label) || '') : ''} onHome={() => nav('/settings')} />} actions={helpItem(obj) ? <button type="button" className="aw-sp-helpicon" onClick={() => saveButton(helpItem(obj))} aria-label="Help" title="Help"><Icon name="help" /></button> : undefined} />;
+  const back = <PageHead variant="settings" back={() => nav(parent.path)} backLabel={parent.label} nav={<Crumbs root="Настройки" trail={parent.trail} onCrumb={() => nav('/plugin-manager')} current={obj && show ? ((obj.page && obj.page.label) || '') : ''} onHome={() => nav('/settings')} />} actions={helpItem(obj) ? <button type="button" className="aw-sp-helpicon" onClick={() => saveButton(helpItem(obj))} aria-label="Справка" title="Справка"><Icon name="help" /></button> : undefined} />;
   // nothing yet: say so, instead of a blank screen — the settings may take a moment on a slow player, and a
   // plugin that fails to build them would otherwise leave the page black for good
   if (!show || !obj) {
@@ -119,10 +126,10 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
           {answered ? (
             <>
               <Icon name="error" />
-              <p className="aw-pluginwait__text">This plugin did not send its settings page. It may still be starting, or it failed to build the page.</p>
-              <button type="button" className="aw-btn aw-btn--primary" onClick={() => { setAnswered(false); askUiConfig(pageKey(pluginName), wizard).then(takeRef.current); }}><span>Try again</span></button>
+              <p className="aw-pluginwait__text">Не удалось загрузить настройки. Плагин может ещё запускаться. Попробуйте снова.</p>
+              <button type="button" className="aw-btn aw-btn--primary" onClick={() => { setAnswered(false); askUiConfig(isAudio && engineEnabled ? ENGINE_PAGE : pageKey(pluginName), wizard).then(takeRef.current); }}><span>Повторить</span></button>
             </>
-          ) : (<><Spinner size={24} /><p className="aw-pluginwait__text">Loading settings…</p></>)}
+          ) : (<><Spinner size={24} /><p className="aw-pluginwait__text">Загрузка настроек…</p></>)}
         </div>
       </div></div></div>
     );
@@ -159,13 +166,13 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
     // a card saves when it has something to save: a section of buttons only acts at once, and has no footer
     const saves = !!(section.saveButton && !section.saveButton.hidden && section.onSave) && rows.some(r => r.item.element !== 'button');
     if (!rows.length && !section.description) { return; }
-    cards.push({ section, card: { key, id: section.id, label: sectionLabel(sc, String(section.label || '')), icon: (sc && sc.icon) || (section.icon ? pluginIcon(section.icon, 'settings') : 'settings'), description: section.description ? plainText(String(section.description)) : undefined, rows, save: saves ? String(section.saveButton.label || 'Save') : null } });
+    cards.push({ section, card: { key, id: section.id, label: sectionLabel(sc, String(section.label || '')), icon: (sc && sc.icon) || (section.icon ? pluginIcon(section.icon, 'settings') : 'settings'), description: section.description ? plainText(String(section.description)) : undefined, rows, save: saves ? String(section.saveButton.label || 'Сохранить') : null } });
   });
   const all = cards.concat(moved);
   const isAppearance = pluginName === 'miscellanea-appearance';
   // the page's name: the settings menu's for Volumio's own pages, the plugin's own name for a plugin; the
   // page's longer title under it when it says more
-  const title = menuName || (plugin && plugin.prettyName) || String(page.label || '');
+  const title = (isAudio ? 'Аудио' : '') || menuName || (plugin && plugin.prettyName) || String(page.label || '');
   const subtitle = plugin && page.label && !same(page.label, title) ? String(page.label) : '';
   const author = storeEntry && storeEntry.author ? String(storeEntry.author) : '';
   const meta = plugin ? [plugin.version ? 'v' + plugin.version : '', author].filter(Boolean).join(' · ') : '';
@@ -181,11 +188,11 @@ export default function PluginPage({ wizard }: { wizard?: boolean }) {
               <h2 className="aw-sp-head__title">{title}</h2>
               {subtitle || meta ? <div className="aw-sp-head__sub">{subtitle ? <span className="aw-sp-head__subtitle">{subtitle}</span> : null}{meta ? <span className="aw-sp-head__meta mono">{meta.toUpperCase()}</span> : null}</div> : null}
             </div>
-            {help ? <button type="button" className="aw-sp-help" onClick={() => saveButton(help)}><Icon name="help" /><span>Help</span></button> : null}
+            {help ? <button type="button" className="aw-sp-help" onClick={() => saveButton(help)}><Icon name="help" /><span>Справка</span></button> : null}
             {plugin ? (
               <div className="aw-sp-enabled">
-                <span className="aw-sp-enabled__label">Enabled</span>
-                <Switch on={enabled} onChange={() => emit('pluginManager', { name: plugin.name, category: plugin.category, action: plugin.active ? 'disable' : 'enable' })} label={'Enabled: ' + title} noLabel />
+                <span className="aw-sp-enabled__label">Включён</span>
+                <Switch on={enabled} onChange={() => emit('pluginManager', { name: plugin.name, category: plugin.category, action: plugin.active ? 'disable' : 'enable' })} label={'Включён: ' + title} noLabel />
               </div>
             ) : null}
           </div>

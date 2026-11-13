@@ -73,44 +73,44 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
   const b = useBrowse.getState();
   return (
     <div className="aw-artist">
-      <PageHead variant="artist" back={() => b.goBack()} backLabel="Back"
+      <PageHead variant="artist" back={() => b.goBack()} backLabel="Назад"
         nav={<Crumbs trail={crumbs} current={info.title} onHome={() => b.backHome()} onCrumb={goCrumb} />}
         actions={<label className={'aw-filter aw-artist__filter' + (filter.length ? ' aw-filter--on' : '')}>
           <Icon name="search" />
-          <input type="search" value={filter} onChange={(e) => onFilter(e.target.value)} placeholder="Search this artist" aria-label="Search this artist" spellCheck={false} />
+          <input type="search" value={filter} onChange={(e) => onFilter(e.target.value)} placeholder="Поиск у исполнителя" aria-label="Поиск у исполнителя" spellCheck={false} />
         </label>} />
 
       <div className="aw-artist__hero">
         {picture ? <img className="aw-artist__img" src={picture} alt="" onError={onImgError} /> : <div className="aw-artist__img aw-artist__img--glyph" aria-hidden="true"><Icon name="person" /></div>}
         <div className="aw-artist__body">
-          <div className="aw-artist__eyebrow mono">ARTIST</div>
+          <div className="aw-artist__eyebrow mono">ИСПОЛНИТЕЛЬ</div>
           <h1 className="aw-artist__name">{info.title}</h1>
           {albums.length || trackCount ? (
             <div className="aw-artist__meta">
-              {albums.length ? <span className="mono">{albums.length} albums</span> : null}
+              {albums.length ? <span className="mono">{albums.length} альбомов</span> : null}
               {albums.length && trackCount ? <span className="aw-artist__dot" /> : null}
-              {trackCount ? <span className="mono">{trackCount} tracks</span> : null}
+              {trackCount ? <span className="mono">{trackCount} треков</span> : null}
             </div>
           ) : null}
         </div>
         {info.disablePlayButton !== true ? <div className="aw-artist__actions">
-          <button type="button" className="aw-artist__play" onClick={() => A.playItemsList(info as BrowseItem)}><Icon name="play_arrow" /><span>Play</span></button>
-          <button type="button" className="aw-artist__shuffle" onClick={() => A.shufflePlay(info as BrowseItem)}><Icon name="shuffle" /><span>Shuffle</span></button>
-          <button type="button" className="aw-artist__iconbtn" onClick={() => A.addToQueue(info as BrowseItem)} aria-label="Add to queue" title="Add to queue"><Icon name="queue_music" /></button>
+          <button type="button" className="aw-artist__play" onClick={() => A.playItemsList(info as BrowseItem)}><Icon name="play_arrow" /><span>Воспроизвести</span></button>
+          <button type="button" className="aw-artist__shuffle" onClick={() => A.shufflePlay(info as BrowseItem)}><Icon name="shuffle" /><span>Перемешать</span></button>
+          <button type="button" className="aw-artist__iconbtn" onClick={() => A.addToQueue(info as BrowseItem)} aria-label="В очередь" title="В очередь"><Icon name="queue_music" /></button>
           <Dropdown className="hamburgerMenu aw-artist__menu" toggleClass="aw-artist__iconbtn" toggle={<Icon name="more_horiz" />}
-            entries={[{ icon: 'play_arrow', label: 'Play', onClick: () => A.playItemsList(info as BrowseItem) }, { icon: 'queue_music', label: 'Add to queue', onClick: () => A.addToQueue(info as BrowseItem) }]} />
+            entries={[{ icon: 'play_arrow', label: 'Воспроизвести', onClick: () => A.playItemsList(info as BrowseItem) }, { icon: 'queue_music', label: 'В очередь', onClick: () => A.addToQueue(info as BrowseItem) }]} />
         </div> : null}
       </div>
 
       {groups.map((g, gi) => {
         const inGroup = sorted.filter(a => a.listIndex === g);
-        const title = gi === 0 ? 'ALBUMS' : String((lists || [])[g]?.title || 'MORE').toUpperCase();
+        const title = gi === 0 ? 'АЛЬБОМЫ' : String((lists || [])[g]?.title || 'ЕЩЁ').toUpperCase();
         return (
           <div key={g}>
             <div className="aw-artist__sechead">
               <span className="mono aw-artist__label">{title}</span>
               <span className="mono aw-artist__count">{inGroup.length}</span>
-              {gi === 0 && hasYears ? <button type="button" className="aw-artist__link" onClick={onToggleOrder}>{newest ? 'Newest first' : 'Oldest first'}</button> : null}
+              {gi === 0 && hasYears ? <button type="button" className="aw-artist__link" onClick={onToggleOrder}>{newest ? 'Сначала новые' : 'Сначала старые'}</button> : null}
             </div>
             <div className="aw-artist__albums">
               {inGroup.map(a => {
@@ -124,11 +124,11 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
                       <div className="aw-artist-album__actions" onClick={(e) => e.stopPropagation()}>
                         <ItemMenu item={a.item} id={`hamburgerMenuBtn-${a.listIndex}-${a.itemIndex}`} toggleClass="ghost-btn action-btn aw-artist-album__more" glyph="more_horiz" onOpenChange={(o) => { setOpenMenu(o ? a.listIndex + ':' + a.itemIndex : null); if (onMenuOpen) { onMenuOpen(a.listIndex + ':' + a.itemIndex, o); } }} />
                       </div>
-                      <button type="button" className="aw-artist-album__play" onClick={(e) => { e.stopPropagation(); A.playRendered(a.item, list, a.itemIndex); }} aria-label="Play"><Icon name="play_arrow" /></button>
+                      <button type="button" className="aw-artist-album__play" onClick={(e) => { e.stopPropagation(); A.playRendered(a.item, list, a.itemIndex); }} aria-label="Воспроизвести"><Icon name="play_arrow" /></button>
                     </div>
                     <div className="aw-artist-album__title">{a.item.title}</div>
                     {a.item.recordingQuality ? <div className="music-card__recording-quality mono" title="Максимальное качество альбома по каталогу; отдельные треки могут отличаться">{formatRecordingQuality(a.item.recordingQuality)}</div> : null}
-                    {a.year || a.tracks ? <div className="aw-artist-album__sub mono">{a.year ? <span>{a.year}</span> : null}{a.year && a.tracks ? <span> · </span> : null}{a.tracks ? <span>{a.tracks} tracks</span> : null}</div> : null}
+                    {a.year || a.tracks ? <div className="aw-artist-album__sub mono">{a.year ? <span>{a.year}</span> : null}{a.year && a.tracks ? <span> · </span> : null}{a.tracks ? <span>{a.tracks} треков</span> : null}</div> : null}
                   </div>
                 );
               })}
@@ -140,7 +140,7 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
       {similar.length ? (
         <>
           <div className="aw-artist__sechead">
-            <span className="mono aw-artist__label">{String((lists || [])[similar[0].listIndex]?.title || 'SIMILAR ARTISTS').toUpperCase()}</span>
+            <span className="mono aw-artist__label">{String((lists || [])[similar[0].listIndex]?.title || 'ПОХОЖИЕ ИСПОЛНИТЕЛИ').toUpperCase()}</span>
             <span className="mono aw-artist__count">{similar.length}</span>
           </div>
           <div className="aw-artist__albums aw-artist__similar">
@@ -160,9 +160,9 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
 
       {trackCount ? (
         <div className="aw-artist__sechead aw-artist__sechead--tracks">
-          <span className="mono aw-artist__label">TRACKS</span>
+          <span className="mono aw-artist__label">ТРЕКИ</span>
           <span className="mono aw-artist__count">{filter ? visibleTracks + ' / ' : ''}{trackCount}</span>
-          {trackCount > 5 && !filter ? <button type="button" className="aw-artist__link" onClick={onShowAll}>{showAll ? 'Show less' : 'See all ' + trackCount}</button> : null}
+          {trackCount > 5 && !filter ? <button type="button" className="aw-artist__link" onClick={onShowAll}>{showAll ? 'Свернуть' : 'Показать все: ' + trackCount}</button> : null}
         </div>
       ) : null}
     </div>

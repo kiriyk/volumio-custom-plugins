@@ -68,24 +68,24 @@ export default function SettingsNav() {
     return (
       <a key={i} className={cls} onClick={() => itemClick(item, nav)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') { itemClick(item, nav); } }}>
         <Icon name={iconOf(item)} /><span className="aw-snav__label">{item.name}</span>
-        {searching && n ? <span className="aw-snav__count mono" aria-label={n + ' results'}>{n}</span> : null}
-        {!searching && updates && itemKey(item) === 'plugins' ? <span className="aw-snav__badge mono" aria-label={updates + ' plugin updates'}>{updates}</span> : null}
+        {searching && n ? <span className="aw-snav__count mono" aria-label={n + ' результатов'}>{n}</span> : null}
+        {!searching && updates && itemKey(item) === 'plugins' ? <span className="aw-snav__badge mono" aria-label={updates + ' обновлений плагинов'}>{updates}</span> : null}
         {itemKey(item) === 'shop' ? <Icon name="open_in_new" className="aw-snav__out" /> : null}
       </a>
     );
   };
   return (
     <>
-      <nav className="aw-snav" aria-label="Settings">
-        <div className="aw-snav__title">Settings</div>
+      <nav className="aw-snav" aria-label="Настройки">
+        <div className="aw-snav__title">Настройки</div>
         <SearchField className="aw-sfield--nav" />
         {main.map((item, i) => entry(item, i))}
         {foot.length ? <div className="aw-snav__foot">{foot.map((item, i) => entry(item, i, true))}</div> : null}
       </nav>
       {isLanding ? (
         <div className="aw-mnav">
-          <PageHead variant="settings" nav={<nav className="aw-crumbs" aria-label="Breadcrumb"><span className="aw-crumbs__cur">Settings</span></nav>} />
-          <div className="aw-mnav__title">Settings</div>
+          <PageHead variant="settings" nav={<nav className="aw-crumbs" aria-label="Навигация"><span className="aw-crumbs__cur">Настройки</span></nav>} />
+          <div className="aw-mnav__title">Настройки</div>
           <SearchField className="aw-sfield--landing" />
           {searching ? <SearchResults /> : (
             <>

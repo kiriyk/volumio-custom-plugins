@@ -14,7 +14,7 @@ export function ConfirmSheet() {
     <>
       <div className={'modal-header' + (data.danger ? ' aw-modal--danger' : '')}><h3 className="modal-title"><i className="fa fa-info-circle"><Icon name="info" /></i> {data.title}</h3></div>
       <div className="modal-body">{data.message}</div>
-      <div className="modal-footer"><button type="button" className="btn btn-warning" onClick={() => done(false)}>No</button><button type="button" className="btn btn-info" onClick={() => done(true)}>Yes</button></div>
+      <div className="modal-footer"><button type="button" className="btn btn-warning" onClick={() => done(false)}>Нет</button><button type="button" className="btn btn-info" onClick={() => done(true)}>Да</button></div>
     </>
   );
 }
@@ -63,7 +63,7 @@ export function GotItSheet() {
     <>
       {data.title ? <div className="modal-header"><h3 className="modal-title"><i className="fa fa-info-circle"><Icon name="info" /></i> {data.title}</h3></div> : null}
       <div className="modal-body" dangerouslySetInnerHTML={{ __html: String(data.message || '') }} />
-      <div className="modal-footer"><button type="button" className="btn btn-info" onClick={() => { useModal.getState().close(); if (data.onClose) { data.onClose(); } }}><span>Got it</span></button></div>
+      <div className="modal-footer"><button type="button" className="btn btn-info" onClick={() => { useModal.getState().close(); if (data.onClose) { data.onClose(); } }}><span>Понятно</span></button></div>
     </>
   );
 }
@@ -74,13 +74,13 @@ export function PasswordSheet() {
   const cancel = () => { useModal.getState().close(); if (data.resolve) { data.resolve(false); } };
   return (
     <>
-      <div className="modal-header"><h3 className="modal-title"><span>Enter password</span></h3></div>
+      <div className="modal-header"><h3 className="modal-title"><span>Введите пароль</span></h3></div>
       <div className="modal-body">
         {data.message ? <div>{data.message}<br /><br /></div> : null}
-        <form className="form" onSubmit={(e) => { e.preventDefault(); if (pw) { setErr(false); emit('checkPassword', { password: pw, pluginName: data.pluginName }); } }}><input placeholder="Password" type="password" className="form-control" value={pw} onChange={(e) => setPw(e.target.value)} required /></form>
-        {err ? <div><span>Invalid password</span></div> : null}
+        <form className="form" onSubmit={(e) => { e.preventDefault(); if (pw) { setErr(false); emit('checkPassword', { password: pw, pluginName: data.pluginName }); } }}><input placeholder="Пароль" type="password" className="form-control" value={pw} onChange={(e) => setPw(e.target.value)} required /></form>
+        {err ? <div><span>Неверный пароль</span></div> : null}
       </div>
-      <div className="modal-footer"><button type="button" className="btn btn-warning" onClick={cancel}>Cancel</button><button type="button" className="btn btn-info" onClick={() => { if (pw) { setErr(false); emit('checkPassword', { password: pw, pluginName: data.pluginName }); } }}>Ok</button></div>
+      <div className="modal-footer"><button type="button" className="btn btn-warning" onClick={cancel}>Отмена</button><button type="button" className="btn btn-info" onClick={() => { if (pw) { setErr(false); emit('checkPassword', { password: pw, pluginName: data.pluginName }); } }}>ОК</button></div>
     </>
   );
 }
@@ -130,7 +130,7 @@ export function UpdaterSheet() {
         {data.status === 'updateWait' ? (
           <div className="aw-upd-wait">
             {!data.timedOut ? <Spinner size={18} /> : null}
-            <span>{data.timedOut ? 'The updater did not answer. Check again later — playback is not affected.' : String(data.description || '')}</span>
+            <span>{data.timedOut ? 'Служба обновления не отвечает. Повторите попытку позже. Воспроизведение продолжается.' : String(data.description || '')}</span>
           </div>
         ) : null}
         {data.status === 'updateReady' ? <span dangerouslySetInnerHTML={{ __html: String(data.description || '') }} /> : null}
@@ -144,17 +144,17 @@ export function UpdaterSheet() {
         {data.status === 'updateDone' ? <h3>{done.message}</h3> : null}
       </div>
       <div className="modal-footer">
-        {data.status === 'updateWait' ? <button type="button" className="btn btn-default" onClick={close}>Close</button> : null}
+        {data.status === 'updateWait' ? <button type="button" className="btn btn-default" onClick={close}>Закрыть</button> : null}
         {data.status === 'updateReady' ? (ready.updateavailable
-          ? <><button type="button" className="btn btn-warning" onClick={close}>Cancel</button> <button type="button" className="btn btn-primary" onClick={update}>Update now</button></>
+          ? <><button type="button" className="btn btn-warning" onClick={close}>Отмена</button> <button type="button" className="btn btn-primary" onClick={update}>Обновить сейчас</button></>
           : <button type="button" className="btn btn-primary" onClick={close}>OK</button>) : null}
         {data.status === 'updateDone' ? (done.status === 'success'
-          ? <button type="button" className="btn btn-primary" onClick={() => { emit('reboot'); close(); }}>Restart system</button>
+          ? <button type="button" className="btn btn-primary" onClick={() => { emit('reboot'); close(); }}>Перезагрузить систему</button>
           : (done.status === 'error' ? <button type="button" className="btn btn-primary" onClick={close}>OK</button> : null)) : null}
         {/* never a dialog without a way out (a TV with a remote got stuck on it): while the update downloads, or when its
             end says neither success nor error, Hide closes the window — the player keeps going and reopens it on its next message */}
         {data.status === 'updateProgress' || (data.status === 'updateDone' && done.status !== 'success' && done.status !== 'error') || (data.status !== 'updateWait' && data.status !== 'updateReady' && data.status !== 'updateProgress' && data.status !== 'updateDone')
-          ? <button type="button" className="btn btn-default" onClick={close}>Hide</button> : null}
+          ? <button type="button" className="btn btn-default" onClick={close}>Скрыть</button> : null}
       </div>
     </>
   );
@@ -168,11 +168,11 @@ export function NasPasswordSheet() {
       <div className="modal-header"><h3 className="modal-title"><i className="fa fa-info-circle"><Icon name="info" /></i> {data.title}</h3></div>
       <div className="modal-body">{data.message}<br />
         <form className="form" onSubmit={(e) => { e.preventDefault(); save(); }}>
-          <div className="form-group"><label className="control-label"><span>Username</span></label><input type="text" className="form-control" value={user} onChange={(e) => setUser(e.target.value)} required /></div>
-          <div className="form-group"><label className="control-label"><span>Password</span></label><div className="input-group"><span className="input-group-addon clickable" onClick={() => setType(type === 'password' ? 'text' : 'password')}><Icon name={type === 'password' ? 'visibility' : 'visibility_off'} /></span><input type={type} className="form-control" value={pw} onChange={(e) => setPw(e.target.value)} required /></div></div>
+          <div className="form-group"><label className="control-label"><span>Имя пользователя</span></label><input type="text" className="form-control" value={user} onChange={(e) => setUser(e.target.value)} required /></div>
+          <div className="form-group"><label className="control-label"><span>Пароль</span></label><div className="input-group"><span className="input-group-addon clickable" onClick={() => setType(type === 'password' ? 'text' : 'password')}><Icon name={type === 'password' ? 'visibility' : 'visibility_off'} /></span><input type={type} className="form-control" value={pw} onChange={(e) => setPw(e.target.value)} required /></div></div>
         </form>
       </div>
-      <div className="modal-footer"><button type="button" className="btn btn-warning" onClick={() => useModal.getState().close()}><span>Cancel</span></button><button type="button" className="btn btn-info" onClick={save}><span>Save</span></button></div>
+      <div className="modal-footer"><button type="button" className="btn btn-warning" onClick={() => useModal.getState().close()}><span>Отмена</span></button><button type="button" className="btn btn-info" onClick={save}><span>Сохранить</span></button></div>
     </>
   );
 }

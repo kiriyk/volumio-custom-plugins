@@ -64,13 +64,13 @@ export default function TrackActionsSheet() {
   };
   const twitterOn = !(settings.trackManagerButtonBar && settings.trackManagerButtonBar.actions && settings.trackManagerButtonBar.actions.twitter === false);
   const repeatTile = !st.repeat
-    ? <button type="button" className="aw-track__tile" onClick={() => emit('setRepeat', { value: true, repeatSingle: false })} title="Repeat all"><Icon name="repeat" /></button>
+    ? <button type="button" className="aw-track__tile" onClick={() => emit('setRepeat', { value: true, repeatSingle: false })} title="Повторять всё"><Icon name="repeat" /></button>
     : (!st.repeatSingle
-      ? <button type="button" className="aw-track__tile active" onClick={() => emit('setRepeat', { value: true, repeatSingle: true })} title="Repeat single"><Icon name="repeat" /></button>
-      : <button type="button" className="aw-track__tile active" onClick={() => emit('setRepeat', { value: false, repeatSingle: false })} title="Repeat off"><Icon name="repeat_one" /></button>);
+      ? <button type="button" className="aw-track__tile active" onClick={() => emit('setRepeat', { value: true, repeatSingle: true })} title="Повторять трек"><Icon name="repeat" /></button>
+      : <button type="button" className="aw-track__tile active" onClick={() => emit('setRepeat', { value: false, repeatSingle: false })} title="Отключить повтор"><Icon name="repeat_one" /></button>);
   const row = (key: string, icon: string, label: string, onClick: () => void) => (
     <button type="button" className={'aw-track__row' + (err[key] ? ' is-off' : '')} disabled={busy[key] || err[key]} onClick={onClick}>
-      <Icon name={icon} /><span className="aw-track__label">{label}{err[key] ? ' · Not found' : ''}</span>{busy[key] ? <Spinner size={16} className="aw-track__spin" /> : null}
+      <Icon name={icon} /><span className="aw-track__label">{label}{err[key] ? ' · Не найдено' : ''}</span>{busy[key] ? <Spinner size={16} className="aw-track__spin" /> : null}
     </button>
   );
   return (
@@ -83,31 +83,31 @@ export default function TrackActionsSheet() {
         </div>
       </div>
       <div className="aw-track__tiles">
-        <button type="button" className={'aw-track__tile' + (st.random ? ' active' : '')} onClick={() => usePlayer.getState().shuffle()} title="Random"><Icon name="shuffle" /></button>
+        <button type="button" className={'aw-track__tile' + (st.random ? ' active' : '')} onClick={() => usePlayer.getState().shuffle()} title="Перемешать"><Icon name="shuffle" /></button>
         {repeatTile}
-        <button type="button" className={'aw-track__tile' + (fav ? ' active' : '')} onClick={() => usePlayer.getState().toggleFavourite()} title="Add to favourites" disabled={!!st.disableUi}><Icon name="favorite" /></button>
-        <button type="button" className="aw-track__tile" onClick={() => { close(); addToPlaylist({ uri: String(st.uri || ''), service: st.service, type: 'song', title: st.title, artist: st.artist, album: st.album, albumart: st.albumart }); }} title="Add to Playlist" disabled={!!st.disableUi}><Icon name="playlist_add" /></button>
+        <button type="button" className={'aw-track__tile' + (fav ? ' active' : '')} onClick={() => usePlayer.getState().toggleFavourite()} title="В избранное" disabled={!!st.disableUi}><Icon name="favorite" /></button>
+        <button type="button" className="aw-track__tile" onClick={() => { close(); addToPlaylist({ uri: String(st.uri || ''), service: st.service, type: 'song', title: st.title, artist: st.artist, album: st.album, albumart: st.albumart }); }} title="В плейлист" disabled={!!st.disableUi}><Icon name="playlist_add" /></button>
       </div>
       <div className="aw-track__rows">
         {/^qobuz_custom\/track\/\d+$/.test(st.uri || '') ? row('download','download','Скачать на внешний диск',()=>{downloadQobuz(st.uri);close();}) : null}
-        {row('credits', 'info', 'Album credits', () => ask('credits', { mode: 'creditsAlbum', artist: st.artist, album: st.album }, st.album, true))}
-        {row('album', 'album', 'Album story', () => ask('album', { mode: 'storyAlbum', artist: st.artist, album: st.album }, st.album))}
-        {row('artist', 'groups', 'Artist story', () => ask('artist', { mode: 'storyArtist', artist: st.artist }, st.artist))}
+        {row('credits', 'info', 'Участники записи альбома', () => ask('credits', { mode: 'creditsAlbum', artist: st.artist, album: st.album }, st.album, true))}
+        {row('album', 'album', 'Об альбоме', () => ask('album', { mode: 'storyAlbum', artist: st.artist, album: st.album }, st.album))}
+        {row('artist', 'groups', 'Об исполнителе', () => ask('artist', { mode: 'storyArtist', artist: st.artist }, st.artist))}
         {lp.available ? (
           <button type="button" className={'aw-track__row' + (here ? ' active' : '')} onClick={() => { lp.toggle(); close(); }}>
-            <Icon name="headphones" /><span className="aw-track__label">{here ? 'Stop playing in this browser' : 'Play in this browser'}</span>
+            <Icon name="headphones" /><span className="aw-track__label">{here ? 'Остановить воспроизведение в браузере' : 'Воспроизвести в браузере'}</span>
           </button>
         ) : null}
         {typeof st.position === 'number' && st.position >= 0 && !st.disableUi ? (
           <button type="button" className={'aw-track__row' + (stopAfter ? ' active' : '')} onClick={() => { useStopAfter.getState().toggle(st.position); close(); }}>
-            <Icon name="stop_circle" /><span className="aw-track__label">{stopAfter ? "Don't stop after this track" : 'Stop after this track'}</span>
+            <Icon name="stop_circle" /><span className="aw-track__label">{stopAfter ? "Не останавливаться после трека" : 'Остановиться после трека'}</span>
           </button>
         ) : null}
         <div className="aw-track__sep" />
-        {st.artist ? <button type="button" className="aw-track__row" onClick={() => goTo('artist')}><Icon name="person" /><span className="aw-track__label">Go To Artist</span></button> : null}
-        {st.album ? <button type="button" className="aw-track__row" onClick={() => goTo('album')}><Icon name="album" /><span className="aw-track__label">Go To Album</span></button> : null}
-        {st.album && twitterOn ? <button type="button" className="aw-track__row" onClick={tweet}><Icon name="share" /><span className="aw-track__label">Tweet Track</span></button> : null}
-        <button type="button" className="aw-power__cancel" onClick={close}><span>Close</span></button>
+        {st.artist ? <button type="button" className="aw-track__row" onClick={() => goTo('artist')}><Icon name="person" /><span className="aw-track__label">К исполнителю</span></button> : null}
+        {st.album ? <button type="button" className="aw-track__row" onClick={() => goTo('album')}><Icon name="album" /><span className="aw-track__label">К альбому</span></button> : null}
+        {st.album && twitterOn ? <button type="button" className="aw-track__row" onClick={tweet}><Icon name="share" /><span className="aw-track__label">Поделиться в Twitter</span></button> : null}
+        <button type="button" className="aw-power__cancel" onClick={close}><span>Закрыть</span></button>
       </div>
     </div>
   );

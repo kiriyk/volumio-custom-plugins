@@ -54,7 +54,19 @@ export const useMenu = create<MenuStore>((_set, get) => ({
   byKey: (key) => get().items.find(i => itemKey(i) === key) || null,
 }));
 
-on('pushMenuItems', (data: MenuItem[]) => useMenu.setState({ items: Array.isArray(data) ? data : [] }));
+const MENU_LABELS: Record<string, string> = {
+  playback: 'Аудио', sources: 'Источники', appearance: 'Оформление', network: 'Сеть',
+  system: 'Система', equalizer: 'Эквалайзер', plugins: 'Плагины', alarm: 'Будильник',
+  sleep: 'Таймер сна', shutdown: 'Выключение', myvolumio: 'MyVolumio', zones: 'Зоны',
+  help: 'Помощь', shop: 'Магазин',
+};
+
+on('pushMenuItems', (data: MenuItem[]) => useMenu.setState({
+  items: Array.isArray(data) ? data.map(item => {
+    const label = MENU_LABELS[itemKey(item) || ''];
+    return label ? { ...item, name: label } : item;
+  }) : [],
+}));
 on('pushSystemInfo', (d: SystemInfo) => useMenu.setState({ systemInfo: d || null }));
 emit('getMenuItems');
 emit('getSystemInfo');

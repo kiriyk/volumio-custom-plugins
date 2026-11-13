@@ -35,21 +35,21 @@ function rowEntries(t: QueueItem, i: number, position: number, goTo: (item: any)
   const current = i === position;
   const song = { uri: String(t.uri || ''), service: t.service, type: 'song', title: t.name || t.title, name: t.name || t.title, artist: t.artist, album: t.album, albumart: t.albumart };
   const out: MenuEntry[] = [];
-  if (!current) { out.push({ icon: 'play_arrow', label: 'Play now', onClick: () => q.play(i) }); }
-  if (!current && position >= 0 && i !== position + 1) { out.push({ icon: 'playlist_play', label: 'Play next', onClick: () => q.move(i, i > position ? position + 1 : position) }); }
-  out.push({ icon: 'stop_circle', label: sa.isMarked(i) ? "Don't stop after this" : 'Stop after this', onClick: () => sa.toggle(i) });
+  if (!current) { out.push({ icon: 'play_arrow', label: 'Воспроизвести сейчас', onClick: () => q.play(i) }); }
+  if (!current && position >= 0 && i !== position + 1) { out.push({ icon: 'playlist_play', label: 'Воспроизвести следующим', onClick: () => q.move(i, i > position ? position + 1 : position) }); }
+  out.push({ icon: 'stop_circle', label: sa.isMarked(i) ? "Не останавливаться после трека" : 'Остановиться после трека', onClick: () => sa.toggle(i) });
   if (song.uri && t.service) {
     out.push({ label: '-', onClick: () => {} });
-    out.push({ icon: 'favorite', label: 'Add to Favorites', onClick: () => usePlaylists.getState().addToFavourites(song) });
-    out.push({ icon: 'playlist_add', label: 'Add to Playlist…', onClick: () => addToPlaylist(song as any) });
+    out.push({ icon: 'favorite', label: 'В избранное', onClick: () => usePlaylists.getState().addToFavourites(song) });
+    out.push({ icon: 'playlist_add', label: 'В плейлист…', onClick: () => addToPlaylist(song as any) });
   }
   if (t.service === 'mpd' && t.artist) {
     out.push({ label: '-', onClick: () => {} });
-    if (t.album) { out.push({ icon: 'album', label: 'Go to album', onClick: () => goTo({ uri: 'albums://' + encodeURIComponent(String(t.artist)) + '/' + encodeURIComponent(String(t.album)), title: t.album, name: t.album, type: 'folder', service: 'mpd' }) }); }
-    out.push({ icon: 'person', label: 'Go to artist', onClick: () => goTo({ uri: 'artists://' + encodeURIComponent(String(t.artist)), title: t.artist, name: t.artist, type: 'folder', service: 'mpd' }) });
+    if (t.album) { out.push({ icon: 'album', label: 'К альбому', onClick: () => goTo({ uri: 'albums://' + encodeURIComponent(String(t.artist)) + '/' + encodeURIComponent(String(t.album)), title: t.album, name: t.album, type: 'folder', service: 'mpd' }) }); }
+    out.push({ icon: 'person', label: 'К исполнителю', onClick: () => goTo({ uri: 'artists://' + encodeURIComponent(String(t.artist)), title: t.artist, name: t.artist, type: 'folder', service: 'mpd' }) });
   }
   out.push({ label: '-', onClick: () => {} });
-  out.push({ icon: 'close', label: 'Remove', danger: true, onClick: () => q.remove(i) });
+  out.push({ icon: 'close', label: 'Удалить', danger: true, onClick: () => q.remove(i) });
   return out;
 }
 
@@ -84,13 +84,13 @@ export default function QueuePanel({ page }: { page?: boolean }) {
   const minutesLeft = secondsLeft === null ? null : Math.round(secondsLeft / 60);
   let endsAt: string | null = null;
   if (secondsLeft !== null && (!st.repeat || stopAt >= 0)) { const d = new Date(Date.now() + secondsLeft * 1000); endsAt = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
-  const endNote = stopAt >= 0 ? (stopAt === position ? 'Stops after this track' : 'Stops after ' + (queue[stopAt].name || queue[stopAt].title || 'the marked track'))
-    : st.repeat && st.repeatSingle ? 'Repeats this track' : st.repeat ? 'Repeats the queue' : 'Stops after the queue ends';
+  const endNote = stopAt >= 0 ? (stopAt === position ? 'Остановка после этого трека' : 'Остановка после: ' + (queue[stopAt].name || queue[stopAt].title || 'отмеченного трека'))
+    : st.repeat && st.repeatSingle ? 'Повтор этого трека' : st.repeat ? 'Повтор очереди' : 'Остановка в конце очереди';
   // the library's page for a row's artist or album: the floating queue goes away, the page opens
   const goTo = (item: any) => { if (!docked && !page) { useUi.getState().hideQueue(); } useBrowse.getState().open(item, true); nav('/browse'); };
   const clear = async () => {
     const n = queue.length;
-    if (n >= CLEAR_ASKS_FROM && !(await useModal.getState().confirm({ title: 'Clear queue', message: 'Remove all ' + n + ' tracks from the queue?', danger: true }))) { return; }
+    if (n >= CLEAR_ASKS_FROM && !(await useModal.getState().confirm({ title: 'Очистить очередь', message: 'Удалить все треки (' + n + ') из очереди?', danger: true }))) { return; }
     useQueue.getState().clear();
   };
 
@@ -108,24 +108,24 @@ export default function QueuePanel({ page }: { page?: boolean }) {
   const onRowDown = (e: React.PointerEvent<HTMLDivElement>) => rowDrag(e, '.aw-queue__row', (from, to) => useQueue.getState().move(from, to));
 
   return (
-    <div className={'aw-queue' + (open ? ' open' : '') + (onPlayback ? ' on-playback' : '') + (docked ? ' is-docked' : '') + (page ? ' aw-queue--page' : '')} role={docked || page ? 'complementary' : 'dialog'} aria-label="Queue" aria-hidden={!open} ref={root}>
+    <div className={'aw-queue' + (open ? ' open' : '') + (onPlayback ? ' on-playback' : '') + (docked ? ' is-docked' : '') + (page ? ' aw-queue--page' : '')} role={docked || page ? 'complementary' : 'dialog'} aria-label="Очередь" aria-hidden={!open} ref={root}>
       <div className="aw-queue__head">
         <div className="aw-queue__titles">
-          <div className="aw-queue__title">Queue</div>
-          <div className="aw-queue__sub mono">{queue.length} TRACKS{minutesLeft !== null ? <span>&nbsp;· {minutesLeft} MIN LEFT</span> : null}</div>
+          <div className="aw-queue__title">Очередь</div>
+          <div className="aw-queue__sub mono">{queue.length} ТРЕКОВ{minutesLeft !== null ? <span>&nbsp;· {minutesLeft} МИН ОСТАЛОСЬ</span> : null}</div>
         </div>
-        {canPin ? <button type="button" className={'aw-queue__pin' + (docked ? ' active' : '')} onClick={() => useUi.getState().toggleQueuePin()} aria-pressed={docked} aria-label={docked ? 'Unpin' : 'Pin beside the cover'} title={docked ? 'Unpin' : 'Pin beside the cover'}><Icon name="push_pin" /></button> : null}
-        {docked || page ? null : <button type="button" className="aw-queue__close" onClick={() => useUi.getState().hideQueue()} aria-label="Close" title="Close"><Icon name="close" /></button>}
+        {canPin ? <button type="button" className={'aw-queue__pin' + (docked ? ' active' : '')} onClick={() => useUi.getState().toggleQueuePin()} aria-pressed={docked} aria-label={docked ? 'Открепить' : 'Закрепить рядом с обложкой'} title={docked ? 'Открепить' : 'Закрепить рядом с обложкой'}><Icon name="push_pin" /></button> : null}
+        {docked || page ? null : <button type="button" className="aw-queue__close" onClick={() => useUi.getState().hideQueue()} aria-label="Закрыть" title="Закрыть"><Icon name="close" /></button>}
       </div>
       <div className="aw-queue__chips">
-        <button type="button" className={'aw-queue__chip' + (st.random ? ' active' : '')} onClick={() => usePlayer.getState().shuffle()} title="Shuffle"><Icon name="shuffle" /><span>Shuffle</span></button>
-        <button type="button" className={'aw-queue__chip' + (st.repeat ? ' active' : '')} onClick={() => usePlayer.getState().cycleRepeat()} title="Repeat"><Icon name={st.repeat && st.repeatSingle ? 'repeat_one' : 'repeat'} /><span>Repeat</span></button>
-        <button type="button" className="aw-queue__chip" onClick={() => useModal.getState().open('playlist', { addQueue: true, title: 'Add to playlist' })} title="Save queue as playlist"><Icon name="playlist_add" /><span>Save as playlist</span></button>
-        <button type="button" className="aw-queue__chip aw-queue__chip--danger" onClick={clear} title="Clear queue"><Icon name="delete_sweep" /><span>Clear</span></button>
+        <button type="button" className={'aw-queue__chip' + (st.random ? ' active' : '')} onClick={() => usePlayer.getState().shuffle()} title="Перемешать"><Icon name="shuffle" /><span>Перемешать</span></button>
+        <button type="button" className={'aw-queue__chip' + (st.repeat ? ' active' : '')} onClick={() => usePlayer.getState().cycleRepeat()} title="Повтор"><Icon name={st.repeat && st.repeatSingle ? 'repeat_one' : 'repeat'} /><span>Повтор</span></button>
+        <button type="button" className="aw-queue__chip" onClick={() => useModal.getState().open('playlist', { addQueue: true, title: 'В плейлист' })} title="Сохранить очередь как плейлист"><Icon name="playlist_add" /><span>Сохранить как плейлист</span></button>
+        <button type="button" className="aw-queue__chip aw-queue__chip--danger" onClick={clear} title="Очистить очередь"><Icon name="delete_sweep" /><span>Очистить</span></button>
       </div>
       <div className="aw-queue__sechead">
-        <span className="mono">NOW &amp; NEXT</span>
-        {queue.length > 1 ? <span className="aw-queue__hint"><span className="aw-queue__hint--mouse">Drag a track to reorder</span><span className="aw-queue__hint--touch">Hold a track to move it</span></span> : null}
+        <span className="mono">СЕЙЧАС И ДАЛЕЕ</span>
+        {queue.length > 1 ? <span className="aw-queue__hint"><span className="aw-queue__hint--mouse">Перетащите трек для смены порядка</span><span className="aw-queue__hint--touch">Удерживайте трек для перемещения</span></span> : null}
       </div>
       <div className="aw-queue__scroll">
         <div className="aw-queue__list">
@@ -142,13 +142,13 @@ export default function QueuePanel({ page }: { page?: boolean }) {
                   <div className="aw-queue__name">{t.name || t.title}</div>
                   {(t.artist || t.album) ? <div className="aw-queue__meta">{t.artist}{t.artist && t.album ? <span>&nbsp;·&nbsp;</span> : null}{t.album}</div> : null}
                 </div>
-                {marked ? <span className="aw-queue__stop" title="Stops after this track"><Icon name="stop_circle" /></span> : null}
+                {marked ? <span className="aw-queue__stop" title="Остановка после этого трека"><Icon name="stop_circle" /></span> : null}
                 {t.duration ? <span className="aw-queue__time mono">{fmt(t.duration)}</span> : null}
                 {/* the ⋯ and the × are the row's own buttons: neither starts a drag nor plays the row */}
                 <span className="aw-queue__more" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                   <Dropdown toggleClass="aw-queue__more-btn" toggle={<Icon name="more_vert" />} entries={rowEntries(t, i, position, goTo)} />
                 </span>
-                <button type="button" className="aw-queue__remove" onClick={(e) => { e.stopPropagation(); useQueue.getState().remove(i); }} aria-label="Remove" title="Remove"><Icon name="close" /></button>
+                <button type="button" className="aw-queue__remove" onClick={(e) => { e.stopPropagation(); useQueue.getState().remove(i); }} aria-label="Удалить" title="Удалить"><Icon name="close" /></button>
               </div>
             );
           })}
@@ -157,7 +157,7 @@ export default function QueuePanel({ page }: { page?: boolean }) {
       <div className="aw-queue__foot">
         <Icon name="bedtime" />
         <span className="aw-queue__note">{endNote}</span>
-        {endsAt ? <span className="aw-queue__ends mono">ENDS {endsAt}</span> : null}
+        {endsAt ? <span className="aw-queue__ends mono">КОНЕЦ В {endsAt}</span> : null}
       </div>
     </div>
   );

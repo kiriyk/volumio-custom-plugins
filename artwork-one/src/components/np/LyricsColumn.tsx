@@ -59,7 +59,7 @@ export default function LyricsColumn() {
   const seekToLine = (l: { t: number }) => { const st: any = usePlayer.getState().state; if (!l || !st || !st.duration || st.disableUi) { return; } usePlayer.getState().seekTo(l.t / 1000); };
   return (
     <div className={'np-lyrics np-lyrics--' + state}>
-      {state === 'synced' ? <div className="np-lyrics__eyebrow np-lyrics__eyebrow--synced mono">LYRICS · LRCLIB</div> : null}
+      {state === 'synced' ? <div className="np-lyrics__eyebrow np-lyrics__eyebrow--synced mono">ТЕКСТ ПЕСНИ · LRCLIB</div> : null}
       {state === 'synced' ? (
         <div className="np-lyrics__col np-lyrics__col--synced" ref={col}>
           <div className="np-lyrics__stack">
@@ -73,11 +73,11 @@ export default function LyricsColumn() {
       ) : null}
       {state === 'plain' ? (
         <div className="np-lyrics__col np-lyrics__col--plain">
-          <div className="np-lyrics__eyebrow mono">LYRICS · LRCLIB</div>
+          <div className="np-lyrics__eyebrow mono">ТЕКСТ ПЕСНИ · LRCLIB</div>
           <div className="np-lyrics__plain">{plain.split(/\r?\n/).map((l, i) => <div key={i} className="np-lyrics__line is-plain">{l || '\u00a0'}</div>)}</div>
         </div>
       ) : null}
-      {state === 'none' ? <div className="np-lyrics__col np-lyrics__col--empty"><div className="np-lyrics__empty">No lyrics for this track.</div></div> : null}
+      {state === 'none' ? <div className="np-lyrics__col np-lyrics__col--empty"><div className="np-lyrics__empty">Текст этой песни не найден.</div></div> : null}
       {state === 'loading' ? <div className="np-lyrics__col np-lyrics__col--loading"><div className="np-lyrics__skeleton"><i /><i /><i /><i /><i /></div></div> : null}
     </div>
   );

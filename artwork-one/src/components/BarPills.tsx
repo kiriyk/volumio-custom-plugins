@@ -8,8 +8,8 @@ export function OutputPill() {
   const zone = useMultiroom(s => s.zones.find(z => z.isSelf)?.name || '');
   const open = useUi(s => s.outputsOpen);
   return (
-    <button type="button" className={'tb-pill tb-pill--output' + (open ? ' active' : '')} onClick={() => useUi.getState().toggleOutputs()} title="Zones & outputs">
-      <Icon name="speaker" /><span className="tb-pill__name">{zone || 'This player'}</span>
+    <button type="button" className={'tb-pill tb-pill--output' + (open ? ' active' : '')} onClick={() => useUi.getState().toggleOutputs()} title="Зоны и выходы">
+      <Icon name="speaker" /><span className="tb-pill__name">{zone || 'Этот плеер'}</span>
     </button>
   );
 }
@@ -18,7 +18,7 @@ export function QueuePill({ active, onClick }: { active?: boolean; onClick?: () 
   const len = useQueue(s => s.queue.length);
   const open = useUi(s => s.queueOpen);
   return (
-    <button type="button" className={'tb-pill tb-pill--queue' + ((active ?? open) ? ' active' : '')} onClick={onClick || (() => useUi.getState().toggleQueue())} title="Queue">
+    <button type="button" className={'tb-pill tb-pill--queue' + ((active ?? open) ? ' active' : '')} onClick={onClick || (() => useUi.getState().toggleQueue())} title="Очередь">
       <Icon name="queue_music" />{len ? <span className="tb-pill__count mono">{len}</span> : null}
     </button>
   );

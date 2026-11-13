@@ -1,3 +1,4 @@
+import { sourceLabel } from '../navigationLabels';
 import SearchSources from './SearchSources';
 /**
  * The Browse landing (mockup 2b-browse): every card a real source; counts, stats and tile
@@ -62,19 +63,19 @@ export default function BrowseLanding({ dedicated }: { dedicated?: boolean }) {
 
   const s = home.stats;
   const h = s ? parseInt(String(s.playtime || '').split(':')[0], 10) : NaN;
-  const statsLine = s ? `${s.artists} ARTISTS · ${s.albums} ALBUMS` + (isNaN(h) ? '' : ` · ${h} H`) : '';
+  const statsLine = s ? `${s.artists} ИСПОЛНИТЕЛЕЙ · ${s.albums} АЛЬБОМОВ` + (isNaN(h) ? '' : ` · ${h} Ч`) : '';
   const landingSearch = isSearching;
   const recents = (
     <>
-      {searchField.length === 1 ? <div className="aw-recent__hint">Keep typing: the search starts at two characters.</div> : null}
+      {searchField.length === 1 ? <div className="aw-recent__hint">Введите хотя бы два символа для поиска.</div> : null}
       {recent.length && !searchField.length ? (
         <div className="aw-recent">
-          <div className="aw-recent__head"><span className="mono">RECENT SEARCHES</span><button type="button" className="aw-recent__clear" onClick={() => useRecentSearches.getState().clear()}>Clear all</button></div>
+          <div className="aw-recent__head"><span className="mono">НЕДАВНИЕ ЗАПРОСЫ</span><button type="button" className="aw-recent__clear" onClick={() => useRecentSearches.getState().clear()}>Очистить всё</button></div>
           <div className="aw-recent__chips">
             {recent.map(q => (
               <span className="aw-recent__chip" key={q}>
                 <button type="button" className="aw-recent__run" onClick={() => useBrowse.getState().search(q)}><Icon name="history" /><span>{q}</span></button>
-                <button type="button" className="aw-recent__x" onClick={() => useRecentSearches.getState().remove(q)} aria-label={'Forget ' + q} title="Forget"><Icon name="close" /></button>
+                <button type="button" className="aw-recent__x" onClick={() => useRecentSearches.getState().remove(q)} aria-label={'Забыть запрос: ' + q} title="Забыть"><Icon name="close" /></button>
               </span>
             ))}
           </div>
@@ -90,31 +91,31 @@ export default function BrowseLanding({ dedicated }: { dedicated?: boolean }) {
         <PageHead variant="home"
           nav={<>
             {/* the same row as Home's: Home, Library (here), the sources */}
-            <div className="aw-tab" onClick={() => nav('/home')}>Home</div>
-            <div className="aw-tab active" aria-current="page">Library</div>
-            {streaming.map(x => <div key={x.uri} className="aw-tab" onClick={() => fetch(x)}>{x.name}</div>)}
-            {source('radio') ? <div className="aw-tab" onClick={() => fetch(source('radio'))}>Radio</div> : null}
+            <div className="aw-tab" onClick={() => nav('/home')}>Главная</div>
+            <div className="aw-tab active" aria-current="page">Медиатека</div>
+            {streaming.map(x => <div key={x.uri} className="aw-tab" onClick={() => fetch(x)}>{sourceLabel(x)}</div>)}
+            {source('radio') ? <div className="aw-tab" onClick={() => fetch(source('radio'))}>Радио</div> : null}
           </>}
           actions={<div className="aw-search-tools"><label className={'aw-search' + (searchField.length ? ' active' : '')}>
             <Icon name="search" />
             <input id="aw-search-input" ref={input} type="search" value={searchField} onChange={(e) => useBrowse.getState().search(e.target.value)}
-              placeholder={s ? 'Search ' + s.songs + ' tracks' : 'Search everything'} aria-label="Search" autoComplete="off" spellCheck={false} />
+              placeholder={s ? 'Поиск: ' + s.songs + ' tracks' : 'Поиск по всей медиатеке'} aria-label="Поиск" autoComplete="off" spellCheck={false} />
             {!searchField.length ? <span className="aw-search-key mono">⌘K</span> : null}
-            {searchField.length ? <button type="button" className="aw-search-clear" onClick={() => useBrowse.getState().clearSearch()} aria-label="Clear search"><Icon name="close" /></button> : null}
+            {searchField.length ? <button type="button" className="aw-search-clear" onClick={() => useBrowse.getState().clearSearch()} aria-label="Очистить поиск"><Icon name="close" /></button> : null}
           </label><SearchScope /></div>} />
       ) : null}
 
       {landingSearch && searchField.length < 2 ? <div className="aw-recent__under">{recents}</div> : null}
       {landingSearch && searchField.length >= 2 ? (
         <div className="aw-listhead aw-listhead--search">
-          <h1 className="aw-listhead__title">Results</h1>
+          <h1 className="aw-listhead__title">Результаты</h1>
           {searchCount ? <span className="aw-listhead__count mono">{searchCount}</span> : null}
         </div>
       ) : landingSearch ? null : (
         <div>
           {recents}
           <div className="aw-browse-head">
-            <h1 className="aw-browse-title">Browse</h1>
+            <h1 className="aw-browse-title">Обзор</h1>
             {statsLine ? <div className="aw-browse-stats mono">{statsLine}</div> : null}
           </div>
 
@@ -125,7 +126,7 @@ export default function BrowseLanding({ dedicated }: { dedicated?: boolean }) {
                   {home.albumsArt.map((a, i) => <img key={i} src={a} alt="" onError={(e) => e.currentTarget.remove()} />)}
                   <Icon name="album" className="aw-tile__glyph" />
                 </div>
-                <div className="aw-card-body"><div className="aw-card-title">Albums</div>{s ? <div className="aw-card-sub">{s.albums} albums</div> : null}</div>
+                <div className="aw-card-body"><div className="aw-card-title">Альбомы</div>{s ? <div className="aw-card-sub">{s.albums} альбомов</div> : null}</div>
                 <Icon name="chevron_right" className="aw-card-chev" />
               </div>
             ) : null}
@@ -135,14 +136,14 @@ export default function BrowseLanding({ dedicated }: { dedicated?: boolean }) {
                   {home.artistsArt.map((a, i) => <img key={i} src={a} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />)}
                   <Icon name="mic_external_on" className="aw-tile__glyph" />
                 </div>
-                <div className="aw-card-body"><div className="aw-card-title">Artists</div>{s ? <div className="aw-card-sub">{s.artists} artists</div> : null}</div>
+                <div className="aw-card-body"><div className="aw-card-title">Исполнители</div>{s ? <div className="aw-card-sub">{s.artists} исполнителей</div> : null}</div>
                 <Icon name="chevron_right" className="aw-card-chev" />
               </div>
             ) : null}
             {source('favourites') ? (
               <div className="aw-card" onClick={() => fetch(source('favourites'))}>
                 <div className="aw-tile aw-tile--icon"><Icon name="favorite" /></div>
-                <div className="aw-card-body"><div className="aw-card-title">Favourites</div>{home.counts.favourites !== undefined ? <div className="aw-card-sub">{home.counts.favourites} tracks</div> : null}</div>
+                <div className="aw-card-body"><div className="aw-card-title">Избранное</div>{home.counts.favourites !== undefined ? <div className="aw-card-sub">{home.counts.favourites} треков</div> : null}</div>
                 <Icon name="chevron_right" className="aw-card-chev" />
               </div>
             ) : null}
@@ -150,45 +151,45 @@ export default function BrowseLanding({ dedicated }: { dedicated?: boolean }) {
               <div className="aw-card" onClick={() => fetch(source('playlists'))}>
                 {home.playlistArt ? <div className="aw-tile aw-tile--stack"><img src={home.playlistArt} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} /><Icon name="queue_music" className="aw-tile__glyph" /></div>
                   : <div className="aw-tile aw-tile--icon"><Icon name="queue_music" /></div>}
-                <div className="aw-card-body"><div className="aw-card-title">Playlists</div>{home.counts.playlists !== undefined ? <div className="aw-card-sub">{home.counts.playlists} playlists</div> : null}</div>
+                <div className="aw-card-body"><div className="aw-card-title">Плейлисты</div>{home.counts.playlists !== undefined ? <div className="aw-card-sub">{home.counts.playlists} плейлистов</div> : null}</div>
                 <Icon name="chevron_right" className="aw-card-chev" />
               </div>
             ) : null}
             {source('genres://') ? (
               <div className="aw-card" onClick={() => fetch(source('genres://'))}>
                 <div className="aw-tile aw-tile--icon aw-tile--lines" aria-hidden="true"><i /><i /><i /><Icon name="graphic_eq" className="aw-tile__glyph" /></div>
-                <div className="aw-card-body"><div className="aw-card-title">Genres</div>{home.counts.genres !== undefined ? <div className="aw-card-sub">{home.counts.genres} genres</div> : null}</div>
+                <div className="aw-card-body"><div className="aw-card-title">Жанры</div>{home.counts.genres !== undefined ? <div className="aw-card-sub">{home.counts.genres} жанров</div> : null}</div>
                 <Icon name="chevron_right" className="aw-card-chev" />
               </div>
             ) : null}
             {source('Last_100') ? (
               <div className="aw-card" onClick={() => fetch(source('Last_100'))}>
                 <div className="aw-tile aw-tile--icon"><Icon name="history" /></div>
-                <div className="aw-card-body"><div className="aw-card-title">Last 100</div><div className="aw-card-sub">Recently played</div></div>
+                <div className="aw-card-body"><div className="aw-card-title">Последние 100</div><div className="aw-card-sub">Недавно прослушано</div></div>
                 <Icon name="chevron_right" className="aw-card-chev" />
               </div>
             ) : null}
           </div>
 
           <div className="aw-sources-head">
-            <span className="mono">SOURCES</span>
-            <a className="aw-sources-manage" onClick={() => nav(SOURCES_SETTINGS)}>Manage</a>
+            <span className="mono">ИСТОЧНИКИ</span>
+            <a className="aw-sources-manage" onClick={() => nav(SOURCES_SETTINGS)}>Управление</a>
           </div>
           <div className="aw-sources">
             {(['music-library', 'radio', 'upnp'] as const).map(u => { const src = source(u); if (!src) { return null; } const glyph = u === 'music-library' ? 'folder_open' : u === 'radio' ? 'radio' : 'dns'; return (
               <div key={u} className="aw-source" onClick={() => fetch(src)}>
-                <Icon name={glyph} /><div className="aw-source-body"><div className="aw-source-name">{src.name}</div></div><Icon name="chevron_right" className="aw-source-chev" />
+                <Icon name={glyph} /><div className="aw-source-body"><div className="aw-source-name">{sourceLabel(src)}</div></div><Icon name="chevron_right" className="aw-source-chev" />
               </div>); })}
             {streaming.map(x => (
               <div key={x.uri} className="aw-source" onClick={() => fetch(x)}>
                 {x.albumart && !logoFail[x.uri]
                   ? <span className="aw-source-logo"><img className={x.plugin_name === 'spop' ? 'aw-source-logo__img--pad' : 'aw-source-logo__img'} src={albumart(x.albumart)} alt="" onError={() => setLogoFail(f => ({ ...f, [x.uri]: true }))} /></span>
                   : <Icon name="cloud" />}
-                <div className="aw-source-body"><div className="aw-source-name">{x.name}</div></div><Icon name="chevron_right" className="aw-source-chev" />
+                <div className="aw-source-body"><div className="aw-source-name">{sourceLabel(x)}</div></div><Icon name="chevron_right" className="aw-source-chev" />
               </div>
             ))}
             <div className="aw-source aw-source--add" onClick={() => nav(SOURCES_SETTINGS)}>
-              <Icon name="add" /><div className="aw-source-body"><div className="aw-source-name">Add a source</div><div className="aw-source-sub">Settings · Sources</div></div>
+              <Icon name="add" /><div className="aw-source-body"><div className="aw-source-name">Добавить источник</div><div className="aw-source-sub">Настройки · Источники</div></div>
             </div>
           </div>
         </div>

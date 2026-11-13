@@ -222,11 +222,11 @@ export default function NowPlaying() {
 
   const topbar = (
       <div id="np-topbar">
-        <button type="button" className="np-menu-btn" onClick={() => useUi.getState().toggleMenu()} aria-label="Menu" title="Menu"><Icon name="menu" /></button>
+        <button type="button" className="np-menu-btn" onClick={() => useUi.getState().toggleMenu()} aria-label="Меню" title="Меню"><Icon name="menu" /></button>
         <div className="np-topbar-left">
-          <a className="np-chevron" onClick={goBack} aria-label="Back" title="Back"><Icon name="expand_more" /></a>
+          <a className="np-chevron" onClick={goBack} aria-label="Назад" title="Назад"><Icon name="expand_more" /></a>
           {zone ? <div className="np-zone mono"><span>{zone}</span>{output ? <span className="np-zone-out">&nbsp;·&nbsp;{output}</span> : null}</div> : null}
-          {sleepRunning ? <button type="button" className="np-sleep-tag" onClick={() => useModal.getState().open('sleep', { name: 'Sleep' })} title="Sleep timer"><Icon name="bedtime" /><span className="mono">SLEEP · {sleepMinutes} MIN</span></button> : null}
+          {sleepRunning ? <button type="button" className="np-sleep-tag" onClick={() => useModal.getState().open('sleep', { name: 'Сон' })} title="Таймер сна"><Icon name="bedtime" /><span className="mono">СОН · {sleepMinutes} МИН</span></button> : null}
         </div>
         <div id="np-badge-slot">
           {bitPerfect && !empty && !ext ? <div className="np-badge"><span className="np-dot" /><span className="mono">BIT PERFECT</span></div> : null}
@@ -254,16 +254,16 @@ export default function NowPlaying() {
         <div id="np-meta" className={lyricsOn ? 'np-meta--lyrics' : ''}>
           {/* the heart has a fixed spot at the end of the face switch's row (handoff 16B): a long title never moves it */}
           <div className="np-tabrow">
-            <div className="np-seg" role="tablist" aria-label="Now Playing view">
+            <div className="np-seg" role="tablist" aria-label="Вид экрана воспроизведения">
               {views.map(v => (
                 <button key={v} type="button" role="tab" className={view === v ? 'active' : ''} aria-selected={view === v} onClick={() => setView(v)} disabled={v === 'lyrics' && lyricsState === 'none'}>
-                  {v === 'cover' ? 'Cover' : v === 'info' ? 'Info' : 'Lyrics'}
+                  {v === 'cover' ? 'Обложка' : v === 'info' ? 'Информация' : 'Текст песни'}
                 </button>
               ))}
             </div>
-            <button type="button" className={'np-heart' + (fav ? ' active' : '')} onClick={() => usePlayer.getState().toggleFavourite()} title={fav ? 'Remove from favourites' : 'Add to favourites'} aria-pressed={fav} disabled={!!st.disableUi}><FavIcon on={fav} /></button>
+            <button type="button" className={'np-heart' + (fav ? ' active' : '')} onClick={() => usePlayer.getState().toggleFavourite()} title={fav ? 'Удалить из избранного' : 'В избранное'} aria-pressed={fav} disabled={!!st.disableUi}><FavIcon on={fav} /></button>
           </div>
-          {!lyricsOn && <div className="np-eyebrow mono">{queue.length ? <span>TRACK {pos + 1} OF {queue.length}</span> : <span>NOW PLAYING</span>}</div>}
+          {!lyricsOn && <div className="np-eyebrow mono">{queue.length ? <span>ТРЕК {pos + 1} ИЗ {queue.length}</span> : <span>СЕЙЧАС ИГРАЕТ</span>}</div>}
           <ClampedTitle text={shownTitle(st)} />
           <div className="np-byline">
             <div className="np-artist">{st.artist}</div>
@@ -286,7 +286,7 @@ export default function NowPlaying() {
                   <Icon name={ext.kind === 'airplay' ? 'airplay' : ext.kind === 'analog' ? 'input' : ext.kind === 'group' ? 'speaker_group' : 'cast'} />
                   <span className="np-external__text">
                     <span className="np-external__title">{ext.text}</span>
-                    <span className="np-external__sub">Controls come back when the stream stops.{ext.kind === 'group' ? <> <a onClick={() => nav('/multi-room')}>Open Zones</a></> : null}</span>
+                    <span className="np-external__sub">Controls come back when the stream stops.{ext.kind === 'group' ? <> <a onClick={() => nav('/multi-room')}>Открыть зоны</a></> : null}</span>
                   </span>
                 </div>
               ) : null}
@@ -307,11 +307,11 @@ export default function NowPlaying() {
       </div>
 
       <div className="np-m-actions">
-        <button type="button" className={'np-m-tile' + (fav ? ' active' : '')} onClick={() => usePlayer.getState().toggleFavourite()} title={fav ? 'Remove from favourites' : 'Add to favourites'} aria-pressed={fav}><FavIcon on={fav} /></button>
-        <button type="button" className="np-m-tile" title="Add to playlist" onClick={() => addToPlaylist({ uri: String(st.uri || ''), service: st.service, type: 'song', title: st.title, artist: st.artist, album: st.album, albumart: st.albumart })} disabled={!!st.disableUi}><Icon name="playlist_add" /></button>
-        <button type="button" className={'np-m-tile' + (st.repeat ? ' active' : '')} onClick={() => usePlayer.getState().cycleRepeat()} title="Repeat"><Icon name={st.repeat && st.repeatSingle ? 'repeat_one' : 'repeat'} /></button>
-        <button type="button" className={'np-m-tile np-m-tile--lyrics' + (lyricsOn ? ' active' : '')} onClick={toggleLyrics} disabled={lyricsState === 'none'} title="Lyrics" aria-label="Lyrics"><Icon name="lyrics" /></button>
-        <button type="button" className="np-m-tile" title="More" onClick={() => { if (st.title || st.album || st.artist) { useModal.getState().open('track-actions'); } }} disabled={!!st.disableUi}><Icon name="more_horiz" /></button>
+        <button type="button" className={'np-m-tile' + (fav ? ' active' : '')} onClick={() => usePlayer.getState().toggleFavourite()} title={fav ? 'Удалить из избранного' : 'В избранное'} aria-pressed={fav}><FavIcon on={fav} /></button>
+        <button type="button" className="np-m-tile" title="В плейлист" onClick={() => addToPlaylist({ uri: String(st.uri || ''), service: st.service, type: 'song', title: st.title, artist: st.artist, album: st.album, albumart: st.albumart })} disabled={!!st.disableUi}><Icon name="playlist_add" /></button>
+        <button type="button" className={'np-m-tile' + (st.repeat ? ' active' : '')} onClick={() => usePlayer.getState().cycleRepeat()} title="Повтор"><Icon name={st.repeat && st.repeatSingle ? 'repeat_one' : 'repeat'} /></button>
+        <button type="button" className={'np-m-tile np-m-tile--lyrics' + (lyricsOn ? ' active' : '')} onClick={toggleLyrics} disabled={lyricsState === 'none'} title="Текст песни" aria-label="Текст песни"><Icon name="lyrics" /></button>
+        <button type="button" className="np-m-tile" title="Ещё" onClick={() => { if (st.title || st.album || st.artist) { useModal.getState().open('track-actions'); } }} disabled={!!st.disableUi}><Icon name="more_horiz" /></button>
       </div>
 
       <div id="np-footer">
@@ -323,12 +323,12 @@ export default function NowPlaying() {
               <>
                 <div className="np-upnext-films">
                   {upNext.map((t, i) => (
-                    <button key={t.uri + i} type="button" className="np-upnext-film" onClick={() => useQueue.getState().play(pos + 1 + i)} title={(t.name || t.title || '') + (t.artist ? ' · ' + t.artist : '')} aria-label={'Play ' + (t.name || t.title || '')}>
+                    <button key={t.uri + i} type="button" className="np-upnext-film" onClick={() => useQueue.getState().play(pos + 1 + i)} title={(t.name || t.title || '') + (t.artist ? ' · ' + t.artist : '')} aria-label={'Воспроизвести: ' + (t.name || t.title || '')}>
                       <img src={albumart(t.albumart)} alt="" />
                     </button>
                   ))}
                 </div>
-                <button type="button" className="np-upnext-label mono" onClick={showQueue} title="Queue">UP NEXT</button>
+                <button type="button" className="np-upnext-label mono" onClick={showQueue} title="Очередь">ДАЛЕЕ</button>
               </>
             ) : null}
           </div>
@@ -344,7 +344,7 @@ export default function NowPlaying() {
       {lyricsOn ? <div className="np-lsheet-scrim" onClick={toggleLyrics} /> : null}
       {lyricsOn ? (
         <div className="np-lsheet" ref={sheet} data-sheet>
-          <button type="button" className="np-lsheet__grab" onPointerDown={drag.onPointerDown} onClick={drag.onClick} aria-label="Close lyrics" />
+          <button type="button" className="np-lsheet__grab" onPointerDown={drag.onPointerDown} onClick={drag.onClick} aria-label="Закрыть текст песни" />
           <div className="np-lsheet__head">
             <div className="np-lsheet__title">{st.title}</div>
             {st.artist ? <div className="np-lsheet__artist">{st.artist}</div> : null}
@@ -354,11 +354,11 @@ export default function NowPlaying() {
       ) : null}
 
       <div className="np-m-bar">
-        <button type="button" className="np-m-bar__btn" onClick={() => useUi.getState().toggleQueue()} title="Queue"><Icon name="queue_music" /></button>
-        <button type="button" className="np-m-bar__btn np-m-bar__btn--skip" onClick={() => usePlayer.getState().prev()} title="Previous" disabled={!!st.disableUi}><Icon name="skip_previous" /></button>
-        <button type="button" className="np-m-bar__play" onClick={() => usePlayer.getState().togglePlay()} title="Play/Pause" disabled={!!st.disableUi}><Icon name={st.status === 'play' ? 'pause' : 'play_arrow'} /></button>
-        <button type="button" className="np-m-bar__btn np-m-bar__btn--skip" onClick={() => usePlayer.getState().next()} title="Next" disabled={!!st.disableUi}><Icon name="skip_next" /></button>
-        <button type="button" className="np-m-bar__btn" onClick={() => useUi.getState().toggleOutputs()} title="Zones & outputs"><Icon name="speaker" /></button>
+        <button type="button" className="np-m-bar__btn" onClick={() => useUi.getState().toggleQueue()} title="Очередь"><Icon name="queue_music" /></button>
+        <button type="button" className="np-m-bar__btn np-m-bar__btn--skip" onClick={() => usePlayer.getState().prev()} title="Предыдущее" disabled={!!st.disableUi}><Icon name="skip_previous" /></button>
+        <button type="button" className="np-m-bar__play" onClick={() => usePlayer.getState().togglePlay()} title="Воспроизведение / пауза" disabled={!!st.disableUi}><Icon name={st.status === 'play' ? 'pause' : 'play_arrow'} /></button>
+        <button type="button" className="np-m-bar__btn np-m-bar__btn--skip" onClick={() => usePlayer.getState().next()} title="Следующее" disabled={!!st.disableUi}><Icon name="skip_next" /></button>
+        <button type="button" className="np-m-bar__btn" onClick={() => useUi.getState().toggleOutputs()} title="Зоны и выходы"><Icon name="speaker" /></button>
       </div>
     </div>
   );

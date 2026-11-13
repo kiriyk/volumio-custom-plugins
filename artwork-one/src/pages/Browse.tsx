@@ -109,7 +109,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
     if (u === 'music-library' || u.indexOf('music-library/') === 0) { return b.sources.find(s => s.uri === 'music-library') || { name: 'Music Library', uri: 'music-library', plugin_name: 'mpd', plugin_type: 'music_service' }; }
     return streamingOf(b.sources).find(s => (s.plugin_name && (s.plugin_name === r.plugin_name || s.plugin_name === r.service)) || (s.service && s.service === r.service) || (s.uri && String(r.uri) === s.uri) || (s.uri && String(r.uri).indexOf(s.uri + '/') === 0) || (s.uri && String(r.uri).indexOf(s.uri + ':') === 0)) || null;
   }, [request, b.sources]);
-  const placeholder = service && (!info || isCustomMusicRoot(uri)) ? 'Search ' + (service.name || service.title || '') : 'Filter ' + String(listTitle || '').toLowerCase();
+  const placeholder = service && (!info || isCustomMusicRoot(uri)) ? 'Поиск: ' + (service.name || service.title || '') : 'Фильтр: ' + String(listTitle || '').toLowerCase();
   // the Playlists list: the field also finds the songs inside the playlists (Volumio lists only their names)
   const [inPlaylists, setInPlaylists] = useState<any>(null);
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
     const q = filter.trim();
     if (!onPlaylists || q.length < 2) { setInPlaylists(null); return; }
     let alive = true;
-    const t = window.setTimeout(() => { searchPlaylists(q).then((pl) => { if (!alive) { return; } setInPlaylists(pl ? { ...pl, title: 'Tracks in playlists', items: pl.items.filter((i: any) => i.type === 'song') } : null); }).catch(() => { if (alive) { setInPlaylists(null); } }); }, 300);
+    const t = window.setTimeout(() => { searchPlaylists(q).then((pl) => { if (!alive) { return; } setInPlaylists(pl ? { ...pl, title: 'Треки в плейлистах', items: pl.items.filter((i: any) => i.type === 'song') } : null); }).catch(() => { if (alive) { setInPlaylists(null); } }); }, 300);
     return () => { alive = false; window.clearTimeout(t); };
   }, [filter, request]);
   const listsShown = inPlaylists && inPlaylists.items.length ? [...lists, { ...inPlaylists, awNoFilter: true }] : lists;
@@ -169,8 +169,8 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
 
   // the list's own order; beside a service's genre menu it joins that group, so both sit on one line
   const localSort = (
-    <button type="button" className="aw-sort" onClick={() => setSortDesc(v => !v)} title="Sort order">
-      <span className="aw-sort__k">Sort</span><span className="aw-sort__v">{sortDesc ? 'Z–A' : 'A–Z'}</span><Icon name="expand_more" />
+    <button type="button" className="aw-sort" onClick={() => setSortDesc(v => !v)} title="Порядок сортировки">
+      <span className="aw-sort__k">Сортировка</span><span className="aw-sort__v">{sortDesc ? 'Z–A' : 'A–Z'}</span><Icon name="expand_more" />
     </button>
   );
   return (
@@ -183,7 +183,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
             {dedicated && !b.isBrowsing ? (
               <PageHead variant="search" nav={<div className="dedicated-search"><div className="search-container">
                 <form action="." id="searchForm" onSubmit={(e) => { e.preventDefault(); (document.activeElement as HTMLElement)?.blur(); }}>
-                  <input type="search" id="search-input-form" ref={searchInput} className="form-control" value={b.searchField} onChange={(e) => b.search(e.target.value)} placeholder="Search ..." title="Search" spellCheck={false} />
+                  <input type="search" id="search-input-form" ref={searchInput} className="form-control" value={b.searchField} onChange={(e) => b.search(e.target.value)} placeholder="Поиск…" title="Поиск" spellCheck={false} />
                 </form>
                 <button type="button" className="search-icon" onMouseDown={(e) => { if (b.searchField.length) { e.preventDefault(); b.search(''); } }}><Icon name={b.searchField.length ? 'cancel' : 'search'} /></button>
               </div>
@@ -211,9 +211,9 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
                     <input type="search" value={filter} onChange={(e) => headInput(e.target.value)} placeholder={placeholder} aria-label={placeholder} spellCheck={false} />
                   </label>
                   {b.showGridViewSelector() ? (
-                    <div className="aw-viewtoggle" role="group" aria-label="View">
-                      <button type="button" className={(b.trackPage() ? b.showGridViewTracks : b.showGridView) ? 'active' : ''} onClick={() => b.setGridView(true, b.trackPage())} aria-label="Grid" title="Grid"><Icon name="grid_view" /></button>
-                      <button type="button" className={!(b.trackPage() ? b.showGridViewTracks : b.showGridView) ? 'active' : ''} onClick={() => b.setGridView(false, b.trackPage())} aria-label="List" title="List"><Icon name="list" /></button>
+                    <div className="aw-viewtoggle" role="group" aria-label="Вид">
+                      <button type="button" className={(b.trackPage() ? b.showGridViewTracks : b.showGridView) ? 'active' : ''} onClick={() => b.setGridView(true, b.trackPage())} aria-label="Плитка" title="Плитка"><Icon name="grid_view" /></button>
+                      <button type="button" className={!(b.trackPage() ? b.showGridViewTracks : b.showGridView) ? 'active' : ''} onClick={() => b.setGridView(false, b.trackPage())} aria-label="Список" title="Список"><Icon name="list" /></button>
                     </div>
                   ) : null}
                 </>} />
@@ -229,8 +229,8 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
               </div>
             ) : null}
 
-            {isPlainList && artistsPage && !b.showGridView ? <div className="aw-cols aw-cols--artists mono" aria-hidden="true"><span>#</span><span /><span>ARTIST</span><span /></div> : null}
-            {isTrackList ? <div className="aw-cols mono aw-cols--fav" aria-hidden="true"><span>#</span><span /><span className="aw-cols__info"><span>TITLE</span><span>ALBUM</span></span><span className="aw-cols__duration">DURATION</span><span /><span /></div> : null}
+            {isPlainList && artistsPage && !b.showGridView ? <div className="aw-cols aw-cols--artists mono" aria-hidden="true"><span>#</span><span /><span>ИСПОЛНИТЕЛЬ</span><span /></div> : null}
+            {isTrackList ? <div className="aw-cols mono aw-cols--fav" aria-hidden="true"><span>#</span><span /><span className="aw-cols__info"><span>НАЗВАНИЕ</span><span>АЛЬБОМ</span></span><span className="aw-cols__duration">ДЛИТЕЛЬНОСТЬ</span><span /><span /></div> : null}
 
             {isDownloads ? <QobuzDownloads /> : null}
             <div id="browse-page">
@@ -240,7 +240,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
             </div>
 
             {isPlainList && letters.length > 1 ? (
-              <nav className="aw-alpha mono" aria-label="Jump to letter">
+              <nav className="aw-alpha mono" aria-label="Перейти к букве">
                 {letters.map(l => <button type="button" key={l} className={l === activeLetter ? 'active' : ''} onClick={() => jumpTo(l)}>{l}</button>)}
               </nav>
             ) : null}

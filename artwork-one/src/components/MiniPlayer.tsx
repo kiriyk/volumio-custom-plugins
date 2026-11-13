@@ -42,7 +42,7 @@ export default function MiniPlayer() {
           <div className="mini-identity" onClick={() => nav('/playback')}>
             <div id="trackInfo-compact">
               {art ? <div className="trackInfo-album-art-wrapper"><img className="album-art" src={albumart(art)} alt={st.album || ''} /></div> : null}
-              {st.title ? <div id="trackInfo-title" title="Song">{shownTitle(st)}</div> : null}
+              {st.title ? <div id="trackInfo-title" title="Трек">{shownTitle(st)}</div> : null}
               <div className="mini-byline">
                 <div id="trackInfo-artist-album">{st.artist ? <span id="trackInfo-artist">{st.artist}</span> : null}</div>
                 <div className={'track-info-rates aw-q--' + quality(st)}>
@@ -50,12 +50,12 @@ export default function MiniPlayer() {
                   {!ext && rates ? <span className="track-info-rate">{rates}</span> : null}
                   {!ext && fmt ? <span className="track-info-type">{fmt}</span> : null}
                   {sleepRunning ? <span className="track-info-sleep">SLEEP {sleepMinutes} MIN</span> : null}
-                  {stopAfter ? <span className="track-info-sleep" title={stopAfter === 'this' ? 'Stops after this track' : 'Stops after ' + stopAfter}>STOP AFTER</span> : null}
+                  {stopAfter ? <span className="track-info-sleep" title={stopAfter === 'this' ? 'Остановка после этого трека' : 'Остановка после: ' + stopAfter}>ОСТАНОВКА ПОСЛЕ</span> : null}
                 </div>
               </div>
             </div>
             {/* the heart is the last item of the zone, after a title that shortens */}
-            {st.title ? <button type="button" className={'btn btn-link mini-fav' + (fav ? ' active' : '')} onClick={(e) => { e.stopPropagation(); usePlayer.getState().toggleFavourite(); }} title={fav ? 'Remove from favourites' : 'Add to favourites'} aria-pressed={fav} disabled={!!st.disableUi}><FavIcon on={fav} /></button> : null}
+            {st.title ? <button type="button" className={'btn btn-link mini-fav' + (fav ? ' active' : '')} onClick={(e) => { e.stopPropagation(); usePlayer.getState().toggleFavourite(); }} title={fav ? 'Удалить из избранного' : 'В избранное'} aria-pressed={fav} disabled={!!st.disableUi}><FavIcon on={fav} /></button> : null}
           </div>
           <div className="mini-center">
             <div className="mini-transport"><Transport compact /></div>

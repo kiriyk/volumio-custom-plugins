@@ -6,7 +6,7 @@ import QueuePanel from '../components/QueuePanel';
 export default function QueuePage() {
   return (
     <div id="aw-queue-page" className="aw-qpage">
-      <PageHead variant="list" nav={<Crumbs root="Queue" />} />
+      <PageHead variant="list" nav={<Crumbs root="Очередь" />} />
       <QueuePanel page />
     </div>
   );

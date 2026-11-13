@@ -14,7 +14,7 @@ export default function UndoToast() {
         <div className="aw-undo__eyebrow mono">{cur.eyebrow}</div>
         <div className="aw-undo__title">{cur.title}</div>
       </div>
-      {cur.undo ? <button type="button" className="aw-undo__btn" onClick={() => useUndo.getState().undo()}>Undo</button> : null}
+      {cur.undo ? <button type="button" className="aw-undo__btn" onClick={() => useUndo.getState().undo()}>Отменить</button> : null}
     </div>
   );
 }

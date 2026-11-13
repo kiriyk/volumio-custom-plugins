@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import Icon from '../Icon';
 import ItemMenu from './ItemMenu';
 import { albumart } from '../../core/api';
+import { librarySectionArtwork } from '../../core/libraryArtwork';
 import { type BrowseItem, useBrowse } from '../../core/store/browse';
 import * as A from '../../core/browseActions';
 import { countText, useArtistCounts } from '../../core/artistCounts';
@@ -27,12 +28,14 @@ export default function MusicCard({ item, list, listIndex, itemIndex, hidden, or
   useArtistCounts(ref, item.uri, !!artistCounts && !item.meta && item.type === 'folder', c => setCountMeta({uri:item.uri,text:countText(c)}));
   const favVisible = A.showPlayButton(item) && (item.type === 'song' || item.type === 'folder-with-favourites') && (req ? req.uri : '') !== 'favourites';
   const noMenu = !A.showHamburgerMenu(item);
+  const libraryCover = librarySectionArtwork(item);
+  const cover = libraryCover || albumart(item.albumart);
   return (
     <div className={'music-card__wrapper' + (hidden ? ' aw-hidden' : '') + (menuOpen ? ' is-menu-open' : '')} ref={ref} style={order ? { order } : undefined}>
       <div className="music-card" onClick={() => A.clickListItem(item, list, itemIndex)}>
         <div className="music-card__header">
-          <img className={'music-card__img' + (!item.albumart ? ' hidden' : '')} src={albumart(item.albumart)} alt="" />
-          <div className={'music-card__img-icon' + (!item.icon ? ' hidden' : '')}><Icon name={A.faIcon(item.icon)} /></div>
+          <img className={'music-card__img' + (!cover ? ' hidden' : '')} src={cover} alt="" />
+          <div className={'music-card__img-icon' + (!item.icon || libraryCover ? ' hidden' : '')}><Icon name={A.faIcon(item.icon)} /></div>
           <div className="music-card__overlay">
             <div className="meta__genre">{item.genre || ''}</div>
             <div className={'meta__actions' + (noMenu ? ' hidden' : '')} onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>

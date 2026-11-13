@@ -1,3 +1,4 @@
+import { sourceLabel } from '../components/navigationLabels';
 /**
  * Home (spec §6.2, renamed from the mockup's My Music): the tabs (Home, Library, the sources) and the search pill, "Pick up where you left off", the recent
  * albums shelf (Last_100 resolved to library albums), and the pinned shelf.
@@ -81,25 +82,25 @@ export default function Home() {
       <PageHead variant="start"
         nav={<>
           {/* where you are, then the places to go: Library is the rail's Music (the library to browse), then the sources */}
-          <div className="aw-tab active" aria-current="page">Home</div>
-          <div className="aw-tab" onClick={() => { useBrowse.getState().home(); nav('/browse'); }}>Library</div>
-          {streaming.map(s => <div key={s.uri} className="aw-tab" onClick={() => openSource(s)}>{s.name}</div>)}
-          {radio ? <div className="aw-tab" onClick={() => openSource(radio)}>Radio</div> : null}
+          <div className="aw-tab active" aria-current="page">Главная</div>
+          <div className="aw-tab" onClick={() => { useBrowse.getState().home(); nav('/browse'); }}>Медиатека</div>
+          {streaming.map(s => <div key={s.uri} className="aw-tab" onClick={() => openSource(s)}>{sourceLabel(s)}</div>)}
+          {radio ? <div className="aw-tab" onClick={() => openSource(radio)}>Радио</div> : null}
         </>}
         actions={<div className="aw-search" onClick={goSearch} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') { goSearch(); } }}>
-          <Icon name="search" /><span className="aw-search-label">Search everything</span><span className="aw-search-key mono">⌘K</span>
+          <Icon name="search" /><span className="aw-search-label">Поиск по всей медиатеке</span><span className="aw-search-key mono">⌘K</span>
         </div>} />
 
       {/* on the phone the label is the section's own line, as PINNED and RECENT ALBUMS are; beside the cover it wrapped */}
-      {continueArt && continueTitle ? <div className="home-eyebrow home-eyebrow--row mono">PICK UP WHERE YOU LEFT OFF</div> : null}
+      {continueArt && continueTitle ? <div className="home-eyebrow home-eyebrow--row mono">ПРОДОЛЖИТЬ ПРОСЛУШИВАНИЕ</div> : null}
       {continueArt && continueTitle ? (
         <div className="home-hero">
           <div className="home-hero-cover"><img src={continueArt} alt={continueTitle} /></div>
           <div className="home-hero-meta">
-            <div className="home-eyebrow mono">PICK UP WHERE YOU LEFT OFF</div>
+            <div className="home-eyebrow mono">ПРОДОЛЖИТЬ ПРОСЛУШИВАНИЕ</div>
             <div className="home-hero-title">{continueTitle}</div>
             <div className="home-hero-actions">
-              <button className="home-resume" onClick={() => { if (st.status !== 'play') { usePlayer.getState().play(); } nav('/playback'); }}><Icon name="play_arrow" /><span>Resume</span></button>
+              <button className="home-resume" onClick={() => { if (st.status !== 'play') { usePlayer.getState().play(); } nav('/playback'); }}><Icon name="play_arrow" /><span>Продолжить</span></button>
               {st.artist ? <span className="home-hero-sub">{st.artist}</span> : null}
             </div>
           </div>
@@ -109,9 +110,9 @@ export default function Home() {
       {pins.length ? (
         <div className={'home-shelf home-pins' + (edit ? ' is-editing' : '')}>
           <div className="home-shelf-head">
-            <span className="mono home-shelf-title">PINNED</span>
+            <span className="mono home-shelf-title">ЗАКРЕПЛЕНО</span>
             <span className="mono home-pins-count">{pins.length}</span>
-            <button type="button" className="home-pins-edit" onClick={() => setEdit(v => !v)}>{edit ? 'Done' : 'Edit'}</button>
+            <button type="button" className="home-pins-edit" onClick={() => setEdit(v => !v)}>{edit ? 'Готово' : 'Изменить'}</button>
           </div>
           <div className="main__row">
             {pins.map((p, i) => {
@@ -124,7 +125,7 @@ export default function Home() {
                       {art ? <img className="music-card__img" src={art} alt="" onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.style.display = 'none'; (img.nextElementSibling as HTMLElement).style.display = 'grid'; }} /> : null}
                       <div className="home-pin__glyph" style={{ display: art ? 'none' : 'grid' }}><Icon name={pinGlyph(p)} /></div>
                       <Dropdown className="home-pin__menu" toggleClass="home-pin__more" toggle={<Icon name="more_horiz" />}
-                        entries={[{ icon: station ? 'play_arrow' : 'open_in_new', label: station ? 'Play' : 'Open', onClick: () => openPin(p) }, { label: '-', onClick: () => {} }, { icon: 'push_pin', label: 'Unpin', danger: true, onClick: () => usePins.getState().unpin(p) }]} />
+                        entries={[{ icon: station ? 'play_arrow' : 'open_in_new', label: station ? 'Воспроизвести' : 'Открыть', onClick: () => openPin(p) }, { label: '-', onClick: () => {} }, { icon: 'push_pin', label: 'Открепить', danger: true, onClick: () => usePins.getState().unpin(p) }]} />
                     </div>
                     <div className="music-card__info"><div className="music-card__label" title={p.title}>{p.title}</div></div>
                     <p className="music-card__meta">{pinEyebrow(p)}</p>
@@ -139,11 +140,11 @@ export default function Home() {
       {recent.length ? (
         <div className="home-shelf">
           <div className="home-shelf-head">
-            <span className="mono home-shelf-title">RECENT ALBUMS</span>
+            <span className="mono home-shelf-title">НЕДАВНИЕ АЛЬБОМЫ</span>
             {pages > 1 ? (
               <div className="home-shelf-nav">
-                <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page <= 0} aria-label="Previous"><Icon name="chevron_left" /></button>
-                <button type="button" onClick={() => setPage(p => Math.min(pages - 1, p + 1))} disabled={page >= pages - 1} aria-label="Next"><Icon name="chevron_right" /></button>
+                <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page <= 0} aria-label="Предыдущее"><Icon name="chevron_left" /></button>
+                <button type="button" onClick={() => setPage(p => Math.min(pages - 1, p + 1))} disabled={page >= pages - 1} aria-label="Следующее"><Icon name="chevron_right" /></button>
               </div>
             ) : null}
           </div>

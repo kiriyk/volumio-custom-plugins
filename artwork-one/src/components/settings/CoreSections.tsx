@@ -22,10 +22,10 @@ export function SystemVersion() {
   const sv: any = useSocket('pushSystemVersion', 'getSystemVersion') || {};
   return (
     <div id="systemVersion" className="panel panel-default">
-      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-info-circle" /> <span>System Version</span></h3></div>
+      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-info-circle" /> <span>Версия системы</span></h3></div>
       <div className="panel-body">
-        <span className="sv-main"><span>System Version</span>: <span className="sv-value">{sv.systemversion}</span></span>
-        <span className="sv-sub"><span>Released</span>: <span className="sv-value">{sv.builddate}</span></span>
+        <span className="sv-main"><span>Версия системы</span>: <span className="sv-value">{sv.systemversion}</span></span>
+        <span className="sv-sub"><span>Дата выпуска</span>: <span className="sv-value">{sv.builddate}</span></span>
         {sv.additionalSVInfo ? <div>{sv.additionalSVInfo}</div> : null}
       </div>
     </div>
@@ -37,7 +37,7 @@ export function NetworkStatus() {
   useEffect(() => { emit('getInfoNetwork'); const off = on('pushInfoNetworkReload', () => { if (window.location.pathname === '/plugin/system_controller-network') { window.location.reload(); } }); return off; }, []);
   return (
     <div id="networkStatus" className="panel panel-default">
-      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-tachometer" /> <span>Network Status</span></h3></div>
+      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-tachometer" /> <span>Состояние сети</span></h3></div>
       <div className="panel-body">
         <div className="networkStatus">
           {infos.map((n: any, i: number) => (
@@ -64,23 +64,23 @@ export function MyMusic() {
   useEffect(() => { const off = on('pushMyCollectionStats', (d: any) => setStats(d || {})); emit('getMyCollectionStats'); const t = window.setInterval(() => emit('getMyCollectionStats'), 4000); return () => { off(); window.clearInterval(t); }; }, []);
   return (
     <div id="myMusic" className="panel panel-default">
-      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-music" /> <span>My Music</span></h3></div>
+      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-music" /> <span>Моя музыка</span></h3></div>
       <div className="panel-body">
         <div className="aw-mystats">
-          <div className="aw-mystats__item"><span className="aw-mystats__label">Artists</span><span className="aw-mystats__value">{stats.artists}</span></div>
-          <div className="aw-mystats__item"><span className="aw-mystats__label">Albums</span><span className="aw-mystats__value">{stats.albums}</span></div>
-          <div className="aw-mystats__item"><span className="aw-mystats__label">Tracks</span><span className="aw-mystats__value">{stats.songs}</span></div>
-          <div className="aw-mystats__item"><span className="aw-mystats__label">Playtime</span><span className="aw-mystats__value">{stats.playtime}</span></div>
+          <div className="aw-mystats__item"><span className="aw-mystats__label">Исполнители</span><span className="aw-mystats__value">{stats.artists}</span></div>
+          <div className="aw-mystats__item"><span className="aw-mystats__label">Альбомы</span><span className="aw-mystats__value">{stats.albums}</span></div>
+          <div className="aw-mystats__item"><span className="aw-mystats__label">Треки</span><span className="aw-mystats__value">{stats.songs}</span></div>
+          <div className="aw-mystats__item"><span className="aw-mystats__label">Время звучания</span><span className="aw-mystats__value">{stats.playtime}</span></div>
         </div>
         {scanning ? (
           <div className="aw-mystats__scan" role="status">
             <Spinner size={20} />
-            <span className="aw-mystats__scan-text"><span className="aw-mystats__scan-title">Scanning your library…</span><span className="aw-mystats__scan-sub">The numbers grow as files are found</span></span>
+            <span className="aw-mystats__scan-text"><span className="aw-mystats__scan-title">Сканирование медиатеки…</span><span className="aw-mystats__scan-sub">Данные обновляются по мере обнаружения файлов</span></span>
           </div>
         ) : (
           <>
-            <button type="button" className="btn btn-info" onClick={() => emit('updateDb')} title="Update music database entries for any changed, new, or deleted files"><span>Update</span></button>
-            <button type="button" className="btn btn-info" onClick={() => emit('rescanDb')} title="Remake music database entries for all files"><span>Rescan</span></button>
+            <button type="button" className="btn btn-info" onClick={() => emit('updateDb')} title="Обновить медиатеку с учётом новых, изменённых и удалённых файлов"><span>Обновить</span></button>
+            <button type="button" className="btn btn-info" onClick={() => emit('rescanDb')} title="Полностью пересоздать медиатеку"><span>Сканировать заново</span></button>
           </>
         )}
       </div>
@@ -94,7 +94,7 @@ export function MyMusicPluginEnabler() {
   if (!plugins.length) { return <div id="myMusicPlugins" className="panel panel-default" />; }
   return (
     <div id="myMusicPlugins" className="panel panel-default">
-      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-toggle-on" /> <span>Functionalities control</span></h3></div>
+      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-toggle-on" /> <span>Управление функциями</span></h3></div>
       <div className="panel-body">
         {plugins.map((pl, i) => (
           <div id="installed-plugin-lists" key={i}>
@@ -105,7 +105,7 @@ export function MyMusicPluginEnabler() {
               </div></div>
               <div className="col-xs-24 col-sm-24 col-md-10" id="list-group">
                 <div className="col-xs-12 col-sm-12 col-md-12"><span className={'pluginDotStatus' + (pl.active ? ' active' : ' inactive')} /><span>{pl.active ? 'Active' : 'Inactive'}</span></div>
-                <div className="col-xs-12 col-sm-12 col-md-12">{pl.enabled && pl.hasConfiguration ? <button type="button" className="btn btn-info pull-right" onClick={() => nav('/plugin/' + pl.category + '-' + pl.name + '?isPluginSettings=1')} title="Settings">Settings</button> : null}</div>
+                <div className="col-xs-12 col-sm-12 col-md-12">{pl.enabled && pl.hasConfiguration ? <button type="button" className="btn btn-info pull-right" onClick={() => nav('/plugin/' + pl.category + '-' + pl.name + '?isPluginSettings=1')} title="Настройки">Настройки</button> : null}</div>
               </div>
             </div>
           </div>
@@ -130,8 +130,8 @@ function DriveForm({ drive, setDrive, adding, onSave, onCancel, shares, busy, er
     <div className="aw-drive">
       {adding ? (
         <div className="aw-drive__found">
-          {!shares ? <div className="aw-drive__note"><Spinner size={16} /><span>Scanning for network drives…</span></div> : null}
-          {shares && shares.nas && shares.nas.length === 0 ? <div className="aw-drive__note"><Icon name="info" /><span>No network drives found. Enter the drive's address below.</span></div> : null}
+          {!shares ? <div className="aw-drive__note"><Spinner size={16} /><span>Поиск сетевых дисков…</span></div> : null}
+          {shares && shares.nas && shares.nas.length === 0 ? <div className="aw-drive__note"><Icon name="info" /><span>Сетевые диски не найдены. Введите адрес диска ниже.</span></div> : null}
           {shares && shares.nas && shares.nas.length ? shares.nas.map((share: any, i: number) => (
             <div className="aw-drive__nas" key={i}>
               <button type="button" className="aw-drive__nas-head" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}><Icon name="storage" /><span>{share.name}</span><Icon name={open === i ? 'expand_less' : 'expand_more'} /></button>
@@ -153,15 +153,15 @@ function DriveForm({ drive, setDrive, adding, onSave, onCancel, shares, busy, er
               <div className="aw-sc-row__control"><Segment value={{ value: drive.fstype || 'cifs' }} options={[{ label: 'SMB / CIFS', value: 'cifs' }, { label: 'NFS', value: 'nfs' }]} onChange={(o: any) => setDrive({ ...drive, fstype: o.value })} label="File share type" /></div>
             </div>
             {field('username', 'Username', 'Username')}
-            {field('password', 'Password', 'Password', undefined, pwType, <button type="button" className="aw-drive__eye" onClick={() => setPwType(pwType === 'password' ? 'text' : 'password')} aria-label={pwType === 'password' ? 'Show the password' : 'Hide the password'}><Icon name={pwType === 'password' ? 'visibility' : 'visibility_off'} /></button>)}
+            {field('password', 'Password', 'Password', undefined, pwType, <button type="button" className="aw-drive__eye" onClick={() => setPwType(pwType === 'password' ? 'text' : 'password')} aria-label={pwType === 'password' ? 'Показать пароль' : 'Скрыть пароль'}><Icon name={pwType === 'password' ? 'visibility' : 'visibility_off'} /></button>)}
             {field('options', 'Options', 'Options', 'Mount options, for example vers=3.0.')}
           </>
         ) : null}
         {error ? <div className="aw-drive__error" role="alert"><Icon name="error" /><span>{error}</span></div> : null}
         <footer className="aw-sc__foot aw-drive__foot">
-          <button type="button" className="aw-drive__more" onClick={() => setAdvanced(!advanced)}>{advanced ? 'Hide advanced options' : 'Show advanced options'}</button>
-          <button type="button" className="aw-sc__cancel" onClick={onCancel}>Cancel</button>
-          <button type="button" className="aw-sc__save is-on" onClick={onSave} disabled={busy}>{busy ? <><Spinner size={14} /> Connecting…</> : 'Save'}</button>
+          <button type="button" className="aw-drive__more" onClick={() => setAdvanced(!advanced)}>{advanced ? 'Скрыть дополнительные параметры' : 'Показать дополнительные параметры'}</button>
+          <button type="button" className="aw-sc__cancel" onClick={onCancel}>Отмена</button>
+          <button type="button" className="aw-sc__save is-on" onClick={onSave} disabled={busy}>{busy ? <><Spinner size={14} /> Подключение…</> : 'Сохранить'}</button>
         </footer>
       </form>
     </div>
@@ -219,14 +219,14 @@ export function NetworkDrives() {
     pending.current = { name: alias, timer: window.setTimeout(() => finish(false, 'The player did not answer. The NAS may be off, or the address is wrong.'), 60000) };
     emit(adding ? 'addShare' : 'editShare', d);
   };
-  const del = async (d: any) => { if (await useModal.getState().confirm({ title: 'Delete Drive', message: `Do you want to delete ${d.name}?`, danger: true })) { emit('deleteShare', { id: d.id }); } };
+  const del = async (d: any) => { if (await useModal.getState().confirm({ title: 'Удалить диск', message: `Удалить диск «${d.name}»?`, danger: true })) { emit('deleteShare', { id: d.id }); } };
   return (
     <div>
       <div id="networkDrives" className="panel panel-default">
-        <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-hdd-o" /> <span>Network Drives</span><i className="fa fa-info-circle pull-right" onClick={() => emit('showNasHelper')} /></h3></div>
+        <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-hdd-o" /> <span>Сетевые диски</span><i className="fa fa-info-circle pull-right" onClick={() => emit('showNasHelper')} /></h3></div>
         <div className="panel-body">
-          <button type="button" id="addNewDrive" className="aw-sc-pill" onClick={() => { setDrive({ fstype: 'cifs' }); setAdding(true); setEditing(null); setDiscovered(undefined); emit('getNetworkSharesDiscovery'); }} title="Add New Drive">
-            <Icon name={adding ? 'refresh' : 'add'} /><span className="aw-sc-pill__text">{adding ? 'Scan again' : 'Add a drive'}</span>
+          <button type="button" id="addNewDrive" className="aw-sc-pill" onClick={() => { setDrive({ fstype: 'cifs' }); setAdding(true); setEditing(null); setDiscovered(undefined); emit('getNetworkSharesDiscovery'); }} title="Добавить сетевой диск">
+            <Icon name={adding ? 'refresh' : 'add'} /><span className="aw-sc-pill__text">{adding ? 'Искать снова' : 'Добавить диск'}</span>
           </button>
           {adding ? <DriveForm drive={drive} setDrive={setDrive} adding onSave={save} onCancel={() => { setAdding(false); setError(''); }} shares={discovered} busy={busy} error={error} /> : null}
           {shares && shares.length ? (
@@ -239,8 +239,8 @@ export function NetworkDrives() {
                   <td><i className={'fa ' + (d.mounted ? 'fa-check true' : 'fa-remove false')}><Icon name={d.mounted ? 'check' : 'close'} /></i></td>
                   <td>{d.size}</td>
                   <td className="commandCol">
-                    <button type="button" className="btn btn-danger" onClick={() => del(d)} title="Delete Drive"><Icon name="delete" /></button>
-                    <button type="button" className="btn btn-info" onClick={() => { setEditing(i); setAdding(false); setDrive(d); }} title="Edit Drive"><Icon name="edit" /></button>
+                    <button type="button" className="btn btn-danger" onClick={() => del(d)} title="Удалить диск"><Icon name="delete" /></button>
+                    <button type="button" className="btn btn-info" onClick={() => { setEditing(i); setAdding(false); setDrive(d); }} title="Изменить диск"><Icon name="edit" /></button>
                   </td>
                 </tr>,
                 editing === i ? <tr key={'e' + i}><td colSpan={5}><div className="row"><div className="col-xs-24"><DriveForm drive={drive} setDrive={setDrive} adding={false} onSave={save} onCancel={() => { setEditing(null); setError(''); }} shares={null} busy={busy} error={error} /></div></div></td></tr> : null]
@@ -291,7 +291,7 @@ export function Wifi({ wizard, persistentWizard }: { wizard?: boolean; persisten
   const signal = (s: number) => '/assets/wifi-icons/' + s + '.png';
   return (
     <div id="wifiPlugin" className="panel panel-default">
-      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-wifi" /> <span>Wireless Network Connection</span></h3></div>
+      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-wifi" /> <span>Подключение к Wi-Fi</span></h3></div>
       <div className="panel-body">
         <table className="table"><tbody>
           {connected ? (
@@ -305,22 +305,22 @@ export function Wifi({ wizard, persistentWizard }: { wizard?: boolean; persisten
             <tr key={i} onClick={() => { list.forEach((x, j) => { x.insertPassword = j === i ? true : undefined; }); setTick(t => t + 1); }}>
               <td className="wifiIcon">{w.signal >= 0 ? <img src={signal(w.signal)} alt="" /> : <i className="fa fa-eye-slash"><Icon name="visibility_off" /></i>}</td>
               <td className="lockIcon"><span><i className={'fa ' + (isOpen(w) ? 'fa-unlock' : 'fa-lock')}><Icon name={isOpen(w) ? 'lock_open' : 'lock'} /></i></span></td>
-              <td>{!w.manual ? <span>{w.ssid}</span> : <span>Manual WiFi Connection</span>}</td>
+              <td>{!w.manual ? <span>{w.ssid}</span> : <span>Подключить Wi-Fi вручную</span>}</td>
             </tr>,
             w.insertPassword ? (
               <tr key={'p' + i}><td colSpan={4} className="insertPasswordRow">
                 {w.ssidHidden ? <span className="checkbox-wrapper"><input type="checkbox" id="customWifi" className="custom-checkbox" checked={!!w.hidden} onChange={(e) => { w.hidden = e.target.checked; setTick(t => t + 1); }} /><label htmlFor="customWifi" /><span>Hidden</span> &nbsp;|&nbsp; </span> : null}
-                {w.ssidHidden || w.hotSpot ? <><span>Security</span> &nbsp;<div className="securitySelectWrapper"><Select value={w.security} options={SECURITY} onChange={(o) => { w.security = o; setTick(t => t + 1); }} placeholder="Select encryption" /></div></> : null}
-                {w.ssidHidden ? <input className="form-control" value={w.ssid || ''} onChange={(e) => { w.ssid = e.target.value; setTick(t => t + 1); }} type="text" placeholder="Network Name" /> : null}
-                {!isOpen(w) ? <input className="form-control" value={w.password || ''} onChange={(e) => { w.password = e.target.value; setTick(t => t + 1); }} type={w.showHidePassword || 'password'} placeholder="password" /> : null}
+                {w.ssidHidden || w.hotSpot ? <><span>Security</span> &nbsp;<div className="securitySelectWrapper"><Select value={w.security} options={SECURITY} onChange={(o) => { w.security = o; setTick(t => t + 1); }} placeholder="Выберите шифрование" /></div></> : null}
+                {w.ssidHidden ? <input className="form-control" value={w.ssid || ''} onChange={(e) => { w.ssid = e.target.value; setTick(t => t + 1); }} type="text" placeholder="Имя сети" /> : null}
+                {!isOpen(w) ? <input className="form-control" value={w.password || ''} onChange={(e) => { w.password = e.target.value; setTick(t => t + 1); }} type={w.showHidePassword || 'password'} placeholder="Пароль" /> : null}
                 <br />
                 {!isOpen(w) && w.password && w.password.length ? <button type="button" className="btn btn-info showHidePassword" onClick={() => { w.showHidePassword = w.showHidePassword === 'text' ? 'password' : 'text'; setTick(t => t + 1); }}><Icon name={w.showHidePassword === 'text' ? 'visibility_off' : 'visibility'} /></button> : null}
-                <button type="button" className="btn btn-info" onClick={() => connect(w, i)}><Icon name="subdirectory_arrow_right" /> <span>Connect</span></button>
+                <button type="button" className="btn btn-info" onClick={() => connect(w, i)}><Icon name="subdirectory_arrow_right" /> <span>Подключиться</span></button>
               </td></tr>
             ) : null,
           ]))}
         </tbody></table>
-        <button type="button" className="btn btn-info refreshWiFiNetworks" onClick={() => emit('getWirelessNetworks', '')}><Icon name="refresh" /> <span>Refresh</span></button>
+        <button type="button" className="btn btn-info refreshWiFiNetworks" onClick={() => emit('getWirelessNetworks', '')}><Icon name="refresh" /> <span>Обновить</span></button>
       </div>
     </div>
   );
@@ -338,29 +338,29 @@ export function UiSettingsSection() {
   const current = (ui.background && ui.background.title) || '';
   return (
     <div id="uiSettings" className="panel panel-default">
-      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-paint-brush" /> <span>Theme Settings</span></h3></div>
+      <div className="panel-heading"><h3 className="panel-title"><i className="fa fa-paint-brush" /> <span>Настройки оформления</span></h3></div>
       <div className="panel-body">
-        <h4 className="sectionDescription">Click and select new background or drop it here.</h4>
-        {!pct ? <label className="uploadDroppableArea"><input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => pick(e.target.files ? e.target.files[0] : null)} /><span>Click and select new background or drop it here.</span></label> : null}
-        {pct > 0 ? <div id="installProgressBar"><h3>Click and select new background or drop it here.</h3><Progress value={pct} /></div> : null}
+        <h4 className="sectionDescription">Выберите фон или перетащите его сюда.</h4>
+        {!pct ? <label className="uploadDroppableArea"><input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => pick(e.target.files ? e.target.files[0] : null)} /><span>Выберите фон или перетащите его сюда.</span></label> : null}
+        {pct > 0 ? <div id="installProgressBar"><h3>Выберите фон или перетащите его сюда.</h3><Progress value={pct} /></div> : null}
         <hr />
-        <h4 className="sectionDescription">Select background</h4>
+        <h4 className="sectionDescription">Выберите фон</h4>
         <div id="backgroundSelector" className="row">
           {((backgrounds && backgrounds.list) || []).map((bg: any, i: number) => (
             <div className="col-sm-6" key={i}><div className="background">
               <img onClick={() => emit('setBackgrounds', bg)} className={current === bg.name ? 'current' : ''} src={bg.thumbnail} alt={bg.name} />
               <div className="backgroundName"><span className={current === bg.name ? 'current' : ''}>{bg.name}</span>
-                {current !== bg.name ? <p><button type="button" className="btn btn-info" onClick={() => emit('setBackgrounds', bg)} title="Apply background"><Icon name="check" /></button>{!bg.notDeletable ? <button type="button" className="btn btn-danger" onClick={() => emit('deleteBackground', bg)} title="Delete background"><Icon name="delete" /></button> : null}</p> : null}
+                {current !== bg.name ? <p><button type="button" className="btn btn-info" onClick={() => emit('setBackgrounds', bg)} title="Применить фон"><Icon name="check" /></button>{!bg.notDeletable ? <button type="button" className="btn btn-danger" onClick={() => emit('deleteBackground', bg)} title="Удалить фон"><Icon name="delete" /></button> : null}</p> : null}
               </div>
             </div></div>
           ))}
         </div>
         <hr />
-        <h4 className="sectionDescription">Select background color</h4>
+        <h4 className="sectionDescription">Выберите цвет фона</h4>
         <div id="backgroundColorSelector" className="row"><div className="col-xs-24" id="colorPalette">
-          {COLORS.map(c => <div key={c} className={c === ui.color ? 'selected' : ''} style={{ backgroundColor: c }}><button type="button" className="btn btn-info" onClick={() => emit('setBackgrounds', { color: c })} title="Apply background color"><Icon name="check" /></button></div>)}
+          {COLORS.map(c => <div key={c} className={c === ui.color ? 'selected' : ''} style={{ backgroundColor: c }}><button type="button" className="btn btn-info" onClick={() => emit('setBackgrounds', { color: c })} title="Применить цвет фона"><Icon name="check" /></button></div>)}
           <div style={{ backgroundColor: custom }} className={ui.color && custom === ui.color ? 'selected' : ''}>
-            <button type="button" className="btn btn-info customColor" onClick={() => { if (custom.length >= 4) { emit('setBackgrounds', { color: custom }); } }} title="Apply background color"><Icon name="check" /></button>
+            <button type="button" className="btn btn-info customColor" onClick={() => { if (custom.length >= 4) { emit('setBackgrounds', { color: custom }); } }} title="Применить цвет фона"><Icon name="check" /></button>
             <input type="text" className="form-control" value={custom} onChange={(e) => setCustom(e.target.value)} />
           </div>
         </div></div>
@@ -372,7 +372,7 @@ export function UiSettingsSection() {
 export function FirmwareUpload() {
   const pick = (file: File | null) => {
     if (!file) { return; }
-    useModal.getState().open('updater', { title: 'Uploading Firmware File', description: 'Uploading Firmware File', progress: 0 });
+    useModal.getState().open('updater', { title: 'Загрузка файла прошивки', description: 'Загрузка файла прошивки', progress: 0 });
     upload(HOST + '/firmware-upload', file, (p) => useModal.setState(s => s.name === 'updater' ? { data: { ...s.data, progress: p } } : {})).then(() => useModal.getState().close()).catch(() => useModal.getState().close());
   };
   return (

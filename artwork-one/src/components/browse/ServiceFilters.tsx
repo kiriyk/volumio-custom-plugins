@@ -58,7 +58,7 @@ export default function ServiceFilters({ children }: { children?: ReactNode }) {
       ) : null}
       {sortings.length ? (
         <Dropdown className="hamburgerMenu aw-svcfilter" toggleClass="aw-sort" entries={sortEntries}
-          toggle={<><span className="aw-sort__k">Sort</span><span className="aw-sort__v">{current ? current.label : '–'}</span><Icon name="expand_more" /></>} />
+          toggle={<><span className="aw-sort__k">Сортировка</span><span className="aw-sort__v">{current ? current.label : '–'}</span><Icon name="expand_more" /></>} />
       ) : null}
       {children}
     </div>

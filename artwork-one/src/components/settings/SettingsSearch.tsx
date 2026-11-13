@@ -55,8 +55,8 @@ export function SearchField({ className }: { className?: string }) {
   return (
     <label className={'aw-sfield' + (active ? ' is-active' : '') + (className ? ' ' + className : '')}>
       <Icon name="search" />
-      <input ref={input} type="search" value={q} onChange={(e) => useSettings.getState().setSearch(e.target.value)} onKeyDown={key} placeholder="Search" aria-label="Search settings" autoComplete="off" spellCheck={false} />
-      {!active ? <span className="aw-sfield__key mono">⌘K</span> : <button type="button" className="aw-sfield__clear" onClick={() => useSettings.getState().setSearch('')} aria-label="Clear the search"><Icon name="close" /></button>}
+      <input ref={input} type="search" value={q} onChange={(e) => useSettings.getState().setSearch(e.target.value)} onKeyDown={key} placeholder="Поиск" aria-label="Поиск настроек" autoComplete="off" spellCheck={false} />
+      {!active ? <span className="aw-sfield__key mono">⌘K</span> : <button type="button" className="aw-sfield__clear" onClick={() => useSettings.getState().setSearch('')} aria-label="Очистить поиск"><Icon name="close" /></button>}
     </label>
   );
 }
@@ -71,11 +71,11 @@ export function SearchResults({ where }: { where?: string }) {
   return (
     <div className="aw-sres">
       <div className="aw-sres__head">
-        <h2 className="aw-sres__title">Results</h2>
-        <span className="aw-sres__count mono">{results.length} FOR “{q.trim().toUpperCase()}”</span>
+        <h2 className="aw-sres__title">Результаты</h2>
+        <span className="aw-sres__count mono">{results.length} ПО ЗАПРОСУ «{q.trim().toUpperCase()}»</span>
       </div>
       {results.length ? (
-        <div className="aw-sres__list" role="listbox" aria-label="Results">
+        <div className="aw-sres__list" role="listbox" aria-label="Результаты">
           {results.map((r, i) => (
             <div key={r.key} className={'aw-sres__row' + (i === focus ? ' is-focus' : '')} onClick={() => openResult(r, nav)} onMouseEnter={() => useSettings.setState({ searchFocus: i })} role="option" aria-selected={i === focus}>
               <div className="aw-sres__text">
@@ -88,9 +88,9 @@ export function SearchResults({ where }: { where?: string }) {
           ))}
         </div>
       ) : null}
-      {indexing ? <div className="aw-sres__loading"><span className="aw-sres__spin" /><span className="mono">READING PLUGIN SECTIONS…</span></div> : null}
-      {!results.length && !indexing ? <div className="aw-sres__none">Nothing in Settings matches “{q.trim()}”.</div> : null}
-      {results.length ? <p className="aw-sres__hint">Esc or the × clears the search{where ? ' and returns to ' + where + ', where you were' : ''}. Enter opens the focused result.</p> : null}
+      {indexing ? <div className="aw-sres__loading"><span className="aw-sres__spin" /><span className="mono">ЗАГРУЗКА РАЗДЕЛОВ ПЛАГИНОВ…</span></div> : null}
+      {!results.length && !indexing ? <div className="aw-sres__none">В настройках ничего не найдено по запросу «{q.trim()}».</div> : null}
+      {results.length ? <p className="aw-sres__hint">Esc или × очищает поиск{where ? ' и возвращает в раздел «' + where + '»' : ''}. Enter открывает выбранный результат.</p> : null}
     </div>
   );
 }

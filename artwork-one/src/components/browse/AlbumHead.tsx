@@ -32,7 +32,7 @@ export function AlbumPageHead({ filter, onFilter }: { filter?: string; onFilter?
   const info = useBrowse(s => s.info) || {};
   const crumbs = useCrumbs();
   const title = info.title || info.album;
-  const placeholder = 'Filter ' + (isPlaylistInfo(info as BrowseItem) ? 'playlist' : 'album');
+  const placeholder = 'Фильтр: ' + (isPlaylistInfo(info as BrowseItem) ? 'playlist' : 'album');
   return (
     <PageHead variant="album" back={() => useBrowse.getState().goBack()}
       nav={<Crumbs trail={crumbs} current={title} onHome={() => useBrowse.getState().backHome()} onCrumb={goCrumb} />}
@@ -53,7 +53,7 @@ export default function AlbumHead() {
   const songs = (lists || []).flatMap(l => (l.items || []).filter(i => i && i.type === 'song'));
   const count = songs.length || (() => { try { return lists![0].items.length; } catch { return 0; } })();
   const total = runtime(songs.reduce((t, i) => t + (Number(i.duration) || 0), 0));
-  const summary = [count ? count + (count === 1 ? ' TRACK' : ' TRACKS') : '', total].filter(Boolean).join(' · ');
+  const summary = [count ? count + (count === 1 ? ' ТРЕК' : ' ТРЕКОВ') : '', total].filter(Boolean).join(' · ');
   const title = info.title || info.album;
   const genre = info.genre ? String(info.genre).split(';').join(' · ') : '';
   return (
@@ -88,10 +88,10 @@ function Actions({ info, isPlaylist }: { info: BrowseItem; isPlaylist: boolean }
   const collect = canCollect(info);
   return (
     <div className="aw-albumhead__actions">
-      <button type="button" className="aw-btn aw-btn--primary" onClick={() => A.playItemsList(info)}><Icon name="play_arrow" /><span>{isPlaylist ? 'Play' : 'Play album'}</span></button>
-      {collect ? <button type="button" className="aw-iconbtn" onClick={() => A.addToFavorites(info)} title="Favourite"><Icon name="favorite" /></button> : null}
-      {collect ? <button type="button" className="aw-iconbtn" onClick={() => A.addToPlaylist(info)} title="Add to playlist"><Icon name="playlist_add" /></button> : null}
-      <button type="button" className="aw-iconbtn" onClick={() => A.addToQueue(info)} title="Add to queue"><Icon name="queue_music" /></button>
+      <button type="button" className="aw-btn aw-btn--primary" onClick={() => A.playItemsList(info)}><Icon name="play_arrow" /><span>{isPlaylist ? 'Воспроизвести' : 'Воспроизвести альбом'}</span></button>
+      {collect ? <button type="button" className="aw-iconbtn" onClick={() => A.addToFavorites(info)} title="В избранное"><Icon name="favorite" /></button> : null}
+      {collect ? <button type="button" className="aw-iconbtn" onClick={() => A.addToPlaylist(info)} title="В плейлист"><Icon name="playlist_add" /></button> : null}
+      <button type="button" className="aw-iconbtn" onClick={() => A.addToQueue(info)} title="В очередь"><Icon name="queue_music" /></button>
     </div>
   );
 }

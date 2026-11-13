@@ -18,12 +18,12 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="aw-crash" role="alert">
         <Icon name="error" />
-        <h2 className="aw-crash__title">This screen could not be shown</h2>
-        <p className="aw-crash__text">Something on it went wrong. Reloading usually helps; if it keeps happening, please report it with the line below.</p>
+        <h2 className="aw-crash__title">Не удалось открыть экран</h2>
+        <p className="aw-crash__text">Произошла ошибка. Попробуйте перезагрузить страницу. Если ошибка повторится, сообщите о ней и приложите строку ниже.</p>
         <pre className="aw-crash__detail mono">{String(error && error.message || error)}</pre>
         <div className="aw-crash__actions">
-          <button type="button" className="aw-btn aw-btn--primary" onClick={() => window.location.reload()}><span>Reload</span></button>
-          <button type="button" className="aw-btn" onClick={() => { this.setState({ error: null }); window.history.back(); }}><span>Go back</span></button>
+          <button type="button" className="aw-btn aw-btn--primary" onClick={() => window.location.reload()}><span>Перезагрузить страницу</span></button>
+          <button type="button" className="aw-btn" onClick={() => { this.setState({ error: null }); window.history.back(); }}><span>Назад</span></button>
         </div>
       </div>
     );

@@ -68,7 +68,7 @@ function Control({ row, onChange, onButton }: { row: RowView; onChange: () => vo
     const on = item.value === true || item.value === 'true';
     return (
       <div className="aw-sc-switch">
-        <span className="aw-sc-switch__state">{on ? 'On' : 'Off'}</span>
+        <span className="aw-sc-switch__state">{on ? 'Вкл.' : 'Выкл.'}</span>
         <Switch on={on} onChange={(v) => { item.value = v; onChange(); }} label={row.label} noLabel />
       </div>
     );
@@ -79,14 +79,14 @@ function Control({ row, onChange, onButton }: { row: RowView; onChange: () => vo
     const seg = item.options && item.options.length > 1 && item.options.length <= 3 && item.options.some((o: any) => same(item.value, o) || (item.value && typeof item.value === 'object' && o && typeof o === 'object' && o.label === item.value.label));
     return seg
       ? <Segment value={item.value} options={item.options} onChange={(o) => { item.value = o; onChange(); }} label={row.label} />
-      : <Select value={item.value} options={item.options || []} onChange={(o) => { item.value = o; onChange(); }} label={row.label} placeholder="Enter an address..." byLabel={item.id === 'i2sid'} />;
+      : <Select value={item.value} options={item.options || []} onChange={(o) => { item.value = o; onChange(); }} label={row.label} placeholder="Введите адрес…" byLabel={item.id === 'i2sid'} />;
   }
   if (item.element === 'button') {
     const c = item.onClick || {};
     const nav = NAV_TYPES.indexOf(c.type) > -1;
     const danger = !!c.askForConfirm;
     // a button that only repeats its row's label says what it does instead: it opens, or it runs
-    const text = row.button || (nav ? 'Open' : danger ? 'Run…' : 'Run');
+    const text = row.button || (nav ? 'Открыть' : danger ? 'Выполнить…' : 'Выполнить');
     return (
       <button id={item.id} type="button" name={item.id} className={'aw-sc-pill' + (nav ? ' aw-sc-pill--open' : '') + (danger ? ' aw-sc-pill--danger' : '')} onClick={() => onButton(item)} aria-label={row.label}>
         <span className="aw-sc-pill__text">{text}</span>{nav ? <Icon name="chevron_right" /> : null}
@@ -143,8 +143,8 @@ export default function SettingsCard({ card, dirty, onChange, onButton, onSave, 
       {card.rows.length ? <div className="aw-sc__rows">{card.rows.map((r, i) => <Row key={r.item.id || i} row={r} onChange={onChange} onButton={onButton} />)}</div> : null}
       {card.save ? (
         <footer className="aw-sc__foot">
-          {dirty ? <span className="aw-sc__status mono"><i aria-hidden="true" />UNSAVED</span> : null}
-          {dirty ? <button type="button" className="aw-sc__cancel" onClick={onCancel}>Cancel</button> : null}
+          {dirty ? <span className="aw-sc__status mono"><i aria-hidden="true" />НЕ СОХРАНЕНО</span> : null}
+          {dirty ? <button type="button" className="aw-sc__cancel" onClick={onCancel}>Отмена</button> : null}
           <button type="button" className={'aw-sc__save' + (dirty ? ' is-on' : '')} onClick={onSave}>{card.save}</button>
         </footer>
       ) : null}

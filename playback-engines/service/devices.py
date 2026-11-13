@@ -33,6 +33,12 @@ def enumerate_devices(proc_root='/proc', sys_root='/sys'):
     cards = proc / 'asound'
     if not cards.exists():
         return result
+    try:
+        card_types = {int(index): kind for index, kind in re.findall(
+            r'^\s*([0-9]+)\s+\[[^\]]+\]\s*:\s*(\S+)',
+            _read(cards / 'cards'), re.MULTILINE)}
+    except OSError:
+        card_types = {}
     for card in sorted(cards.glob('card[0-9]*')):
         match = re.fullmatch(r'card([0-9]+)', card.name)
         if not match:
@@ -53,12 +59,21 @@ def enumerate_devices(proc_root='/proc', sys_root='/sys'):
                 label = _read(usb_device / 'product') if (usb_device / 'product').is_file() else alsa_id
             else:
                 key, label = 'alsa:' + alsa_id, alsa_id
-            for pcm in sorted(card.glob('pcm*p')):
-                endpoint = re.fullmatch(r'pcm([0-9]+)p', pcm.name)
-                if not endpoint or not pcm.is_dir():
-                    continue
-                device = int(endpoint.group(1))
-                result.append({'key': '%s:%d' % (key, device), 'label': '%s (device %d)' % (label, device),
+            endpoints = [int(endpoint.group(1)) for pcm in sorted(card.glob('pcm*p'))
+                         if (endpoint := re.fullmatch(r'pcm([0-9]+)p', pcm.name)) and pcm.is_dir()]
+            card_type = card_types.get(int(match.group(1)), '')
+            for device in endpoints:
+                output_label = label
+                hdmi = re.fullmatch(r'vc4hdmi([0-9]+)', alsa_id) if not usb else None
+                if hdmi:
+                    output_label = 'HDMI выход %d' % (int(hdmi.group(1)) + 1)
+                elif not usb and alsa_id == 'Headphones':
+                    output_label = 'Jack 3,5 мм'
+                elif not usb and card_type == 'bcm2835_hdmi':
+                    output_label = 'HDMI выход %d (совместимый)' % (device + 1)
+                if len(endpoints) > 1 and not (not usb and card_type == 'bcm2835_hdmi'):
+                    output_label += ' (выход %d)' % (device + 1)
+                result.append({'key': '%s:%d' % (key, device), 'label': output_label,
                                'pcm': 'hw:CARD=%s,DEV=%d' % (alsa_id, device),
                                'index': int(match.group(1)), 'device': device, 'usb': usb})
         except OSError:
