@@ -48,7 +48,7 @@ class SoapClient {
   }
 }
 function metadata(url, track) {
-  const mime = track.trackType === 'mp3' ? 'audio/mpeg' : track.trackType === 'mp4' ? 'audio/mp4' : 'audio/flac';
+  const mime = track.trackType === 'mp3' ? 'audio/mpeg' : track.trackType === 'mp4' ? 'audio/mp4' : /\.wav(?:[?#]|$)/i.test(url) ? 'audio/wav' : 'audio/flac';
   return `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><item id="${escape(track.uri)}" parentID="0" restricted="1"><dc:title>${escape(track.name || track.title || '')}</dc:title><dc:creator>${escape(track.artist || '')}</dc:creator><upnp:artist>${escape(track.artist || '')}</upnp:artist><upnp:album>${escape(track.album || '')}</upnp:album><upnp:class>object.item.audioItem.musicTrack</upnp:class><res protocolInfo="http-get:*:${mime}:*"${track.duration > 0 ? ` duration="${time(track.duration * 1000)}"` : ''}>${escape(url)}</res></item></DIDL-Lite>`;
 }
 module.exports = { SoapClient, metadata, milliseconds, time, error };

@@ -31,7 +31,7 @@ class Manager {
   constructor({router,stateDir,runtime,mpdConfig='/etc/mpd.conf',localStream}) {
     Object.assign(this,{router,stateDir,mpdConfig});
     this.mpd=router.pluginManager.getPlugin('music_service','mpd');
-    this.runtime=runtime || new Runtime({stateDir}); this.localStream=localStream || new LocalStream();
+    this.runtime=runtime || new Runtime({stateDir}); this.localStream=localStream || new LocalStream({cacheDir:path.join(stateDir,'cue-cache')});
     this.settings=defaults();this.devices=[];this.active=null;this.ready=false;this.error=null;
     this.chain=Promise.resolve();this.hooks=[];this.facades=new Set();this.closed=false;this.closing=false;this.generation=0;this.localGeneration=0;
     this.inputFormat=null;this.original={};this.volume=0;this.muted=false;this.mpdDirty=false;
@@ -212,6 +212,13 @@ class Manager {
   patch(object,key,value){const old=object[key];this.hooks.push(()=>{object[key]=old;});object[key]=value;}
   installHooks() {
     const mpd=this.mpd;
+    // Volumio advances its queue early whenever a source exposes prefetch().
+    // Managed playback starts each track itself, so native MPD cannot prefetch it.
+    if(typeof mpd.prefetch==='function'){
+      const descriptor=Object.getOwnPropertyDescriptor(mpd,'prefetch'),native=mpd.prefetch;
+      Object.defineProperty(mpd,'prefetch',{configurable:true,get:()=>this.settings.managed?undefined:native});
+      this.hooks.push(()=>{if(descriptor)Object.defineProperty(mpd,'prefetch',descriptor);else delete mpd.prefetch;});
+    }
     for(const key of ['stop','pause','resume','seek','clearAddPlayTrack','next','previous'])if(typeof mpd[key]==='function')this.original[key]=mpd[key].bind(mpd);
     const create=mpd.createMPDFile.bind(mpd);
     this.patch(mpd,'createMPDFile',callback=>{
@@ -246,7 +253,7 @@ class Manager {
       const index=this.router.stateMachine.currentPosition;
       const current=()=>this.router.stateMachine.getTrack(this.router.stateMachine.currentPosition);
       const valid=()=>generation===this.localGeneration&&!this.closed&&!this.closing&&!this.router.stateMachine.isVolatile && this.router.stateMachine.currentPosition===index && current()===track;
-      return kew((async()=>{const url=await this.localStream.urlFor(track.uri);if(!valid())return;await this.local.play(url,track,valid,valid);})().catch(e=>{this.error=e.code||'LOCAL_FILE_UNAVAILABLE';this.publish();return this.router.stateMachine.stop();}));
+      return kew((async()=>{if(this.active)await this.active.stop();if(!valid())return;const url=await this.localStream.urlFor(track.uri,{valid});if(!valid())return;await this.local.play(url,track,valid,valid);})().catch(e=>{if(!valid())return;this.error=e.code||'LOCAL_FILE_UNAVAILABLE';this.publish();return this.router.stateMachine.stop();}));
     });
     for(const key of ['stop','pause','resume','seek'])this.patch(mpd,key,(...args)=>{
       if(key==='stop'||key==='pause')this.localGeneration++;

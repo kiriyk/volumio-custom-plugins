@@ -65,3 +65,27 @@ engine from a kernel-observed running engine, and exposes mismatches. This is
 route/format evidence, not a bit-perfect sample comparison. Without a USB serial
 number the saved identity includes the USB port; moving the DAC to another port
 requires selecting its available entry again. No automatic fallback is performed.
+
+## Version 0.1.4
+
+Managed local playback no longer exposes native MPD `prefetch()` to Volumio.
+The native queue timer otherwise advances the position before Album Player EOF,
+invalidating its active track without starting the next one. Both managed
+engines now retain queue ownership until the actual EOF notification; disabling
+managed playback restores native MPD prefetch. This does not provide gapless
+playback.
+
+Local CUE virtual tracks (`album.cue/track0001`) resolve to exact INDEX 01 sample
+boundaries in the referenced audio file. The bridge prepares a seekable WAVE
+segment using FFmpeg without resampling, channel mixing or gain changes; 16/24/32
+bit integer precision is preserved. Preparation adds a pause before a CUE track.
+The disk cache is under the plugin state directory on `/data`, with two segments
+of at most 256 MiB each. Cancellation/close removes incomplete files; startup
+prunes sessions belonging to dead processes. It does not store decoded tracks in
+`/tmp` RAM. CUE sheets must be valid UTF-8 with AUDIO tracks and supported FILE
+syntax. Separate PREGAP/POSTGAP silence is not synthesized; INDEX 01 defines the
+played boundaries. Nonintegral sample boundaries and unsupported formats fail
+explicitly. Unmanaged native MPD playback is unchanged.
+
+Artwork One fixes local CUE cover addresses by asking the album-art service for
+the album directory, instead of receiving the CUE text as an image.

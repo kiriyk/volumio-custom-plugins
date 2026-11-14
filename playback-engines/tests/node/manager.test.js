@@ -9,7 +9,7 @@ function environment(t){
   const calls=[];const card={key:'usb:fiio:123',label:'FiiO',pcm:'hw:CARD=FiiO,DEV=0',index:2,device:0,usb:true};
   let failStart=false,deviceList=[card];
   const runtime={devices:async()=>deviceList,stopRenderer:async()=>calls.push('renderer-stop'),startRenderer:async()=>{calls.push('renderer-start');if(failStart)throw Object.assign(Error('offline'),{code:'RENDERER_UNAVAILABLE'});return{controlUrl:'http://127.0.0.1:1234/control'};},outputPolicy:async engine=>calls.push('outputs-'+engine)};
-  const mpd={stop:async()=>calls.push('mpd-stop'),sendMpdCommand:async()=>({}),createMPDFile:cb=>{fs.writeFileSync(conf,original);cb();},restartMpd:cb=>{calls.push('mpd-restart');cb();},clearAddPlayTrack:async()=>{},pause:async()=>{},resume:async()=>{},seek:async()=>{},next:async()=>{},previous:async()=>{}};
+  const mpd={stop:async()=>calls.push('mpd-stop'),sendMpdCommand:async()=>({}),createMPDFile:cb=>{const before=fs.statSync(conf).mtimeMs;fs.writeFileSync(conf,original);/* Pi tmpfs can timestamp immediate rewrites identically. Make this fake native write observable. */fs.utimesSync(conf,new Date(),new Date(Math.max(Date.now(),before+10)));cb();},restartMpd:cb=>{calls.push('mpd-restart');cb();},clearAddPlayTrack:async()=>{},pause:async()=>{},resume:async()=>{},seek:async()=>{},next:async()=>{},previous:async()=>{}};
   const sm={currentPosition:4,currentStatus:'pause',stop:async()=>{calls.push('core-stop');sm.currentStatus='stop';}};
   const router={stateMachine:sm,pluginManager:{getPlugin:()=>mpd},broadcastMessage:()=>{},volumiosetvolume:async value=>{calls.push(['hardware-volume',value]);},volumioretrievevolume:async()=>({vol:86,mute:false}),volumioupdatevolume:()=>{}};
   const manager=new Manager({router,stateDir:dir,runtime,mpdConfig:conf});
@@ -208,4 +208,29 @@ test('cancelling a launch after Album Player accepts Play still stops that rende
  await e.manager.start();t.after(()=>e.manager.close());const next=defaults();next.managed=true;next.engine='album_player';next.modes.album_player='custom';next.device={key:e.card.key,label:e.card.label};await e.manager.apply(next);
  assert.equal(await e.manager.createTransport('qobuz_custom').play('http://127.0.0.1/file',{duration:1},()=>valid),false);
  assert.equal(actions.at(-1),'Stop');assert.equal(e.manager.active,null);
+});
+test('cancelled CUE preparation failure cannot stop a newer track',async t=>{
+ const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
+ const next=defaults();next.managed=true;next.device={key:e.card.key,label:e.card.label};await e.manager.apply(next);
+ const track={uri:'USB/album.cue/track0001',service:'mpd'};e.sm.getTrack=()=>track;let reject,entered;
+ const preparing=new Promise(resolve=>entered=resolve);e.manager.localStream.urlFor=async()=>{entered();return new Promise((_,r)=>reject=r);};
+ const playing=e.manager.mpd.clearAddPlayTrack(track);await preparing;await e.manager.mpd.stop();
+ const stopped=e.calls.filter(x=>x==='core-stop').length;reject(Error('cancelled'));await playing;
+ assert.equal(e.calls.filter(x=>x==='core-stop').length,stopped);assert.equal(e.manager.error,null);
+});
+test('changing to a CUE track stops the previous audio before segment preparation',async t=>{
+ const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
+ const next=defaults();next.managed=true;next.device={key:e.card.key,label:e.card.label};await e.manager.apply(next);
+ const track={uri:'USB/album.cue/track0001',service:'mpd'};e.sm.getTrack=()=>track;let stopped=false;
+ e.manager.active={stop:async()=>{stopped=true;e.manager.active=null;}};
+ e.manager.localStream.urlFor=async()=>{assert.equal(stopped,true);throw Error('fixture ends before playback');};
+ await e.manager.mpd.clearAddPlayTrack(track);assert.equal(stopped,true);
+});
+for(const engine of ['mpd','album_player'])test(`managed ${engine} hides native MPD prefetch and restores it when disabled`,async t=>{
+ const e=environment(t);const native=function(){return this;};e.manager.mpd.prefetch=native;
+ await e.manager.start();t.after(()=>e.manager.close());assert.equal(e.manager.mpd.prefetch,native);
+ e.manager.settings.managed=true;e.manager.settings.engine=engine;
+ assert.equal(typeof e.manager.mpd.prefetch,'undefined');
+ e.manager.settings.managed=false;assert.equal(e.manager.mpd.prefetch(),e.manager.mpd);
+ await e.manager.close();assert.equal(e.manager.mpd.prefetch,native);
 });

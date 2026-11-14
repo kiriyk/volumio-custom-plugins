@@ -1,10 +1,11 @@
 import { HOST } from './socket';
+import { normalizeAlbumartPath } from './albumartUrl';
 
 // the cover's address: the player's, unless the state already carries a full URL
 export function albumart(path?: string | null): string {
   if (!path) { return ''; }
   if (path.indexOf('http') > -1) { return path; }
-  return HOST + path;
+  return HOST + normalizeAlbumartPath(path);
 }
 // Volumio's own cover for "nothing playing" (the Volumio logo), as the stock interface shows it
 export const IDLE_ART = '/albumart';

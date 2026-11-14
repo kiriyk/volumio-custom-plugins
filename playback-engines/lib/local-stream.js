@@ -4,6 +4,7 @@ const fsp = fs.promises;
 const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
+const CueStream = require('./cue-stream');
 const {pipeline} = require('stream');
 
 const MAX_TICKETS = 256;
@@ -40,7 +41,8 @@ function rangeFor(value, size) {
 }
 
 class LocalStream {
-  constructor({roots = ['/mnt/USB', '/mnt/NAS', '/mnt/INTERNAL'], port = 0} = {}) {
+  constructor({roots = ['/mnt/USB', '/mnt/NAS', '/mnt/INTERNAL'], port = 0, cacheDir = '/data/configuration/audio_interface/playback_engines/cue-cache'} = {}) {
+    this.cue = new CueStream(cacheDir);
     this.roots = roots.map(root => path.resolve(root));
     this.port = port;
     this.tickets = new Map();
@@ -102,11 +104,12 @@ class LocalStream {
     } catch (error) { await handle.close(); throw error; }
   }
 
-  async urlFor(uri) {
+  async urlFor(uri, {valid = () => true} = {}) {
     if (this.closed) throw new Error('Local stream is closed');
     let ticket;
     try {
-      ticket = await this.resolveFile(uri);
+      const cue = /^(.*\.cue)\/track([0-9]+)$/i.exec(decodePath(uri));
+      ticket = cue ? await this.cue.prepare(this, cue[1], 'track' + cue[2], valid) : await this.resolveFile(uri);
       const {handle} = await this.openFile(ticket);
       await handle.close();
     } catch (_) { throw new Error('Local file is unavailable or unsupported'); }
@@ -155,6 +158,7 @@ class LocalStream {
   async close() {
     this.closed = true;
     this.tickets.clear();
+    await this.cue.close();
     if (!this.server) return;
     const server = this.server;
     if (this.starting) await this.starting.catch(() => {});
