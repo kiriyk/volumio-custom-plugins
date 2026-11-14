@@ -1,0 +1,86 @@
+{
+  "case": "one",
+  "passed": false,
+  "pid": 17942,
+  "url": "http://127.0.0.1:7778",
+  "expectedMarkers": [
+    1
+  ],
+  "observedMarkers": [
+    1,
+    2,
+    3
+  ],
+  "elapsedSeconds": 30.11818663699978,
+  "eof": true,
+  "songs": {
+    "Songs": [
+      "One"
+    ],
+    "SongsLen": [
+      10000
+    ]
+  },
+  "paths": [
+    {
+      "Path": "/tmp/NATIVE_TEST_ROOT/music/CUE/original.flac"
+    },
+    {
+      "Path": "/tmp/NATIVE_TEST_ROOT/music/CUE/original.flac"
+    },
+    {
+      "Path": "/tmp/NATIVE_TEST_ROOT/music/CUE/original.flac"
+    }
+  ],
+  "states": [
+    {
+      "Playing": true,
+      "Paused": false,
+      "Album": 0,
+      "Song": 0,
+      "Position": 10,
+      "PlayingLen": 10000,
+      "LastError": ""
+    },
+    {
+      "Playing": false,
+      "Paused": false,
+      "Album": 0,
+      "Song": 0,
+      "Position": 30050,
+      "PlayingLen": 10000,
+      "LastError": ""
+    }
+  ],
+  "runs": [
+    {
+      "value": 0,
+      "frames": 11907
+    },
+    {
+      "value": 1,
+      "frames": 441000
+    },
+    {
+      "value": 2,
+      "frames": 441000
+    },
+    {
+      "value": 3,
+      "frames": 441000
+    },
+    {
+      "value": 0,
+      "frames": 11025
+    }
+  ],
+  "recorderStderr": "",
+  "config": {
+    "auto_mode": false,
+    "cue_mode": true,
+    "di_mode": 0,
+    "gapless_mode": true,
+    "preload_mode": false,
+    "volume_enabled": false
+  }
+}

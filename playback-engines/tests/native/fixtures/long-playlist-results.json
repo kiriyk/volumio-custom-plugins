@@ -1,0 +1,181 @@
+{
+  "flac_one": {
+    "songs": {
+      "Songs": [
+        "One"
+      ],
+      "SongsLen": [
+        10000
+      ]
+    },
+    "elapsed": 30.063421071999983,
+    "response": {
+      "Result": "OK"
+    },
+    "states": [
+      {
+        "Playing": true,
+        "Song": 0,
+        "Position": 10,
+        "PlayingLen": 10000,
+        "LastError": ""
+      },
+      {
+        "Playing": false,
+        "Song": 0,
+        "Position": 30010,
+        "PlayingLen": 10000,
+        "LastError": ""
+      }
+    ],
+    "runs": [
+      {
+        "value": 1,
+        "frames": 441000
+      },
+      {
+        "value": 2,
+        "frames": 441000
+      },
+      {
+        "value": 3,
+        "frames": 440559
+      },
+      {
+        "value": 0,
+        "frames": 441
+      },
+      {
+        "value": 3,
+        "frames": 441
+      }
+    ],
+    "runCount": 5,
+    "hw": "closed\n",
+    "recorderError": ""
+  },
+  "flac_third": {
+    "songs": {
+      "Songs": [
+        "Three"
+      ],
+      "SongsLen": [
+        10000
+      ]
+    },
+    "elapsed": 10.031369104000078,
+    "response": {
+      "Result": "OK"
+    },
+    "states": [
+      {
+        "Playing": true,
+        "Song": 0,
+        "Position": 0,
+        "PlayingLen": 10000,
+        "LastError": ""
+      },
+      {
+        "Playing": false,
+        "Song": 0,
+        "Position": 9970,
+        "PlayingLen": 10000,
+        "LastError": ""
+      }
+    ],
+    "runs": [
+      {
+        "value": 3,
+        "frames": 437913
+      },
+      {
+        "value": 0,
+        "frames": 972
+      },
+      {
+        "value": 3,
+        "frames": 351
+      }
+    ],
+    "runCount": 3,
+    "hw": "closed\n",
+    "recorderError": ""
+  },
+  "flac_reordered": {
+    "songs": {
+      "Songs": [
+        "Three",
+        "One",
+        "Three"
+      ],
+      "SongsLen": [
+        10000,
+        10000,
+        10000
+      ]
+    },
+    "elapsed": 39.991300476000106,
+    "response": {
+      "Result": "OK"
+    },
+    "states": [
+      {
+        "Playing": true,
+        "Song": 0,
+        "Position": 0,
+        "PlayingLen": 10000,
+        "LastError": ""
+      },
+      {
+        "Playing": true,
+        "Song": 1,
+        "Position": 30,
+        "PlayingLen": 10000,
+        "LastError": ""
+      },
+      {
+        "Playing": true,
+        "Song": 2,
+        "Position": 20,
+        "PlayingLen": 10000,
+        "LastError": ""
+      },
+      {
+        "Playing": false,
+        "Song": 2,
+        "Position": 19970,
+        "PlayingLen": 10000,
+        "LastError": ""
+      }
+    ],
+    "runs": [
+      {
+        "value": 3,
+        "frames": 438264
+      },
+      {
+        "value": 1,
+        "frames": 441000
+      },
+      {
+        "value": 2,
+        "frames": 441000
+      },
+      {
+        "value": 3,
+        "frames": 440208
+      },
+      {
+        "value": 0,
+        "frames": 90
+      },
+      {
+        "value": 3,
+        "frames": 792
+      }
+    ],
+    "runCount": 6,
+    "hw": "closed\n",
+    "recorderError": ""
+  }
+}

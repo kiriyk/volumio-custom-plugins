@@ -1,0 +1,140 @@
+{
+  "flac_contract": {
+    "songs": {
+      "Songs": [
+        "One",
+        "Two",
+        "Three"
+      ],
+      "SongsLen": [
+        2000,
+        2000,
+        2000
+      ]
+    },
+    "elapsed": 6.117680909000228,
+    "response": {
+      "Result": "OK"
+    },
+    "states": [
+      {
+        "Playing": true,
+        "Song": 0,
+        "Position": 20,
+        "PlayingLen": 2000,
+        "LastError": ""
+      },
+      {
+        "Playing": true,
+        "Song": 1,
+        "Position": 60,
+        "PlayingLen": 2000,
+        "LastError": ""
+      },
+      {
+        "Playing": true,
+        "Song": 2,
+        "Position": 30,
+        "PlayingLen": 2000,
+        "LastError": ""
+      },
+      {
+        "Playing": true,
+        "Song": 0,
+        "Position": 2070,
+        "PlayingLen": 2000,
+        "LastError": ""
+      },
+      {
+        "Playing": false,
+        "Song": 0,
+        "Position": 2070,
+        "PlayingLen": 2000,
+        "LastError": ""
+      }
+    ],
+    "runs": [
+      {
+        "value": 1,
+        "frames": 88200
+      },
+      {
+        "value": 2,
+        "frames": 88200
+      },
+      {
+        "value": 3,
+        "frames": 88200
+      }
+    ],
+    "runCount": 3,
+    "hw": "closed\n",
+    "recorderError": ""
+  },
+  "direct_last": {
+    "songs": {
+      "Songs": [
+        "One",
+        "Two",
+        "Three"
+      ],
+      "SongsLen": [
+        2000,
+        2000,
+        2000
+      ]
+    },
+    "elapsed": 6.098503518000143,
+    "response": {
+      "Result": "OK"
+    },
+    "states": [
+      {
+        "Playing": true,
+        "Song": 2,
+        "Position": 0,
+        "PlayingLen": 2000,
+        "LastError": ""
+      },
+      {
+        "Playing": true,
+        "Song": 0,
+        "Position": 6040,
+        "PlayingLen": 2000,
+        "LastError": ""
+      },
+      {
+        "Playing": false,
+        "Song": 0,
+        "Position": 6040,
+        "PlayingLen": 2000,
+        "LastError": ""
+      }
+    ],
+    "runs": [
+      {
+        "value": 1,
+        "frames": 88200
+      },
+      {
+        "value": 2,
+        "frames": 88200
+      },
+      {
+        "value": 3,
+        "frames": 87759
+      },
+      {
+        "value": 0,
+        "frames": 441
+      },
+      {
+        "value": 3,
+        "frames": 441
+      }
+    ],
+    "runCount": 5,
+    "hw": "closed\n",
+    "recorderError": ""
+  }
+}

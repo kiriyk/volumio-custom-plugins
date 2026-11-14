@@ -1,0 +1,132 @@
+{
+  "case": "reordered",
+  "passed": false,
+  "pid": 18073,
+  "url": "http://127.0.0.1:7778",
+  "expectedMarkers": [
+    3,
+    1,
+    3
+  ],
+  "observedMarkers": [
+    3,
+    1,
+    2,
+    3
+  ],
+  "elapsedSeconds": 40.06746165799996,
+  "eof": true,
+  "songs": {
+    "Songs": [
+      "Three",
+      "One",
+      "Three"
+    ],
+    "SongsLen": [
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "paths": [
+    {
+      "Path": "/tmp/NATIVE_TEST_ROOT/music/CUE/original.flac"
+    },
+    {
+      "Path": "/tmp/NATIVE_TEST_ROOT/music/CUE/original.flac"
+    },
+    {
+      "Path": "/tmp/NATIVE_TEST_ROOT/music/CUE/original.flac"
+    }
+  ],
+  "states": [
+    {
+      "Playing": true,
+      "Paused": false,
+      "Album": 0,
+      "Song": 0,
+      "Position": 30,
+      "PlayingLen": 10000,
+      "LastError": ""
+    },
+    {
+      "Playing": true,
+      "Paused": false,
+      "Album": 0,
+      "Song": 1,
+      "Position": 60,
+      "PlayingLen": 10000,
+      "LastError": ""
+    },
+    {
+      "Playing": true,
+      "Paused": false,
+      "Album": 0,
+      "Song": 2,
+      "Position": 0,
+      "PlayingLen": 10000,
+      "LastError": ""
+    },
+    {
+      "Playing": true,
+      "Paused": false,
+      "Album": 0,
+      "Song": 0,
+      "Position": 20040,
+      "PlayingLen": 10000,
+      "LastError": ""
+    },
+    {
+      "Playing": false,
+      "Paused": false,
+      "Album": 0,
+      "Song": 0,
+      "Position": 20040,
+      "PlayingLen": 10000,
+      "LastError": ""
+    }
+  ],
+  "runs": [
+    {
+      "value": 0,
+      "frames": 12348
+    },
+    {
+      "value": 3,
+      "frames": 438264
+    },
+    {
+      "value": 1,
+      "frames": 441000
+    },
+    {
+      "value": 2,
+      "frames": 441000
+    },
+    {
+      "value": 3,
+      "frames": 440649
+    },
+    {
+      "value": 0,
+      "frames": 531
+    },
+    {
+      "value": 3,
+      "frames": 351
+    },
+    {
+      "value": 0,
+      "frames": 7056
+    }
+  ],
+  "recorderStderr": "",
+  "config": {
+    "auto_mode": false,
+    "cue_mode": true,
+    "di_mode": 0,
+    "gapless_mode": true,
+    "preload_mode": false,
+    "volume_enabled": false
+  }
+}
