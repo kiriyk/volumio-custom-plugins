@@ -13,10 +13,10 @@ function badSettings() {
 function ensure(condition) { if (!condition) throw badSettings(); }
 function defaults() {
   return {
-    version: 1, managed: false, engine: 'mpd', device: null,
+    version: 1, managed: false, engine: 'mpd', device: null, localAlbumPlayer: 'renderer',
     modes: {mpd: 'custom', album_player: 'bypass'},
     custom: {
-      mpd: {volumeEnabled: false, volume: 80, resampleRate: 0, resampleBits: 24, normalization: false, replaygain: 'off', crossfade: 0},
+      mpd: {volumeEnabled: false, volume: 80, resampleRate: 0, resampleBits: 24, normalization: false, replaygain: 'off', crossfade: 0, dsdDoP: false},
       album_player: {volumeEnabled: false, volume: 80, resampleRate: 0, forceBits: 0, phaseInvert: false, swapChannels: false, downmix: false, convolverEnabled: false, convolverFilter: 0, convolverGain: 0, dsdMode: 0}
     }
   };
@@ -40,6 +40,7 @@ function validateCustom(engine, value) {
   if (engine === 'mpd') {
     ensure([16,24,32].includes(value.resampleBits));
     bool(value.normalization);
+    bool(value.dsdDoP);
     ensure(['off','track','album','auto'].includes(value.replaygain));
     integer(value.crossfade, 0, 60);
   } else {
@@ -51,7 +52,13 @@ function validateCustom(engine, value) {
   }
 }
 function validateSettings(value) {
-  object(value, Object.keys(defaults()));
+  const keys = Object.keys(defaults());
+  if (value && !Object.hasOwn(value, 'localAlbumPlayer')) {
+    object(value, keys.filter(key => key !== 'localAlbumPlayer'));
+    value = {...value, localAlbumPlayer: 'renderer'};
+  }
+  object(value, keys);
+  ensure(['renderer', 'aplayer'].includes(value.localAlbumPlayer));
   ensure(value.version === 1); bool(value.managed);
   ensure(value.engine === 'mpd' || value.engine === 'album_player');
   if (value.device !== null) {
@@ -60,20 +67,28 @@ function validateSettings(value) {
   }
   object(value.modes, ['mpd','album_player']);
   object(value.custom, ['mpd','album_player']);
-  for (const engine of ['mpd','album_player']) {mode(value.modes[engine]); validateCustom(engine, value.custom[engine]);}
-  return JSON.parse(JSON.stringify(value));
+  const mpd = value.custom.mpd;
+  const mpdKeys = Object.keys(defaults().custom.mpd);
+  const legacyMpd = mpd && !Object.hasOwn(mpd, 'dsdDoP');
+  if (legacyMpd) object(mpd, mpdKeys.filter(key => key !== 'dsdDoP'));
+  const result = legacyMpd ? {...value, custom:{...value.custom, mpd:{...mpd, dsdDoP:false}}} : value;
+  for (const engine of ['mpd','album_player']) {mode(result.modes[engine]); validateCustom(engine, result.custom[engine]);}
+  return JSON.parse(JSON.stringify(result));
 }
 function effectiveProfile(settings) {
   const value = validateSettings(settings);
   const profile = value.custom[value.engine];
   if (value.modes[value.engine] === 'custom') return profile;
-  if (value.engine === 'mpd') return {...profile, volumeEnabled:false, resampleRate:0, resampleBits:0, normalization:false, replaygain:'off', crossfade:0};
+  if (value.engine === 'mpd') return {...profile, volumeEnabled:false, resampleRate:0, resampleBits:0, normalization:false, replaygain:'off', crossfade:0, dsdDoP:false};
   return {...profile, volumeEnabled:false, resampleRate:0, forceBits:0, phaseInvert:false, swapChannels:false, downmix:false, convolverEnabled:false, dsdMode:0};
 }
 function albumPatch(selectedMode, custom) {
   mode(selectedMode); validateCustom('album_player', custom);
   const enabled = selectedMode === 'custom';
   const patch = {
+    // Volumio starts each track explicitly. Renderer gapless can retain the
+    // previous stream when switching between DSF and DFF.
+    gapless_mode: false,
     volume_enabled: enabled && custom.volumeEnabled, hw_volume:false,
     mode_16bit: enabled && custom.forceBits === 16,
     mode_24bit: enabled && custom.forceBits === 24,
@@ -174,6 +189,7 @@ function rewriteMpdConfig(text, pcm, selectedMode, custom) {
   output = output.trimEnd();
   const enabled = selectedMode === 'custom';
   const lines = ['audio_output {','    type "alsa"','    name "Playback Engines"','    device "' + pcm + '"','    mixer_type "' + (enabled && custom.volumeEnabled ? 'software' : 'none') + '"'];
+  if (enabled && custom.dsdDoP) lines.push('    dop "yes"');
   if (enabled && custom.resampleRate) lines.push('    format "' + custom.resampleRate + ':' + custom.resampleBits + ':*"');
   lines.push('}');
   if (enabled) lines.push('replaygain "' + custom.replaygain + '"','volume_normalization "' + (custom.normalization ? 'yes' : 'no') + '"');

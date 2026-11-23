@@ -24,11 +24,11 @@ class CueStream{
   this.directory=await fsp.mkdtemp(path.join(this.cacheDir,'session-'+process.pid+'-'));
   return this.directory;
  }
- prepare(bridge,cuePath,track,valid){const work=this.tail.then(()=>this.convert(bridge,cuePath,track,()=>!this.closed&&!bridge.closed&&valid()));this.tail=work.catch(()=>{});return work;}
- async convert(bridge,cuePath,track,valid){
+ prepare(bridge,cuePath,track,valid,options){const work=this.tail.then(()=>this.convert(bridge,cuePath,track,()=>!this.closed&&!bridge.closed&&valid(),options));this.tail=work.catch(()=>{});return work;}
+ async convert(bridge,cuePath,track,valid,options){
   if(!valid())throw Error('CUE preparation cancelled');
   const cue=await bridge.resolveFile(encodeURIComponent(cuePath));const opened=await bridge.openFile(cue);let segment;
-  try{if(opened.stat.size>1024*1024)throw Error('CUE too large');segment=parseCue(await opened.handle.readFile('utf8'),track);}finally{await opened.handle.close();}
+  try{if(opened.stat.size>1024*1024)throw Error('CUE too large');segment=parseCue(await opened.handle.readFile('utf8'),track,options);}finally{await opened.handle.close();}
   const source={file:await fsp.realpath(path.resolve(path.dirname(cue.file),segment.file)),roots:cue.roots};
   const input=await bridge.openFile(source);let output,filename,success=false;
   try{

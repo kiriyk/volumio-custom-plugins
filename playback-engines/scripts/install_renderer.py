@@ -11,7 +11,7 @@ import tempfile
 import urllib.request
 
 URL = 'https://albumplayer.ru/linux/aprenderer-arm32.tar.gz'
-SHA256 = '66fc02a0b4ad9305f782f4fcf3ff27cedbaed2c15afd9e2c5dafb77335b5bb1d'
+SHA256 = '135a2fa38114e704f0679270dd468057361a2c051e6370dc2dbe94ae0c2b1d38'
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_EXTRACTED = 256 * 1024 * 1024
 
@@ -27,7 +27,8 @@ def _no_links(path):
             raise InstallError('Installation paths must not contain symbolic links')
 
 
-def install_archive(archive, state_dir, expected_sha256=SHA256, max_bytes=MAX_EXTRACTED):
+def install_archive(archive, state_dir, expected_sha256=SHA256, max_bytes=MAX_EXTRACTED, *, component="aprenderer",
+                    binary="ap2renderer", subdirectory="renderer"):
     archive, state = Path(archive), Path(state_dir)
     if archive.stat().st_size > MAX_DOWNLOAD:
         raise InstallError('Renderer download exceeds size limit')
@@ -38,7 +39,7 @@ def install_archive(archive, state_dir, expected_sha256=SHA256, max_bytes=MAX_EX
     if digest.hexdigest() != expected_sha256:
         raise InstallError('Renderer archive SHA256 mismatch')
     _no_links(state)
-    destination = state / 'renderer'
+    destination = state / subdirectory
     _no_links(destination)
     # No extraction API is trusted with archive-selected paths or metadata.
     with tarfile.open(archive, 'r:gz') as bundle, tempfile.TemporaryDirectory(prefix='playback-renderer-') as temporary:
@@ -46,7 +47,7 @@ def install_archive(archive, state_dir, expected_sha256=SHA256, max_bytes=MAX_EX
         members, seen, total = [], set(), 0
         for member in bundle:
             path = PurePosixPath(member.name)
-            if path.is_absolute() or '..' in path.parts or '\\' in member.name or not path.parts or path.parts[0] != 'aprenderer':
+            if path.is_absolute() or '..' in path.parts or '\\' in member.name or not path.parts or path.parts[0] != component:
                 raise InstallError('Unsafe renderer archive path')
             if not member.isfile() and not member.isdir():
                 raise InstallError('Renderer archive contains a link or special file')
@@ -63,7 +64,7 @@ def install_archive(archive, state_dir, expected_sha256=SHA256, max_bytes=MAX_EX
                 continue
             _no_links(destination / relative)
             members.append((member, relative))
-        if not any(relative == Path('ap2renderer') and member.isfile() for member, relative in members):
+        if not any(relative == Path(binary) and member.isfile() for member, relative in members):
             raise InstallError('Renderer archive has no executable')
         for member, relative in members:
             target = stage / relative
@@ -73,8 +74,8 @@ def install_archive(archive, state_dir, expected_sha256=SHA256, max_bytes=MAX_EX
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with bundle.extractfile(member) as source, target.open('xb') as output:
                     shutil.copyfileobj(source, output)
-                target.chmod(0o755 if relative == Path('ap2renderer') else 0o600 if relative == Path('config.dat') else 0o644)
-        header = (stage / 'ap2renderer').read_bytes()[:52]
+                target.chmod(0o755 if relative == Path(binary) else 0o600 if relative == Path('config.dat') else 0o644)
+        header = (stage / binary).read_bytes()[:52]
         if len(header) < 52 or header[:6] != b'\x7fELF\x01\x01' or header[18:20] != b'\x28\x00':
             raise InstallError('Renderer executable is not ARM 32-bit little-endian ELF')
         state.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -102,8 +103,8 @@ def install_archive(archive, state_dir, expected_sha256=SHA256, max_bytes=MAX_EX
             (destination / 'config.dat').chmod(0o600)
 
 
-def download_archive(target):
-    request = urllib.request.Request(URL, headers={'User-Agent': 'Volumio-Playback-Engines/0.1'})
+def download_archive(target, url=URL):
+    request = urllib.request.Request(url, headers={'User-Agent': 'Volumio-Playback-Engines/0.1'})
     with urllib.request.urlopen(request, timeout=30) as response, Path(target).open('xb') as output:
         if not response.geturl().startswith('https://'):
             raise InstallError('Renderer download must remain HTTPS')

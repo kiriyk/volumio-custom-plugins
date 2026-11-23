@@ -106,8 +106,21 @@ def _alsa_library():
 def check_pcm(pcm, rate, bits, channels, library=None):
     if not isinstance(pcm, str) or not PCM.fullmatch(pcm):
         raise HelperError('Only a stable hardware PCM is allowed')
-    if type(rate) is not int or not 8000 <= rate <= 1536000 or bits not in (16, 24, 32) or type(channels) is not int or not 1 <= channels <= 32:
+    if type(rate) is not int or not 8000 <= rate <= (6_144_000 if bits in ('dsd', 'dsd32') else 1_536_000) or bits not in (16, 24, 32, 'dsd', 'dsd32', 'dop') or type(channels) is not int or not 1 <= channels <= 32:
         raise HelperError('Unsupported PCM rate, precision or channel count')
+    if bits == 'dsd':
+        # MPD can pack raw DSD into 8-, 16- or 32-bit ALSA frames.
+        formats = [('DSD_U8', 1), ('DSD_U32_LE', 4), ('DSD_U32_BE', 4),
+                   ('DSD_U16_LE', 2), ('DSD_U16_BE', 2)]
+    elif bits == 'dsd32':
+        # The full APlayer selects a 32-bit native DSD packing.
+        formats = [('DSD_U32_BE', 4), ('DSD_U32_LE', 4)]
+    elif bits == 'dop':
+        formats = [('S32_LE', 1)]
+    else:
+        names = {16: ('S16_LE', 'S24_3LE', 'S24_LE', 'S32_LE'),
+                 24: ('S24_3LE', 'S24_LE', 'S32_LE'), 32: ('S32_LE',)}[bits]
+        formats = [(name, 1) for name in names]
     lib = library if library is not None else _alsa_library()
     handle, params = ctypes.c_void_p(), ctypes.c_void_p()
     opened = allocated = False
@@ -119,9 +132,9 @@ def check_pcm(pcm, rate, bits, channels, library=None):
         if lib.snd_pcm_hw_params_malloc(ctypes.byref(params)) < 0:
             raise HelperError('Cannot allocate PCM parameters')
         allocated = True
-        formats = {16: ('S16_LE', 'S24_3LE', 'S24_LE', 'S32_LE'),
-                   24: ('S24_3LE', 'S24_LE', 'S32_LE'), 32: ('S32_LE',)}[bits]
-        for name in formats:
+        for name, divisor in formats:
+            if rate % divisor:
+                continue
             if lib.snd_pcm_hw_params_any(handle, params) < 0:
                 continue
             value = lib.snd_pcm_format_value(name.encode('ascii'))
@@ -132,11 +145,12 @@ def check_pcm(pcm, rate, bits, channels, library=None):
                 continue
             if lib.snd_pcm_hw_params_set_format(handle, params, value) < 0:
                 continue
-            if lib.snd_pcm_hw_params_set_channels(handle, params, channels) < 0:
-                continue
-            if lib.snd_pcm_hw_params_set_rate(handle, params, rate, 0) < 0:
-                continue
-            return {'supported': True}
+            if (lib.snd_pcm_hw_params_set_channels(handle, params, channels) >= 0 and
+                    lib.snd_pcm_hw_params_set_rate(handle, params, rate // divisor, 0) >= 0):
+                return {'supported': True}
+            if bits == 'dsd':
+                # MPD chooses a packing before negotiating channels and rate.
+                break
         raise HelperError('Hardware does not support exact PCM parameters')
     finally:
         if allocated:
@@ -237,9 +251,10 @@ def main(argv=None):
         if args == ['devices']:
             result = enumerate_devices()
         elif len(args) == 5 and args[0] == 'check':
-            if not all(re.fullmatch(r'[0-9]{1,7}', value) for value in args[2:]):
+            rate, bits, channels = args[2:]
+            if not all(re.fullmatch(r'[0-9]{1,7}', value) for value in (rate, channels)) or bits not in ('16', '24', '32', 'dsd', 'dsd32', 'dop'):
                 raise HelperError('Invalid PCM parameters')
-            result = check_pcm(args[1], *map(int, args[2:]))
+            result = check_pcm(args[1], int(rate), int(bits) if bits.isdecimal() else bits, int(channels))
         elif len(args) == 2 and args[0] == 'discover':
             result = discover(args[1])
         else:

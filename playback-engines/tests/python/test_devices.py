@@ -146,6 +146,13 @@ class DevicesTests(unittest.TestCase):
             self.assertEqual(library.closed, not library.busy)
             self.assertEqual(library.freed, not library.busy)
 
+    def test_native_dsd_checks_packed_alsa_frames_at_the_exact_rate(self):
+        library = FakeAlsa()
+        library.accepted_format = 'DSD_U32_BE'
+        self.assertEqual(devices.check_pcm('hw:CARD=DAC,DEV=0', 352800, 'dsd', 2, library=library), {'supported': True})
+        self.assertEqual(library.accepted, ('DSD_U32_BE', 88200, 2))
+        self.assertTrue(all(name.startswith('DSD_') for name in library.formats.values()))
+
     def test_discovery_only_uses_owned_listener_and_local_endpoints(self):
         class Handler(BaseHTTPRequestHandler):
             endpoint = '/AVTransport/control.xml'
@@ -190,6 +197,7 @@ class DevicesTests(unittest.TestCase):
 
 
 class FakeAlsa:
+    accepted_format = 'S32_LE'
     def __init__(self, busy=False, unsupported=False):
         self.busy, self.unsupported = busy, unsupported
         self.closed = self.freed = False
@@ -212,7 +220,7 @@ class FakeAlsa:
         return 0
     def snd_pcm_hw_params_set_format(self, pcm, params, value):
         self.format = self.formats[value]
-        return 0 if self.format == 'S32_LE' else -22
+        return 0 if self.format == self.accepted_format else -22
     def snd_pcm_hw_params_set_channels(self, pcm, params, channels):
         self.channels = channels
         return 0

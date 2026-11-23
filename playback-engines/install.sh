@@ -22,6 +22,10 @@ fi
 python3 -c 'import sys; assert sys.version_info >= (3, 11)'
 command -v ffprobe >/dev/null
 python3 "$PLUGIN_DIR/scripts/install_renderer.py" "$STATE_DIR"
+# Volumio replaces plugin files as its unprivileged user on update.
+if ! python3 -B "$PLUGIN_DIR/scripts/install_aplayer.py" "$STATE_DIR"; then
+  echo 'Local APlayer is unavailable. Reinstall Playback Engines to retry.' >&2
+fi
 chown -R volumio:volumio "$STATE_DIR"
 chmod 700 "$STATE_DIR" "$STATE_DIR/renderer"
 # Settings, accounts and per-engine profiles are never initialized or overwritten here.
@@ -30,10 +34,14 @@ UNIT_TEMP=$(mktemp)
 SUDOERS_TEMP=$(mktemp)
 trap 'rm -f "$UNIT_TEMP" "$SUDOERS_TEMP"' EXIT
 sed "s|@STATE_DIR@|$STATE_DIR|g" "$PLUGIN_DIR/systemd/volumio-playback-renderer.service" > "$UNIT_TEMP"
-printf '%s\n' 'volumio ALL=(root) NOPASSWD: /bin/systemctl start volumio-playback-renderer.service, /bin/systemctl stop volumio-playback-renderer.service' > "$SUDOERS_TEMP"
+printf '%s\n' 'volumio ALL=(root) NOPASSWD: /bin/systemctl start volumio-playback-renderer.service, /bin/systemctl stop volumio-playback-renderer.service, /bin/systemctl start volumio-playback-aplayer-proxy.socket, /bin/systemctl stop volumio-playback-aplayer.service volumio-playback-aplayer-proxy.socket volumio-playback-aplayer-proxy.service' > "$SUDOERS_TEMP"
 visudo -cf "$SUDOERS_TEMP"
 install -m 644 "$UNIT_TEMP" /etc/systemd/system/volumio-playback-renderer.service
 install -m 440 "$SUDOERS_TEMP" /etc/sudoers.d/volumio-playback-renderer
+for unit in volumio-playback-aplayer.service volumio-playback-aplayer-proxy.service volumio-playback-aplayer-proxy.socket; do
+  sed "s|@STATE_DIR@|$STATE_DIR|g" "$PLUGIN_DIR/systemd/$unit" > "$UNIT_TEMP"
+  install -m 644 "$UNIT_TEMP" "/etc/systemd/system/$unit"
+done
 systemctl daemon-reload
 echo 'Playback Engines installed. Renderer starts only when explicitly selected in plugin settings.'
 echo 'plugininstallend'

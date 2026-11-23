@@ -1,5 +1,6 @@
 'use strict';
 const { metadata, milliseconds, time, error } = require('./soap');
+const UNKNOWN_DURATION = 0xffffffff * 1000;
 
 class AlbumPlayerTransport {
   constructor({ client, mpd, sm, service, updateSource = service, onError = () => {}, pollMs = 500, startupTimeoutMs = 20000 }) {
@@ -57,7 +58,7 @@ class AlbumPlayerTransport {
         const elapsed = milliseconds(position.RelTime), duration = milliseconds(position.TrackDuration);
         if (elapsed === null) throw error('ENGINE_ERROR');
         session.position = elapsed;
-        if (duration > 0) session.duration = duration;
+        if (duration > 0 && duration !== UNKNOWN_DURATION) session.duration = duration;
         if (status === 'play') session.seenPlaying = true;
       } else if (!session.seenPlaying) {
         if (Date.now() - session.startedAt > this.startupTimeoutMs) throw error('ENGINE_UNAVAILABLE');

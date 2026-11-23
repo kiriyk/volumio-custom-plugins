@@ -1,0 +1,23 @@
+[Unit]
+Description=Playback Engines local APlayer
+After=sound.target
+ConditionFileIsExecutable=@STATE_DIR@/aplayer/aplayer
+
+[Service]
+Type=forking
+User=volumio
+Group=volumio
+SupplementaryGroups=audio
+WorkingDirectory=@STATE_DIR@/aplayer
+Environment=ALSA_CONFIG_PATH=@STATE_DIR@/aplayer-asound.conf
+ExecStart=@STATE_DIR@/aplayer/aplayer
+TimeoutStartSec=15
+TimeoutStopSec=10
+KillMode=control-group
+UMask=0077
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=@STATE_DIR@/aplayer
+ProtectHome=yes
+NoNewPrivileges=yes

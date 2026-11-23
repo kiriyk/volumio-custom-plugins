@@ -10,6 +10,17 @@ function select(id,label,value,options){return{id,element:'select',label,options
 function input(id,label,value,min,max,step=1){return{id,element:'input',type:'number',label,value,attributes:[{min,max,step}]};}
 function toggle(id,label,value){return{id,element:'switch',label,value};}
 function section(id,label,method,content,description){return{id,element:'section',label,description,content,onSave:{type:'controller',endpoint:ENDPOINT,method},saveButton:{label:'Применить',data:content.map(x=>x.id)}};}
+Object.assign(errors, {
+  APLAYER_NOT_INSTALLED:'Локальный APlayer не установлен. Переустановите Playback Engines.',
+  APLAYER_SERVICE_ERROR:'Не удалось запустить или остановить локальный APlayer.',
+  APLAYER_UNAVAILABLE:'Локальный APlayer не готов.',
+  APLAYER_SCAN_FAILED:'APlayer не подтвердил выбранный локальный трек.',
+  APLAYER_PLAYBACK_ERROR:'Локальный APlayer прервал воспроизведение.',
+  APLAYER_OUTPUT_MISMATCH:'Выход APlayer не соответствует выбранному устройству или формату.',
+  APLAYER_RESAMPLE_UNAVAILABLE:'Выбранная частота преобразования недоступна для DSD в APlayer.',
+  APLAYER_DSD_PROCESSING_UNAVAILABLE:'Программная обработка недоступна в режиме DoP или Native DSD.',
+  LOCAL_FILE_UNAVAILABLE:'Локальный трек недоступен.'
+});
 const modes=[{value:'bypass',label:'Всё отключено'},{value:'custom',label:'Пользовательские настройки'}];
 const rates=[{value:0,label:'Исходная частота'},...[44100,48000,88200,96000,176400,192000,352800,384000].map(value=>({value,label:(value/1000)+' кГц'}))];
 
@@ -20,7 +31,8 @@ function actualOutput(status){
   const messages={idle:'Выбранное ALSA-устройство закрыто. Активный движок не подтверждён.',unavailable:'Выбранный выход недоступен. Если ЦАП переставлен в другой USB-порт, выберите его заново.',unconfirmed:'Процесс аудиовывода не подтверждён.',mismatch:'Несовпадение выбранного движка или исходного формата с фактическим потоком.',running:'Процесс аудиовывода подтверждён по ALSA.',open:'Устройство открыто, но поток сейчас не RUNNING.'};
   const pcm=o.pcm;
   const details=pcm?` ${pcm.ownerProcess||'неизвестный процесс'} · PID ${pcm.ownerPid||'?'} · ${pcm.state} · ${pcm.rate||'?'} Гц · ${pcm.format||'?'} · ${pcm.channels||'?'} канала.`:'';
-  const source=o.inputFormat?` Источник: ${o.inputFormat.rate} Гц · ${o.inputFormat.bits} бит · ${o.inputFormat.channels} канала.`:'';
+  const input=o.inputFormat;
+  const source=input?` Источник: ${input.encoding==='dsd'?`DSD · ${input.rate*8} Гц`:`${input.rate} Гц · ${input.bits} бит`} · ${input.channels} канала.`:'';
   return(messages[o.state]||'Фактический вывод не подтверждён.')+details+source+' Это проверка маршрута и формата; bit-perfect не проверен.';
 }
 
@@ -39,7 +51,11 @@ class ControllerPlaybackEngines{
   onStart(){this.enabled=true;return kew(this.start());}
   async start(){
     if(this.started)return;if(this.startPromise)return this.startPromise;
-    this.startPromise=(async()=>{const manager=this.ensure();await manager.start();this.started=true;
+    this.startPromise=(async()=>{const manager=this.ensure();
+      manager.onLocalError=error=>{
+        this.router.pushToastMessage?.('error','Движки воспроизведения',errors[error]||'Не удалось воспроизвести локальный трек.');
+      };
+      await manager.start();this.started=true;
       this.timer=setInterval(()=>this.pollDevices(),2000);this.timer.unref?.();})();
     try{return await this.startPromise;}finally{this.startPromise=null;}
   }
@@ -72,11 +88,15 @@ class ControllerPlaybackEngines{
     const selected=section('selection','Движок и аудиовыход','saveSelection',[
       select('engine','Движок воспроизведения',s.engine,Object.entries(names).map(([value,label])=>({value,label}))),
       select('device','Аудиоустройство',s.device?.key,options),
-      select('mpdMode','Обработка MPD',s.modes.mpd,modes),select('albumMode','Обработка Album Player',s.modes.album_player,modes)
+      select('mpdMode','Обработка MPD',s.modes.mpd,modes),select('albumMode','Обработка Album Player',s.modes.album_player,modes),
+      select('localAlbumPlayer','Локальное воспроизведение Album Player',s.localAlbumPlayer,[
+        {value:'renderer',label:'Рендерер'},{value:'aplayer',label:'APlayer'}
+      ])
     ],status.error?errors[status.error]||'Движок недоступен.':!s.managed?'Текущий вывод Volumio сохранён. Выберите устройство и нажмите «Применить».':`${names[s.engine]} · ${s.modes[s.engine]==='bypass'?'обработка отключена':'пользовательская обработка'} · ${status.ready?'профиль применён':'вывод не готов'}`);
     const mp=s.custom.mpd,ap=s.custom.album_player;
     const mpd=section('mpdCustom','Пользовательские настройки MPD','saveMpd',[
       toggle('volumeEnabled','Программная регулировка громкости',mp.volumeEnabled),input('volume','Программная громкость, %',mp.volume,0,100),
+      toggle('dsdDoP','Передавать DSD через DoP',mp.dsdDoP),
       select('resampleRate','Частота вывода',mp.resampleRate,rates),select('resampleBits','Разрядность при ресемплинге',mp.resampleBits,[16,24,32].map(value=>({value,label:value+' бит'}))),
       toggle('normalization','Нормализация громкости',mp.normalization),select('replaygain','ReplayGain',mp.replaygain,[['off','Отключён'],['track','По треку'],['album','По альбому'],['auto','Автоматически']].map(([value,label])=>({value,label}))),input('crossfade','Перекрытие треков, с',mp.crossfade,0,60)
     ],'Профиль хранится отдельно и используется только в пользовательском режиме MPD.');
@@ -98,6 +118,7 @@ class ControllerPlaybackEngines{
     const manager=this.ensure(),next=JSON.parse(JSON.stringify(manager.settings));next.engine=unwrap(data.engine);next.managed=true;
     const device=manager.devices.find(d=>d.key===unwrap(data.device));if(!device)throw Object.assign(Error(),{code:'DEVICE_UNAVAILABLE'});next.device={key:device.key,label:device.label};
     if(data.mpdMode!==undefined)next.modes.mpd=unwrap(data.mpdMode);if(data.albumMode!==undefined)next.modes.album_player=unwrap(data.albumMode);if(data.mode!==undefined)next.modes[next.engine]=unwrap(data.mode);
+    if(data.localAlbumPlayer!==undefined)next.localAlbumPlayer=unwrap(data.localAlbumPlayer);
     const previous=manager.settings;
     const enteringBypass=next.modes[next.engine]==='bypass'&&(!previous.managed||previous.engine!==next.engine||previous.modes[previous.engine]!=='bypass'||previous.device?.key!==next.device.key);
     await manager.apply(next);

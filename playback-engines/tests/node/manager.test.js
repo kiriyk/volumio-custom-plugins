@@ -53,10 +53,32 @@ test('local files in managed MPD bypass are capability-checked before starting p
   const track={service:'mpd',uri:'music-library/USB/album/song.flac',duration:180};e.sm.getTrack=()=>track;
   let checked=0;const commands=[];
   e.manager.runtime.probe=async()=>({rate:44100,bits:24,channels:2});e.manager.runtime.check=async()=>{checked++;};
-  e.manager.localStream.urlFor=async()=> 'http://127.0.0.1:12345/opaque.flac';
+  e.manager.localStream.resolveFile=async()=>({file:'/mnt/USB/album/song.flac'});
+  e.manager.localStream.openFile=async()=>({handle:{close:async()=>{}}});
+  e.manager.localStream.urlFor=async()=>assert.fail('MPD must open the library entry');
   e.manager.mpd.sendMpdCommand=async command=>{commands.push(command);return{};};e.sm.setConsumeUpdateService=async()=>{};
   await e.manager.mpd.clearAddPlayTrack(track);
-  assert.equal(checked,1);assert.ok(commands.includes('play'));assert.equal(e.sm.currentPosition,4);
+  assert.equal(checked,1);assert.ok(commands.includes('add "USB/album/song.flac"'));assert.ok(commands.includes('play'));assert.equal(e.sm.currentPosition,4);
+});
+
+test('both Volumio CUE URI forms load exactly one native MPD entry', async t=>{
+  const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
+  const settings=defaults();settings.managed=true;settings.device={key:e.card.key,label:e.card.label};
+  await e.manager.apply(settings);
+  const commands=[];
+  e.manager.runtime.mpdRaw=async command=>{
+    assert.equal(command,'listplaylistinfo "USB/Album @ 100%.cue"');
+    return ['file: USB/first.flac', 'Range: 0.000-2.000', 'file: USB/second.flac', 'Range: 0.000-2.000'];
+  };
+  e.manager.mpd.sendMpdCommand=async command=>commands.push(command);
+  e.manager.localStream.urlFor=async()=>assert.fail('MPD must not generate a WAV');
+  e.sm.setConsumeUpdateService=async()=>{};
+  for(const uri of ['cue://USB/Album @ 100%.cue@1','music-library/USB/Album @ 100%.cue/track0002']){
+    const track={service:'mpd',uri,duration:2};e.sm.getTrack=()=>track;
+    await e.manager.mpd.clearAddPlayTrack(track);
+  }
+  assert.deepEqual(commands.filter(command=>command.startsWith('load ')),Array(2).fill('load "USB/Album @ 100%.cue" 1:2'));
+  assert.equal(commands.filter(command=>command==='play').length,2);
 });
 
 test('saving an inactive custom profile preserves current playback and does not reconfigure output',async t=>{
@@ -100,7 +122,8 @@ for(const action of ['stop','pause'])test(`local preparation is cancelled by ${a
   const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
   const next=defaults();next.managed=true;next.device={key:e.card.key,label:e.card.label};next.modes.mpd='bypass';await e.manager.apply(next);
   const track={service:'mpd',uri:'USB/song.flac'};e.sm.getTrack=()=>track;e.sm.setConsumeUpdateService=async()=>{};
-  e.manager.localStream.urlFor=async()=> 'http://127.0.0.1/song';
+  e.manager.localStream.resolveFile=async()=>({file:'/mnt/USB/song.flac'});
+  e.manager.localStream.openFile=async()=>({handle:{close:async()=>{}}});
   let release,entered;const probing=new Promise(resolve=>{entered=resolve;});
   e.manager.runtime.probe=()=>{entered();return new Promise(resolve=>{release=resolve;});};e.manager.runtime.check=async()=>{};
   const commands=[];e.manager.mpd.sendMpdCommand=async command=>commands.push(command);
@@ -213,17 +236,17 @@ test('cancelled CUE preparation failure cannot stop a newer track',async t=>{
  const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
  const next=defaults();next.managed=true;next.device={key:e.card.key,label:e.card.label};await e.manager.apply(next);
  const track={uri:'USB/album.cue/track0001',service:'mpd'};e.sm.getTrack=()=>track;let reject,entered;
- const preparing=new Promise(resolve=>entered=resolve);e.manager.localStream.urlFor=async()=>{entered();return new Promise((_,r)=>reject=r);};
+ const preparing=new Promise(resolve=>entered=resolve);e.manager.runtime.mpdRaw=async()=>{entered();return new Promise((_,r)=>reject=r);};
  const playing=e.manager.mpd.clearAddPlayTrack(track);await preparing;await e.manager.mpd.stop();
  const stopped=e.calls.filter(x=>x==='core-stop').length;reject(Error('cancelled'));await playing;
  assert.equal(e.calls.filter(x=>x==='core-stop').length,stopped);assert.equal(e.manager.error,null);
 });
-test('changing to a CUE track stops the previous audio before segment preparation',async t=>{
+test('changing to a CUE track stops the previous audio before querying MPD',async t=>{
  const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
  const next=defaults();next.managed=true;next.device={key:e.card.key,label:e.card.label};await e.manager.apply(next);
  const track={uri:'USB/album.cue/track0001',service:'mpd'};e.sm.getTrack=()=>track;let stopped=false;
  e.manager.active={stop:async()=>{stopped=true;e.manager.active=null;}};
- e.manager.localStream.urlFor=async()=>{assert.equal(stopped,true);throw Error('fixture ends before playback');};
+ e.manager.runtime.mpdRaw=async()=>{assert.equal(stopped,true);throw Error('fixture ends before playback');};
  await e.manager.mpd.clearAddPlayTrack(track);assert.equal(stopped,true);
 });
 for(const engine of ['mpd','album_player'])test(`managed ${engine} hides native MPD prefetch and restores it when disabled`,async t=>{
@@ -233,4 +256,43 @@ for(const engine of ['mpd','album_player'])test(`managed ${engine} hides native 
  assert.equal(typeof e.manager.mpd.prefetch,'undefined');
  e.manager.settings.managed=false;assert.equal(e.manager.mpd.prefetch(),e.manager.mpd);
  await e.manager.close();assert.equal(e.manager.mpd.prefetch,native);
+});
+
+test('selecting local APlayer leaves playback stopped and defers loading the native process',async t=>{
+  const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
+  e.manager.aplayer.available=async()=>e.calls.push('aplayer-available');
+  e.manager.aplayer.start=async()=>assert.fail('APlayer should start only on local play');
+  const settings=defaults();settings.managed=true;settings.device={key:e.card.key,label:e.card.label};
+  settings.engine='album_player';settings.localAlbumPlayer='aplayer';
+  await e.manager.apply(settings);
+  assert.ok(e.calls.includes('aplayer-available'));
+  assert.ok(!e.calls.includes('renderer-start'));
+  assert.equal(e.manager.status().localAlbumPlayer,'aplayer');
+  assert.equal(e.sm.currentStatus,'stop');
+});
+
+test('changing only the Album Player local preference leaves current MPD ownership valid',async t=>{
+  const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
+  const settings=defaults();settings.managed=true;settings.device={key:e.card.key,label:e.card.label};
+  await e.manager.apply(settings);
+  e.sm.currentStatus='play';e.calls.length=0;
+  const generation=e.manager.localGeneration;
+  await e.manager.apply({...settings,localAlbumPlayer:'aplayer'});
+  assert.equal(e.manager.localGeneration,generation);
+  assert.equal(e.sm.currentStatus,'play');
+  assert.deepEqual(e.calls,[]);
+});
+
+test('an unavailable APlayer installation does not interrupt the previous selection',async t=>{
+  const e=environment(t);await e.manager.start();t.after(()=>e.manager.close());
+  const settings=defaults();settings.managed=true;settings.device={key:e.card.key,label:e.card.label};
+  await e.manager.apply(settings);
+  e.sm.currentStatus='play';e.calls.length=0;
+  const generation=e.manager.localGeneration;
+  await assert.rejects(e.manager.apply({...settings,engine:'album_player',localAlbumPlayer:'aplayer'}),
+    {code:'APLAYER_NOT_INSTALLED'});
+  assert.equal(e.manager.localGeneration,generation);
+  assert.equal(e.sm.currentStatus,'play');
+  assert.deepEqual(e.calls,[]);
+  assert.equal(e.manager.settings.engine,'mpd');
 });

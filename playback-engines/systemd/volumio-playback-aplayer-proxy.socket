@@ -1,0 +1,11 @@
+[Unit]
+Description=Playback Engines APlayer private API socket
+BindsTo=volumio-playback-aplayer.service
+After=volumio-playback-aplayer.service
+
+[Socket]
+ListenStream=/run/volumio-playback-aplayer/api.sock
+SocketMode=0600
+SocketUser=volumio
+SocketGroup=volumio
+RemoveOnStop=yes

@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 function fields(text){const result={};for(const line of text.split('\n')){const index=line.indexOf(':');if(index>=0)result[line.slice(0,index).trim()]=line.slice(index+1).trim();}return result;}
-function observe(device,requestedEngine,{procRoot='/proc'}={}){
+function observe(device,requestedEngine,{procRoot='/proc',aplayerPid=null}={}){
  const result={checkedAt:Date.now(),state:'unavailable',actualEngine:null,routeMatches:null,pcm:null};
  if(!device||!Number.isInteger(device.index)||device.index<0||!Number.isInteger(device.device)||device.device<0)return result;
  const identity=/^hw:CARD=([A-Za-z0-9_-]+),DEV=(\d+)$/.exec(device.pcm||'');
@@ -28,17 +28,28 @@ function observe(device,requestedEngine,{procRoot='/proc'}={}){
    }catch{unreadable=true;result.state='unconfirmed';}
   }
   if(!streams.length){if(result.state!=='unconfirmed')result.state='idle';return result;}
-  const pcm=streams.find(s=>s.state==='RUNNING')||streams[0];result.pcm=pcm;
-  const engineOf=stream=>stream.ownerProcess==='mpd'?'mpd':stream.ownerProcess==='ap2renderer'?'album_player':null;
-  result.actualEngine=engineOf(pcm);
-  if(unreadable||!result.actualEngine||streams.some(s=>!engineOf(s))){result.state='unconfirmed';return result;}
-  result.routeMatches=streams.every(s=>engineOf(s)===requestedEngine);
-  result.state=!result.routeMatches?'mismatch':pcm.state==='RUNNING'?'running':'open';
+  // APlayer may drain a whole short track without an observable RUNNING interval.
+ const playing=stream=>stream.state==='RUNNING'||(requestedEngine==='aplayer'&&stream.state==='DRAINING');
+ const pcm=streams.find(playing)||streams[0];result.pcm=pcm;
+  const backendOf=stream=>stream.ownerProcess==='mpd'?'mpd':
+   stream.ownerProcess==='ap2renderer'?'album_player':
+   stream.ownerProcess==='aplayer'&&stream.ownerPid===aplayerPid?'aplayer':null;
+  const backend=backendOf(pcm);
+  result.actualEngine=backend==='aplayer'?'album_player':backend;
+  if(unreadable||!result.actualEngine||streams.some(s=>!backendOf(s))){result.state='unconfirmed';return result;}
+  result.routeMatches=streams.every(s=>backendOf(s)===requestedEngine);
+  result.state=!result.routeMatches?'mismatch':playing(pcm)?'running':'open';
   return result;
  }catch{return result;}
 }
 function compareFormat(pcm,source){
  if(!pcm||!source)return null;
+ if(source.encoding==='dop')return pcm.format==='S32_LE'&&pcm.rate===source.rate&&pcm.channels===source.channels;
+ if(source.encoding==='dsd'||source.encoding==='dsd32'){
+  const bytes={DSD_U8:1,DSD_U16_LE:2,DSD_U16_BE:2,DSD_U32_LE:4,DSD_U32_BE:4}[pcm.format];
+  if(!pcm.format||!pcm.rate||!pcm.channels)return null;
+  return !!bytes&&(source.encoding!=='dsd32'||bytes===4)&&pcm.rate*bytes===source.rate&&pcm.channels===source.channels;
+ }
  const bits={S16_LE:16,S24_LE:24,S24_3LE:24,S32_LE:32}[pcm.format];
  if(!bits||!pcm.rate||!pcm.channels)return null;
  return pcm.rate===source.rate&&pcm.channels===source.channels&&bits>=source.bits;

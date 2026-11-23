@@ -1,8 +1,7 @@
 # Playback Engines for Volumio 4
 
 Separate `audio_interface/playback_engines` plugin for ARMHF / Bookworm.
-Sources Qobuz Custom and Yandex Music need version 0.3.1 or later. Local library
-files are supported through a loopback HTTP range server.
+Sources Qobuz Custom and Yandex Music need version 0.3.1 or later.
 
 Enable the plugin, open its settings, select MPD or Album Player and an ALSA
 output, choose each engine's processing mode, then Apply. Opening settings and
@@ -15,28 +14,46 @@ gain and processing and uses a direct `hw:` ALSA output. Hardware gain is never
 set by the plugin. Each transition into this mode warns to lower the DAC or
 amplifier volume: removing software attenuation can raise the signal level.
 Unsupported source PCM formats in this mode stop with an error rather than
-silently converting. DSD bypass has not been validated and is rejected.
+silently converting. MPD accepts raw DSF/DFF in bypass when the direct ALSA
+device passes the native DSD capability check. The optional local APlayer mode
+supports Native DSD in bypass when the selected ALSA device passes the check.
+Use its custom profile to select PCM, DoP or Native DSD. DoP and Native DSD
+require disabled software volume and other digital processing.
 Settings alone do not establish verified bit-perfect playback.
 
 Custom mode uses explicit processing settings of this plugin; it does not import
 Volumio/FusionDsp effects. MPD supports software volume, rate conversion,
-normalization, ReplayGain and crossfade. Album Player exposes its own software
+normalization, ReplayGain, crossfade and optional DoP. Album Player exposes its own software
 volume, sample-rate/precision controls, channel processing and convolution.
 DSD output needs compatible hardware and remains unverified on a physical DAC.
+
+Managed MPD opens local tracks from its own library and loads the selected CUE
+entry with the native playlist plugin. The renderer still receives local files
+over loopback HTTP, including original DSF/DFF bytes, and uses the existing WAV
+bridge for local CUE. Within Album Player, set «Локальное воспроизведение» to
+«APlayer» to send local WAV, FLAC, DSF and DFF directly to the full APlayer
+process. CUE with a supported PCM source is prepared as an exact WAV segment.
+Volumio controls the queue and starts each track on EOF. APlayer starts on demand
+and uses a private Unix control socket. HTTP sources use the renderer.
+Existing settings select the renderer by default. SACD ISO, DSD CUE and gapless
+transitions are outside the local APlayer mode.
 
 ## Installation and state
 
 `npm ci && npm test && npm run package`. The archive contains the plugin and shared
 transport code. Install using Volumio's plugin installer on the player. `install.sh`
 requires root, checks the platform, installs missing system dependencies and
-fetches the official pinned renderer archive with SHA256 verification. It never
-runs vendor installation scripts or starts the renderer during installation.
-The native renderer is proprietary freeware, downloaded separately from
+fetches the official pinned renderer and APlayer ARMHF archives with SHA256
+verification. It never runs vendor installation scripts or starts the players
+during installation. If the APlayer download fails, the standard transports are
+available and selecting APlayer shows an installation error. Both binaries
+are proprietary freeware, downloaded separately from
 https://albumplayer.ru/linux/ and excluded from this repository/package.
 
 State lives under `/data/configuration/audio_interface/playback_engines/`:
 `settings.json`, private `asound.conf`, renderer files/configuration and MPD recovery
-backup. Global `/etc/asound.conf` is untouched. Renderer runs as `volumio`, with
+backup. APlayer uses its own ALSA configuration and private catalogue with
+one active file. Global `/etc/asound.conf` is untouched. Renderer runs as `volumio`, with
 ALSA audio group access, in `volumio-playback-renderer.service`; control URLs must
 belong to its actual PID. Disable the plugin to regenerate normal Volumio MPD
 configuration. Saved profiles survive disable/update/uninstall. The uninstaller
