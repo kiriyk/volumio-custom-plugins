@@ -77,6 +77,16 @@ test('early renderer failure reports error rather than advancing the queue', asy
   state.status = 'STOPPED'; await engine.poll();
   assert.equal(events.filter(x => x.status === 'stop').length, 0); assert.equal(errors.length, 1);
 });
+test('unknown renderer duration keeps the duration supplied for a DSF file', async t => {
+  const { client, state } = await renderer(t); const { engine, events } = transport(client); t.after(() => engine.close());
+  await engine.play('http://127.0.0.1/file.dsf', { ...track, duration: 10.5, trackType: 'dsf' }, () => true);
+  state.duration = '1193046:28:15.000';
+  state.position = '0:00:10.000';
+  await engine.poll();
+  state.status = 'STOPPED';
+  await engine.poll();
+  assert.deepEqual(events.map(event => [event.status, event.duration]), [['play', 10.5], ['stop', 10.5]]);
+});
 test('stale start cannot open renderer after MPD release; stale polls cannot update queue', async t => {
   const { client, state } = await renderer(t); let owned = true;
   const { engine, events } = transport(client, { mpd: { stop: async () => { owned = false; } } }); t.after(() => engine.close());

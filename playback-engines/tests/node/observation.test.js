@@ -35,9 +35,37 @@ test('source comparison accepts lossless integer packing but flags rate, channel
  assert.equal(compareFormat(null,source),null);
 });
 
+test('native DSD observations account for ALSA packing and detect PCM conversion',()=>{
+ const {compareFormat}=require('../../lib/observation');
+ const source={encoding:'dsd',rate:352800,channels:2};
+ assert.equal(compareFormat({rate:88200,format:'DSD_U32_BE',channels:2},source),true);
+ assert.equal(compareFormat({rate:176400,format:'DSD_U16_LE',channels:2},source),true);
+ assert.equal(compareFormat({rate:176400,format:'S32_LE',channels:2},source),false);
+ assert.equal(compareFormat({rate:176400,format:'DSD_U32_LE',channels:2},source),false);
+});
+
 test('MPD output thread is attributed to its owning process instead of treated as an unknown engine',t=>{
  const e=fixture(t);for(const pid of [26,123])fs.mkdirSync(path.join(e.root,String(pid)));
  fs.writeFileSync(path.join(e.root,'26/comm'),'output:alsa\n');fs.writeFileSync(path.join(e.root,'26/status'),'Name:\toutput:alsa\nTgid:\t123\nPid:\t26\n');fs.writeFileSync(path.join(e.root,'123/comm'),'mpd\n');
  fs.writeFileSync(path.join(e.dir,'status'),'state: RUNNING\nowner_pid: 26\n');fs.writeFileSync(path.join(e.dir,'hw_params'),'format: S16_LE\nchannels: 2\nrate: 44100 (44100/1)\n');
  const result=observe(e.device,'mpd',{procRoot:e.root});assert.equal(result.actualEngine,'mpd');assert.equal(result.routeMatches,true);assert.equal(result.pcm.ownerPid,123);assert.equal(result.pcm.ownerProcess,'mpd');
+});
+
+test('only the managed APlayer main PID is accepted and the route still reports Album Player',t=>{
+ const e=fixture(t);
+ fs.mkdirSync(path.join(e.root,'456'));
+ fs.writeFileSync(path.join(e.root,'456/comm'),'aplayer\n');
+ fs.writeFileSync(path.join(e.dir,'status'),'state: RUNNING\nowner_pid: 456\n');
+ fs.writeFileSync(path.join(e.dir,'hw_params'),'format: DSD_U32_BE\nchannels: 2\nrate: 88200\n');
+ const options={procRoot:e.root,aplayerPid:456};
+ const result=observe(e.device,'aplayer',options);
+ assert.equal(result.actualEngine,'album_player');
+ assert.equal(result.routeMatches,true);
+ assert.equal(observe(e.device,'album_player',options).routeMatches,false);
+ assert.equal(observe(e.device,'aplayer',{...options,aplayerPid:457}).state,'unconfirmed');
+ fs.writeFileSync(path.join(e.dir,'status'),'state: DRAINING\nowner_pid: 456\n');
+ assert.equal(observe(e.device,'aplayer',options).state,'running');
+ assert.equal(observe(e.device,'aplayer',{...options,aplayerPid:457}).state,'unconfirmed');
+ fs.writeFileSync(path.join(e.dir,'status'),'state: PREPARED\nowner_pid: 456\n');
+ assert.equal(observe(e.device,'aplayer',options).state,'open');
 });

@@ -46,6 +46,7 @@ test('maps Album Player profiles to native rate indexes and bypass flags', () =>
   const custom = profiles.defaults().custom.album_player;
   Object.assign(custom, {volumeEnabled:true,resampleRate:192000,forceBits:24,phaseInvert:true,swapChannels:true,downmix:true,convolverEnabled:true,convolverFilter:3,convolverGain:-2.5,dsdMode:1});
   const patch = profiles.albumPatch('custom', custom);
+  assert.equal(patch.gapless_mode,false);
   assert.equal(patch.res44, 6); assert.equal(patch.res_bf44, 6); assert.equal(patch.res384, 6);
   assert.equal(patch.mode_24bit,true); assert.equal(patch.mode_16bit,false);
   assert.equal(patch.conv_db,-25); assert.equal(patch.dop_mode,1);
@@ -94,4 +95,26 @@ test('accepts native convolver gain range and rejects values beyond it', () => {
     settings.custom.album_player.convolverGain = gain;
     assert.throws(()=>profiles.validateSettings(settings), {code:'BAD_SETTINGS'});
   }
+});
+
+test('saved MPD profiles default DoP to off and opt in only in custom mode', () => {
+  const settings = profiles.defaults();
+  delete settings.custom.mpd.dsdDoP;
+  const {mpd} = profiles.validateSettings(settings).custom;
+  assert.equal(mpd.dsdDoP, false);
+  mpd.dsdDoP = true;
+  assert.match(profiles.rewriteMpdConfig(config, 'hw:CARD=DAC,DEV=0', 'custom', mpd), /dop "yes"/);
+  assert.doesNotMatch(profiles.rewriteMpdConfig(config, 'hw:CARD=DAC,DEV=0', 'bypass', mpd), /dop "yes"/);
+});
+
+test('old settings retain profiles and choose the renderer for local Album Player',()=>{
+  const saved=profiles.defaults();
+  saved.engine='album_player';
+  saved.custom.album_player.volume=43;
+  delete saved.localAlbumPlayer;
+  const migrated=profiles.validateSettings(saved);
+  assert.equal(migrated.localAlbumPlayer,'renderer');
+  assert.equal(migrated.custom.album_player.volume,43);
+  assert.equal(profiles.validateSettings({...migrated,localAlbumPlayer:'aplayer'}).localAlbumPlayer,'aplayer');
+  assert.throws(()=>profiles.validateSettings({...migrated,localAlbumPlayer:'unavailable'}),{code:'BAD_SETTINGS'});
 });

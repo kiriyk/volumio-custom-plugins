@@ -7,7 +7,7 @@ mkdir -p dist
 STAGING=$(mktemp -d)
 trap 'rm -rf "$STAGING"' EXIT
 mkdir -p "$STAGING/playback_engines/lib/engines"
-files=(package.json package-lock.json index.js config.json lib service systemd scripts/install_renderer.py scripts/update.js install.sh uninstall.sh)
+files=(package.json package-lock.json index.js config.json lib service systemd scripts/install_renderer.py scripts/install_aplayer.py scripts/update.js install.sh uninstall.sh)
 for item in UIConfig.json i18n README.md VERIFYING-AUDIO.md LICENSE NOTICE; do
   if [ -e "$item" ]; then files+=("$item"); fi
 done

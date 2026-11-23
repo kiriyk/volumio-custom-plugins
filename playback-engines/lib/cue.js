@@ -16,7 +16,7 @@ function frames(value) {
   return result;
 }
 
-function parseCue(text, targetTrack) {
+function parseCue(text, targetTrack, {ordinal = false} = {}) {
   if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024 || /[\x00\ufffd]/.test(text)) invalid();
   const number = typeof targetTrack === 'string' && /^track\d{4}$/.test(targetTrack) ? Number(targetTrack.slice(5)) : targetTrack;
   if (!Number.isSafeInteger(number) || number < 1 || number > 99) invalid();
@@ -62,7 +62,7 @@ function parseCue(text, targetTrack) {
     } else if (!['REM', 'TITLE', 'PERFORMER', 'SONGWRITER', 'CATALOG', 'CDTEXTFILE', 'ISRC', 'FLAGS'].includes(keyword)) invalid();
   }
   finishTrack(); finishBlock();
-  const target = tracks.find(track => track.number === number);
+  const target = ordinal ? tracks[number - 1] : tracks.find(track => track.number === number);
   if (!target) invalid();
   const next = target.block.tracks[target.block.tracks.indexOf(target) + 1];
   return {file: target.block.file, startFrame: target.startFrame, endFrame: next ? next.startFrame : null};

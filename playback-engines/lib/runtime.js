@@ -19,6 +19,11 @@ function pcmParts(pcm) {
   if (!m) throw fail('INVALID_DEVICE');
   return { card: m[1], device: Number(m[2]) };
 }
+function directAlsaConfig(pcm) {
+  const { card, device } = pcmParts(pcm);
+  // The global ALSA config loads hooks that can replace these defaults.
+  return `pcm.!default { type hw card "${card}" device ${device} }\nctl.!default { type hw card "${card}" }\n`;
+}
 class Runtime {
   constructor({ stateDir, run = execFile, helper = path.join(__dirname, '../service/devices.py'), mpdPort = 6600 }) {
     Object.assign(this, { stateDir, run, helper, mpdPort }); this.endpoints = null;
@@ -36,10 +41,11 @@ class Runtime {
   mpdRaw(command) {
     return new Promise((resolve, reject) => {
       const socket = net.createConnection({ host: '127.0.0.1', port: this.mpdPort });
+      socket.setEncoding('utf8');
       let buffer = '', greeted = false; const lines = [];
       const timer = setTimeout(() => socket.destroy(fail('MPD_UNAVAILABLE')), 4000);
       socket.on('data', chunk => {
-        buffer += chunk.toString();
+        buffer += chunk;
         while (buffer.includes('\n')) {
           const i = buffer.indexOf('\n'), line = buffer.slice(0, i); buffer = buffer.slice(i + 1);
           if (!greeted) { if (!line.startsWith('OK MPD ')) return socket.destroy(fail('MPD_UNAVAILABLE')); greeted = true; socket.write(command + '\n'); }
@@ -67,8 +73,9 @@ class Runtime {
   }
   async check(device, format) {
     pcmParts(device.pcm);
-    if (!format || ![16,24,32].includes(format.bits) || !Number.isInteger(format.rate) || !Number.isInteger(format.channels)) throw fail('UNSUPPORTED_FORMAT');
-    try{return await this.helperCall(['check', device.pcm, String(format.rate), String(format.bits), String(format.channels)]);}
+    const bits = format?.encoding === 'dsd' ? 'dsd' : format?.encoding === 'dsd32' ? 'dsd32' : format?.encoding === 'dop' ? 'dop' : format?.bits;
+    if (![16,24,32,'dsd','dsd32','dop'].includes(bits) || !Number.isInteger(format.rate) || !Number.isInteger(format.channels)) throw fail('UNSUPPORTED_FORMAT');
+    try{return await this.helperCall(['check', device.pcm, String(format.rate), String(bits), String(format.channels)]);}
     catch(e){if(e.code==='PCM busy')throw fail('PCM_BUSY');if(e.code==='Hardware does not support exact PCM parameters')throw fail('UNSUPPORTED_FORMAT');throw fail('AUDIO_PREFLIGHT_FAILED');}
   }
   async systemctl(action) {
@@ -76,9 +83,8 @@ class Runtime {
     catch { throw fail('RENDERER_SERVICE_ERROR'); }
   }
   async startRenderer(device) {
-    const {card, device: number} = pcmParts(device.pcm);
+    const conf = directAlsaConfig(device.pcm);
     fs.mkdirSync(this.stateDir, { recursive: true, mode: 0o700 });
-    const conf = '</usr/share/alsa/alsa.conf>\npcm.!default {\n type hw\n card "' + card + '"\n device ' + number + '\n}\nctl.!default { type hw card "' + card + '" }\n';
     fs.writeFileSync(path.join(this.stateDir, 'asound.conf'), conf, { mode: 0o600 });
     await this.systemctl('start');
     const deadline = Date.now() + 20000;
@@ -117,12 +123,18 @@ class Runtime {
   }
   async probe(url) {
     try {
-      const {stdout} = await this.run('/usr/bin/ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name,sample_rate,bits_per_raw_sample,bits_per_sample,channels', '-of', 'json', url], { timeout: 20000, maxBuffer: 65536 });
-      const stream = JSON.parse(stdout).streams?.[0];
+      const {stdout} = await this.run('/usr/bin/ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name,sample_rate,bits_per_raw_sample,bits_per_sample,channels:format=duration', '-of', 'json', url], { timeout: 20000, maxBuffer: 65536 });
+      const info = JSON.parse(stdout), stream = info.streams?.[0];
+      const rate = Number(stream?.sample_rate), channels = Number(stream?.channels);
+      if (!Number.isInteger(rate) || rate <= 0 || !Number.isInteger(channels) || channels <= 0) throw fail('UNSUPPORTED_FORMAT');
+      // FFmpeg reports raw DSD at its byte rate (eight 1-bit samples per byte).
+      if (/^dsd_(lsbf|msbf)(?:_planar)?$/.test(stream.codec_name)) {
+        const duration = Number(info.format?.duration);
+        return {encoding: 'dsd', rate, channels, ...(duration > 0 && Number.isFinite(duration) ? {duration} : {})};
+      }
       let bits = Number(stream?.bits_per_raw_sample || stream?.bits_per_sample);
       if (!bits && /^(mp3|aac|opus|vorbis)$/.test(stream?.codec_name || '')) bits = 32;
-      const rate = Number(stream?.sample_rate), channels = Number(stream?.channels);
-      if (!stream || ![16,24,32].includes(bits) || /dsd/i.test(stream.codec_name || '') || !rate || !channels) throw fail('UNSUPPORTED_FORMAT');
+      if (![16,24,32].includes(bits) || /dsd/i.test(stream.codec_name || '')) throw fail('UNSUPPORTED_FORMAT');
       return { bits, rate, channels };
     } catch (e) { throw e.code === 'UNSUPPORTED_FORMAT' ? e : fail('UNSUPPORTED_FORMAT'); }
   }
@@ -131,3 +143,4 @@ module.exports = Runtime;
 module.exports.writeJson = writeJson;
 module.exports.fail = fail;
 module.exports.pcmParts = pcmParts;
+module.exports.directAlsaConfig = directAlsaConfig;

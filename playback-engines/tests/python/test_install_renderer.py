@@ -51,6 +51,20 @@ class InstallRendererTests(unittest.TestCase):
         self.assertEqual((self.state / 'renderer/config.dat').read_bytes(), b'factory')
         self.assertEqual((self.state / 'renderer/config.dat').stat().st_mode & 0o777, 0o600)
 
+    def test_full_aplayer_install_uses_its_own_arm_executable(self):
+        archive = self.root / 'aplayer.tar.gz'
+        with tarfile.open(archive, 'w:gz') as output:
+            for name, data in [('aplayer/aplayer', self.binary), ('aplayer/config.dat', b'native')]:
+                item = tarfile.TarInfo(name)
+                item.size = len(data)
+                output.addfile(item, io.BytesIO(data))
+        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+        installer.install_archive(archive, self.state, digest,
+                                  component='aplayer', binary='aplayer', subdirectory='aplayer')
+        self.assertEqual((self.state / 'aplayer/aplayer').read_bytes(), self.binary)
+        self.assertEqual((self.state / 'aplayer/config.dat').read_bytes(), b'native')
+        self.assertFalse((self.state / 'renderer').exists())
+
     def test_checksum_failure_never_installs_binary(self):
         archive, _ = self.archive()
         with self.assertRaises(installer.InstallError):

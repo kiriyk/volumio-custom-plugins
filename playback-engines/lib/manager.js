@@ -3,12 +3,22 @@ const fs = require('node:fs');
 const path = require('node:path');
 const Q = require('kew');
 const Runtime = require('./runtime');
+const AplayerRuntime = require('./aplayer-runtime');
+const {AplayerTransport,aplayerSource,aplayerProfile}=require('./aplayer');
 const {writeJson, fail} = Runtime;
 const {defaults, validateSettings, effectiveProfile, albumPatch, albumPayload, rewriteMpdConfig} = require('./profiles');
 const LocalStream = require('./local-stream');
+const {localTrack} = require('./native-mpd');
 const {observe,compareFormat}=require('./observation');
-const engines = require(fs.existsSync(path.join(__dirname,'engines/index.js')) ? './engines' : '../../shared/playback');
+const engines = require('./transport');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+function samePlaybackSettings(next,previous) {
+  const sameOutput=next.managed===previous.managed && next.engine===previous.engine &&
+    next.device?.key===previous.device?.key && next.modes[next.engine]===previous.modes[previous.engine] &&
+    (next.engine!=='album_player'||next.localAlbumPlayer===previous.localAlbumPlayer);
+  return sameOutput && (!next.managed || next.modes[next.engine]==='bypass' ||
+    JSON.stringify(next.custom[next.engine])===JSON.stringify(previous.custom[previous.engine]));
+}
 function kew(value) { const d = Q.defer(); Promise.resolve(value).then(v => d.resolve(v),e => d.reject(e)); return d.promise; }
 
 class ManagedTransport {
@@ -28,18 +38,19 @@ class ManagedTransport {
 }
 
 class Manager {
-  constructor({router,stateDir,runtime,mpdConfig='/etc/mpd.conf',localStream}) {
+  constructor({router,stateDir,runtime,aplayer,mpdConfig='/etc/mpd.conf',localStream}) {
     Object.assign(this,{router,stateDir,mpdConfig});
     this.mpd=router.pluginManager.getPlugin('music_service','mpd');
-    this.runtime=runtime || new Runtime({stateDir}); this.localStream=localStream || new LocalStream({cacheDir:path.join(stateDir,'cue-cache')});
+    this.runtime=runtime || new Runtime({stateDir}); this.aplayer=aplayer || new AplayerRuntime({stateDir}); this.localStream=localStream || new LocalStream({cacheDir:path.join(stateDir,'cue-cache')});
     this.settings=defaults();this.devices=[];this.active=null;this.ready=false;this.error=null;
     this.chain=Promise.resolve();this.hooks=[];this.facades=new Set();this.closed=false;this.closing=false;this.generation=0;this.localGeneration=0;
-    this.inputFormat=null;this.original={};this.volume=0;this.muted=false;this.mpdDirty=false;
+    this.inputFormat=null;this.expectedAplayerFormat=null;this.original={};this.volume=0;this.muted=false;this.mpdDirty=false;
   }
   async start() {
     try {this.settings=validateSettings(JSON.parse(fs.readFileSync(path.join(this.stateDir,'settings.json'),'utf8')));}
     catch(e){if(e.code!=='ENOENT')throw fail('BAD_SETTINGS');}
     try {const v=await this.router.volumioretrievevolume?.();if(Number.isFinite(v?.vol))this.volume=v.vol;} catch {}
+    await this.aplayer.recover();
     await this.refreshDevices();this.installHooks();
     if(this.settings.managed){
       try {await this.stopPlayback();await this.runtime.stopRenderer();await this.prepare(this.settings,this.device());this.ready=true;}
@@ -53,17 +64,19 @@ class Manager {
   }
   status() {
     const available=!!this.devices.find(d=>d.key===this.settings.device?.key);
-    return {managed:this.settings.managed,engine:this.settings.engine,mode:this.settings.modes[this.settings.engine],device:this.settings.device,devices:this.devices,available,
+    return {managed:this.settings.managed,engine:this.settings.engine,localAlbumPlayer:this.settings.localAlbumPlayer,mode:this.settings.modes[this.settings.engine],device:this.settings.device,devices:this.devices,available,
       observation:this.observation(),ready:this.ready && (!this.settings.managed || available),error:this.error,volumeEnabled:this.settings.managed && effectiveProfile(this.settings).volumeEnabled,bitPerfectVerified:false};
   }
   observation(){
     if(!this.settings.managed)return{state:'unmanaged',actualEngine:null,routeMatches:null,pcm:null,checkedAt:Date.now()};
     const device=this.devices.find(d=>d.key===this.settings.device?.key);
-    const result=observe(device,this.settings.engine);
+    const native=this.active?.delegate?.kind==='aplayer';
+    const result=observe(device,native?'aplayer':this.settings.engine,{aplayerPid:this.aplayer.pid});
+    const expected=native?this.expectedAplayerFormat:null;
     if(this.inputFormat){
       result.inputFormat=this.inputFormat;
-      if(result.pcm&&this.settings.modes[this.settings.engine]==='bypass'){
-        result.formatMatches=compareFormat(result.pcm,this.inputFormat);
+      if(result.pcm&&(expected||this.settings.modes[this.settings.engine]==='bypass')){
+        result.formatMatches=compareFormat(result.pcm,expected||this.inputFormat);
         if(result.formatMatches===false)result.state='mismatch';
       }
     }
@@ -73,8 +86,9 @@ class Manager {
   async refreshDevices() {
     this.devices=await this.runtime.devices();
     if(this.settings.managed && !this.devices.some(d=>d.key===this.settings.device?.key)) {
+      if(this.ready){this.generation++;this.localGeneration++;}
       this.error='DEVICE_UNAVAILABLE';this.ready=false;
-      if(this.active){await this.stopPlayback();await this.runtime.stopRenderer().catch(()=>{});}
+      if(this.active){await this.stopPlayback();await this.runtime.stopRenderer().catch(()=>{});await this.aplayer.stop();}
     }
     this.publish();return this.devices;
   }
@@ -96,7 +110,7 @@ class Manager {
   }
   async prepare(settings,device) {
     await this.regenerate();
-    if(settings.engine==='album_player')await this.configureRenderer(settings,device);
+    if(settings.engine==='album_player' && settings.localAlbumPlayer!=='aplayer')await this.configureRenderer(settings,device);
   }
   async configureRenderer(settings,device) {
     await this.runtime.startRenderer(device);
@@ -110,15 +124,16 @@ class Manager {
 
   apply(candidate) {
     if(this.closed||this.closing)return Promise.reject(fail('ENGINE_UNAVAILABLE'));
-    this.generation++;this.localGeneration++;
     let next;try{next=validateSettings(candidate);}catch(e){return Promise.reject(e);}
     const operation=this.chain.then(async()=>{
       await this.refreshDevices();const previous=this.settings;const wasReady=this.ready;
-      const sameOutput=next.managed===previous.managed && next.engine===previous.engine && next.device?.key===previous.device?.key && next.modes[next.engine]===previous.modes[previous.engine];
-      const inactiveOnly=sameOutput && (!next.managed || next.modes[next.engine]==='bypass' || JSON.stringify(next.custom[next.engine])===JSON.stringify(previous.custom[previous.engine]));
-      if(inactiveOnly && (wasReady || !next.managed)){writeJson(path.join(this.stateDir,'settings.json'),next);this.settings=next;this.publish();return this.status();}
+      if(samePlaybackSettings(next,previous) && (wasReady || !next.managed)){
+        writeJson(path.join(this.stateDir,'settings.json'),next);this.settings=next;this.publish();return this.status();
+      }
       const device=next.managed?this.device(next):null;
-      await this.stopPlayback();await this.runtime.stopRenderer();
+      if(next.managed&&next.engine==='album_player'&&next.localAlbumPlayer==='aplayer')await this.aplayer.available();
+      this.generation++;this.localGeneration++;
+      await this.stopPlayback();await this.runtime.stopRenderer();await this.aplayer.stop();
       this.settings=next;this.inputFormat=null;this.ready=false;this.error=null;this.publish();
       try {
         if(next.managed)await this.prepare(next,device);else await this.regenerate();
@@ -138,9 +153,10 @@ class Manager {
     if(this.closed||this.closing)return Promise.reject(fail('ENGINE_UNAVAILABLE'));
     const operation=this.chain.then(()=>{
       const generation=this.generation;
-      const current=()=>!this.closed&&!this.closing&&generation===this.generation&&valid();
-      return this.playNow(facade,url,track,current,owns).catch(e=>{
-        if(generation===this.generation&&!this.closing&&!this.closed){this.error=e.code||'ENGINE_ERROR';this.publish();}
+      const live=()=>!this.closed&&!this.closing&&generation===this.generation;
+      const current=()=>live()&&valid();
+      return this.playNow(facade,url,track,current,this.usesAplayer(facade)?()=>live()&&owns():owns).catch(e=>{
+        if(current()){this.error=e.code||'ENGINE_ERROR';this.publish();}
         throw e;
       });
     });
@@ -152,6 +168,10 @@ class Manager {
     if(this.settings.managed && !this.status().ready)throw fail(this.error||'DEVICE_UNAVAILABLE');
     if(this.active)await this.active.stop();if(!valid())return false;
     this.inputFormat=null;
+    this.expectedAplayerFormat=null;
+    if(this.usesAplayer(facade))return this.playAplayer(facade,url,track,valid,owns);
+    await this.aplayer.stop();
+    if(!valid())return false;
     if(this.settings.managed){
       const device=this.device();
       await this.original.stop();if(!valid())return false;
@@ -160,7 +180,8 @@ class Manager {
         // Release that process before opening the device for exact-format preflight.
         if(this.settings.engine==='album_player')await this.runtime.stopRenderer();
         if(!valid())return false;
-        const format=await this.runtime.probe(url);if(!valid())return false;this.inputFormat=format;
+        const format=await this.runtime.probe(typeof url==='string'?url:url.source);if(!valid())return false;this.inputFormat=format;
+        if(format.encoding==='dsd'&&this.settings.engine!=='mpd')throw fail('UNSUPPORTED_FORMAT');
         const deadline=Date.now()+3000;
         for(;;){try{await this.runtime.check(device,format);break;}catch(e){if(e.code!=='PCM_BUSY')throw e;if(Date.now()>=deadline)throw fail('DEVICE_BUSY');await sleep(150);}}
       }
@@ -169,7 +190,16 @@ class Manager {
         await this.mpd.sendMpdCommand('crossfade',[profile.crossfade]);
         await this.mpd.sendMpdCommand('replay_gain_mode',[profile.replaygain]);
         if(profile.volumeEnabled)await this.mpd.sendMpdCommand('setvol',[this.muted?0:this.settings.custom.mpd.volume]);
-      }else await this.configureRenderer(this.settings,device);
+      }else {
+        if(facade===this.local && this.settings.modes.album_player==='custom' && /\.(dsf|dff)$/i.test(url)){
+          const format=await this.runtime.probe(url);
+          if(!valid())return false;
+          if(format.encoding!=='dsd'||!format.duration)throw fail('UNSUPPORTED_FORMAT');
+          this.inputFormat=format;
+          track={...track,duration:format.duration};
+        }
+        await this.configureRenderer(this.settings,device);
+      }
     }
     if(!valid())return false;
     const config=this.settings.managed && this.settings.engine==='album_player' ? {engine:'album_player',controlUrl:this.runtime.endpoints?.controlUrl} : {engine:'mpd'};
@@ -180,9 +210,86 @@ class Manager {
     // MPD methods may be inherited from a prototype, so bind those explicitly.
     if(facade.delegate.kind==='mpd')facade.delegate.mpd=this.nativeMpd();
     this.active=facade;
-    try {const played=await facade.delegate.play(url,track,valid,owns);if(played&&this.active===facade){this.error=null;this.publish();}if(!played && this.active===facade)await facade.stop();return played;}
+    try {
+      const played=await (typeof url==='string' ? facade.delegate.play(url,track,valid,owns) : facade.delegate.playLocal(url,track,valid));
+      if(played&&this.active===facade){this.error=null;this.publish();}
+      if(!played && this.active===facade)await facade.stop();
+      return played;
+    }
     catch(e){if(this.active===facade){facade.close();this.error=e.code||'ENGINE_ERROR';this.publish();}throw e;}
   }
+  usesAplayer(facade) {
+    return facade===this.local && this.settings.managed && this.settings.engine==='album_player' &&
+      this.settings.localAlbumPlayer==='aplayer';
+  }
+
+  async checkOutput(device, format, valid) {
+    const deadline=Date.now()+3000;
+    while(valid()){
+      try{await this.runtime.check(device,format);return;}
+      catch(error){
+        if(error.code!=='PCM_BUSY')throw error;
+        if(Date.now()>=deadline)throw fail('DEVICE_BUSY');
+        await sleep(150);
+      }
+    }
+  }
+
+  async playAplayer(facade,source,track,valid,owns) {
+    const device=this.device();
+    const bypass=this.settings.modes.album_player==='bypass';
+    const profile=effectiveProfile(this.settings);
+    await this.original.stop();
+    if(!valid())return false;
+    await this.runtime.stopRenderer();
+    if(!valid())return false;
+    const format=await this.runtime.probe(source.ticket.file);
+    if(!valid())return false;
+    const dsd=format.encoding==='dsd';
+    if(dsd!==['.dsf','.dff'].includes(source.suffix))throw fail('UNSUPPORTED_FORMAT');
+    const {patch,dsdMode}=aplayerProfile(profile,bypass,format);
+    const expected=dsdMode===1?{encoding:'dop',rate:format.rate/2,channels:format.channels}:
+      dsdMode===2?{...format,encoding:'dsd32'}:bypass?format:null;
+    this.inputFormat=format;
+    this.expectedAplayerFormat=expected;
+    if(expected)await this.checkOutput(device,expected,valid);
+    if(!valid())return false;
+    let played=false;
+    try{
+      if(!await this.aplayer.start(device,valid)||!valid())return false;
+      if(!await this.aplayer.configure(patch,valid)||!valid())return false;
+      if(profile.volumeEnabled)await this.aplayer.setVolume(this.muted?0:profile.volume);
+      if(!valid())return false;
+      facade.delegate?.close();
+      facade.delegate=new AplayerTransport({
+        runtime:this.aplayer,sm:this.router.stateMachine,service:facade.service,
+        verifyOutput:()=>{
+          const actual=observe(device,'aplayer',{aplayerPid:this.aplayer.pid});
+          if(actual.state==='mismatch')throw fail('APLAYER_OUTPUT_MISMATCH');
+          if(actual.state!=='running')return false;
+          if(expected&&compareFormat(actual.pcm,expected)!==true)throw fail('APLAYER_OUTPUT_MISMATCH');
+          return true;
+        },
+        onError:error=>{
+          if(this.active===facade&&owns()){
+            this.error=error.code||'APLAYER_PLAYBACK_ERROR';
+            this.publish();
+            facade.onError(error);
+          }
+        }
+      });
+      this.active=facade;
+      played=await facade.delegate.playLocal(source,track,valid,owns);
+      if(played&&owns()&&this.active===facade){this.error=null;this.publish();}
+      return played;
+    } finally {
+      if(!played){
+        if(this.active===facade)await facade.stop();
+        else await this.aplayer.stop();
+      }
+    }
+  }
+
   nativeMpd(){return{stop:this.original.stop,pause:this.original.pause,resume:this.original.resume,seek:this.original.seek,sendMpdCommand:this.mpd.sendMpdCommand.bind(this.mpd)};}
   async rendererVolume(value){
     const endpoint=this.runtime.endpoints?.renderingControlUrl;if(!endpoint)throw fail('VOLUME_UNAVAILABLE');
@@ -204,7 +311,10 @@ class Manager {
       volume=Math.max(0,Math.min(100,Math.round(volume)));muted=false;
     }
     const gain=muted?0:volume;
-    if(this.settings.engine==='mpd')await this.mpd.sendMpdCommand('setvol',[gain]);else await this.rendererVolume(gain);
+    if(this.settings.engine==='mpd')await this.mpd.sendMpdCommand('setvol',[gain]);
+    else if(this.active?.delegate?.kind==='aplayer'){
+      if(this.aplayer.pid)await this.active.delegate.serialize(()=>this.aplayer.setVolume(gain));
+    }else if(this.runtime.endpoints || this.settings.localAlbumPlayer!=='aplayer')await this.rendererVolume(gain);
     this.muted=muted;this.settings.custom[this.settings.engine].volume=volume;this.volume=volume;writeJson(path.join(this.stateDir,'settings.json'),this.settings);
     return this.volumeState();
   }
@@ -246,21 +356,41 @@ class Manager {
         })().then(()=>callback(),e=>callback(e));
       });
     });
-    this.local=this.createTransport('mpd',e=>{this.error=e.code||'ENGINE_ERROR';this.publish();Promise.resolve(this.router.stateMachine.stop()).catch(()=>{});});
+    this.local=this.createTransport('mpd',e=>{
+      this.error=e.code||'ENGINE_ERROR';this.publish();
+      if(this.usesAplayer(this.local))this.onLocalError?.(this.error);
+      Promise.resolve(this.router.stateMachine.stop()).catch(()=>{});
+    });
     this.patch(mpd,'clearAddPlayTrack',track=>{
       if(!this.settings.managed)return this.original.clearAddPlayTrack(track);
       const generation=++this.localGeneration;
       const index=this.router.stateMachine.currentPosition;
+      const native=this.usesAplayer(this.local);
       const current=()=>this.router.stateMachine.getTrack(this.router.stateMachine.currentPosition);
-      const valid=()=>generation===this.localGeneration&&!this.closed&&!this.closing&&!this.router.stateMachine.isVolatile && this.router.stateMachine.currentPosition===index && current()===track;
-      return kew((async()=>{if(this.active)await this.active.stop();if(!valid())return;const url=await this.localStream.urlFor(track.uri,{valid});if(!valid())return;await this.local.play(url,track,valid,valid);})().catch(e=>{if(!valid())return;this.error=e.code||'LOCAL_FILE_UNAVAILABLE';this.publish();return this.router.stateMachine.stop();}));
+      const owns=()=>generation===this.localGeneration&&!this.closed&&!this.closing&&!this.router.stateMachine.isVolatile &&
+        (native||this.router.stateMachine.currentPosition===index) && current()===track;
+      return kew((async()=>{
+        if(this.active)await this.active.stop();
+        if(!owns())return;
+        const source=this.settings.engine==='mpd' ?
+          await localTrack(track.uri,this.runtime,this.localStream,this.settings.modes.mpd==='bypass') :
+          native?await aplayerSource(this.localStream,track.uri,owns):await this.localStream.urlFor(track.uri,{valid:owns});
+        if(owns())await this.local.play(source,track,owns,owns);
+      })().catch(e=>{
+        if(!owns())return;
+        this.error=e.code||'LOCAL_FILE_UNAVAILABLE';this.publish();
+        if(native)this.onLocalError?.(this.error);
+        return this.router.stateMachine.stop();
+      }));
     });
     for(const key of ['stop','pause','resume','seek'])this.patch(mpd,key,(...args)=>{
-      if(key==='stop'||key==='pause')this.localGeneration++;
+      if(key==='stop'||(key==='pause'&&!(this.active===this.local&&this.local.delegate?.kind==='aplayer'&&
+        this.local.delegate.session?.started!==undefined)))this.localGeneration++;
       return this.active===this.local?kew(this.local[key](...args)):this.original[key](...args);
     });
     for(const key of ['next','previous'])this.patch(mpd,key,(...args)=>{
       if(this.active!==this.local)return this.original[key](...args);
+      if(this.local.delegate?.kind==='aplayer')this.localGeneration++;
       return kew((async()=>{await this.router.stateMachine.setConsumeUpdateService(undefined);return this.router.stateMachine[key]();})());
     });
     for(const [key,method] of [['volumiosetvolume','setVolume'],['volumioretrievevolume','retrieveVolume'],['volumioupdatevolume','updateVolume']]){
@@ -273,7 +403,7 @@ class Manager {
   async shutdown(){
     this.closing=true;this.generation++;this.localGeneration++;
     await this.chain;
-    await this.stopPlayback();await this.runtime.stopRenderer();this.settings={...this.settings,managed:false};
+    await this.stopPlayback();await this.runtime.stopRenderer();await this.aplayer.stop();this.settings={...this.settings,managed:false};
     if(this.mpdDirty)await this.regenerate();this.publish();await this.close();
   }
   async close(){this.closed=true;this.generation++;this.localGeneration++;for(const facade of this.facades)facade.close();while(this.hooks.length)this.hooks.pop()();await this.localStream.close();}

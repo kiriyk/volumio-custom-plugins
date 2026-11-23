@@ -1,0 +1,15 @@
+[Unit]
+Description=Playback Engines APlayer private API proxy
+BindsTo=volumio-playback-aplayer.service
+After=volumio-playback-aplayer.service
+JoinsNamespaceOf=volumio-playback-aplayer.service
+
+[Service]
+User=volumio
+Group=volumio
+ExecStart=/lib/systemd/systemd-socket-proxyd 127.0.0.1:7778
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
