@@ -1,0 +1,355 @@
+diff --git a/src/app/Encoder.ts b/src/app/Encoder.ts
+new file mode 100644
+index 0000000..2bd2104
+--- /dev/null
++++ b/src/app/Encoder.ts
+@@ -0,0 +1,193 @@
++import { constants } from 'fs';
++import { open, stat, type FileHandle } from 'fs/promises';
++import type { Request, Response } from 'express';
++
++export const isKiosk = (req: Request) =>
++  ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '') &&
++  req.headers.host === 'localhost:4004' &&
++  (!req.headers.origin || req.headers.origin === 'http://localhost:4004');
++
++export class Gestures {
++  private pressed = false;
++  private held = false;
++  private second = false;
++  private timer?: NodeJS.Timeout;
++
++  constructor(private emit: (event: string) => void) {}
++
++  input(pressed: boolean) {
++    if (this.pressed === pressed) return;
++    this.pressed = pressed;
++    if (pressed) {
++      this.second = !!this.timer;
++      clearTimeout(this.timer);
++      this.held = false;
++      this.timer = setTimeout(() => {
++        this.timer = undefined;
++        this.held = true;
++        this.emit('long');
++      }, 650);
++      return;
++    }
++    clearTimeout(this.timer);
++    this.timer = undefined;
++    if (this.held) return;
++    if (this.second) {
++      this.emit('double');
++      return;
++    }
++    this.timer = setTimeout(() => {
++      this.timer = undefined;
++      this.emit('short');
++    }, 300);
++  }
++
++  reset() {
++    clearTimeout(this.timer);
++    this.timer = undefined;
++    this.pressed = this.held = this.second = false;
++  }
++}
++
++class InputDevice {
++  private file?: FileHandle;
++  private timer?: NodeJS.Timeout;
++  private generation = 0;
++  private buffer = Buffer.alloc(4096);
++  private remaining = Buffer.alloc(0);
++  private identity = '';
++  private nextCheck = 0;
++  private dropped = false;
++
++  constructor(private path: string, private event: (type: number, code: number, value: number) => void,
++    private reset: () => void = () => {}) {}
++
++  start() {
++    const generation = ++this.generation;
++    const poll = async () => {
++      try {
++        if (!this.file || Date.now() >= this.nextCheck) {
++          const target = await stat(this.path);
++          if (generation !== this.generation) return;
++          const identity = `${target.dev}:${target.ino}:${target.rdev}`;
++          if (identity !== this.identity) this.disconnect();
++          this.nextCheck = Date.now() + 1000;
++          if (!this.file) {
++            const file = await open(this.path, constants.O_RDONLY | constants.O_NONBLOCK);
++            if (generation !== this.generation) {
++              await file.close();
++              return;
++            }
++            this.file = file;
++            this.identity = identity;
++          }
++        }
++        const { bytesRead } = await this.file.read(this.buffer, 0, this.buffer.length, null);
++        if (generation !== this.generation) return;
++        if (bytesRead === 0) this.disconnect();
++        else this.parse(this.buffer.subarray(0, bytesRead));
++      }
++      catch (error) {
++        if (generation !== this.generation) return;
++        if ((error as NodeJS.ErrnoException).code !== 'EAGAIN') this.disconnect();
++      }
++      if (generation === this.generation) this.timer = setTimeout(poll, this.file ? 12 : 1000);
++    };
++    void poll();
++  }
++
++  private parse(data: Buffer) {
++    const recordSize = process.arch === 'arm' ? 16 : 24;
++    const buffer = Buffer.concat([this.remaining, data]);
++    let offset = 0;
++    for (; offset + recordSize <= buffer.length; offset += recordSize) {
++      const payload = offset + recordSize - 8;
++      const type = buffer.readUInt16LE(payload);
++      const code = buffer.readUInt16LE(payload + 2);
++      if (type === 0) {
++        if (code === 3) {
++          this.dropped = true;
++          this.reset();
++        }
++        if (code === 0) this.dropped = false;
++      }
++      else if (!this.dropped) this.event(type, code, buffer.readInt32LE(payload + 4));
++    }
++    this.remaining = buffer.subarray(offset);
++  }
++
++  private disconnect() {
++    void this.file?.close().catch(() => {});
++    this.file = undefined;
++    this.identity = '';
++    this.remaining = Buffer.alloc(0);
++    this.dropped = false;
++    this.reset();
++  }
++
++  ready() { return !!this.file; }
++
++  stop() {
++    this.generation++;
++    clearTimeout(this.timer);
++    this.disconnect();
++  }
++}
++
++class Encoder {
++  private clients = new Set<Response>();
++  private heartbeat?: NodeJS.Timeout;
++  private gestures = new Gestures(event => this.publish(event));
++  private dial = new InputDevice('/dev/input/by-path/platform-rotary@17-event', (type, code, value) => {
++    if (type === 2 && code === 0 && value) this.publish('rotate', value);
++  }, () => this.gestures.reset());
++  private button = new InputDevice('/dev/input/by-path/platform-button@19-event', (type, _code, value) => {
++    if (this.clients.size && type === 1 && (value === 0 || value === 1)) this.gestures.input(value === 1);
++  }, () => this.gestures.reset());
++
++  start() {
++    this.dial.start();
++    this.button.start();
++    this.heartbeat = setInterval(() => this.send(': heartbeat\n\n'), 15000);
++  }
++
++  stop() {
++    this.dial.stop();
++    this.button.stop();
++    clearInterval(this.heartbeat);
++    for (const client of this.clients) client.end();
++    this.clients.clear();
++  }
++
++  subscribe(req: Request, res: Response) {
++    if (!isKiosk(req)) return res.sendStatus(404);
++    res.set({
++      'Content-Type': 'text/event-stream',
++      'Cache-Control': 'no-store',
++      'X-Accel-Buffering': 'no'
++    });
++    res.flushHeaders();
++    res.write(`event: ready\ndata: ${JSON.stringify({ dial: this.dial.ready(), button: this.button.ready() })}\n\n`);
++    this.clients.add(res);
++    res.on('close', () => {
++      this.clients.delete(res);
++      if (!this.clients.size) this.gestures.reset();
++    });
++  }
++
++  private send(message: string) {
++    for (const client of this.clients) {
++      if (!client.write(message)) {
++        this.clients.delete(client);
++        client.end();
++      }
++    }
++  }
++
++  private publish(event: string, value?: number) {
++    this.send(`data: ${JSON.stringify({ event, value })}\n\n`);
++  }
++}
++
++const encoder = new Encoder();
++export default encoder;
+diff --git a/src/app/TrackQuality.ts b/src/app/TrackQuality.ts
+new file mode 100644
+index 0000000..91e0139
+--- /dev/null
++++ b/src/app/TrackQuality.ts
+@@ -0,0 +1,96 @@
++import type { Request, Response } from 'express';
++import np from '../lib/NowPlayingContext';
++import { isKiosk } from './Encoder';
++
++const validPath = (path: string) => /^(USB|NAS|INTERNAL)\//.test(path) &&
++  !/[\x00-\x1f\x7f]/.test(path) && path.split('/').every(part => part && part !== '.' && part !== '..');
++
++type SourceFormat = { sampleRate?: number; bitDepth?: number; channels?: number; dsdRate?: number };
++
++export function parseFormat(format: string): SourceFormat {
++  const dsd = /^dsd(\d+):(\d+)$/i.exec(format);
++  if (dsd) return { dsdRate: Number(dsd[1]) * 44100, bitDepth: 1, channels: Number(dsd[2]) };
++  const dsdBytes = /^(\d+):dsd:(\d+)$/i.exec(format);
++  if (dsdBytes) return { dsdRate: Number(dsdBytes[1]) * 8, bitDepth: 1, channels: Number(dsdBytes[2]) };
++  const pcm = /^(\d+):(\d+|f):(\d+)$/.exec(format);
++  if (!pcm) return {};
++  return { sampleRate: Number(pcm[1]), bitDepth: Number(pcm[2]) || undefined, channels: Number(pcm[3]) };
++}
++
++const libraryPath = (uri: string) => uri.replace(/^\/?(?:mnt|music-library)\//, '');
++
++async function mpdLines(verb: 'lsinfo' | 'listplaylistinfo', path: string) {
++  const mpd = np.getMusicServicePlugin('mpd');
++  if (!mpd?.clientMpd || !validPath(path)) return [];
++  const command = `${verb} "${path.replace(/["\\]/g, '\\$&')}"`;
++  const data = await new Promise<string>((resolve, reject) => {
++    const timeout = setTimeout(() => reject(new Error(`MPD ${verb} timed out`)), 3000);
++    mpd.clientMpd.sendCommand(command, (error: Error | null, message: string) => {
++      clearTimeout(timeout);
++      if (error) reject(error);
++      else resolve(message);
++    });
++  });
++  return data.split('\n');
++}
++
++async function indexFormat(path: string): Promise<SourceFormat> {
++  const lines = await mpdLines('lsinfo', path);
++  let selected = false;
++  for (const line of lines) {
++    if (/^(?:file|directory|playlist): /.test(line)) selected = line === `file: ${path}`;
++    if (selected && line.startsWith('Format: ')) return parseFormat(line.slice(8));
++  }
++  return {};
++}
++
++export async function localQuality(uri: string) {
++  const artwork = np.getArtworkOne();
++  if (!artwork?.localMusic) return {};
++  const legacy = /^cue:\/\/(.+\.cue)@(\d+)$/i.exec(uri);
++  const cue = legacy || /^(.*\.cue)\/track(\d+)$/i.exec(uri);
++  let path = libraryPath(uri);
++  if (cue) {
++    const entries = await mpdLines('listplaylistinfo', libraryPath(cue[1])).catch(() => []);
++    const position = Number(cue[2]) - (legacy ? 0 : 1);
++    path = entries.filter(line => line.startsWith('file: '))[position]?.slice(6) || '';
++  }
++  if (!path || !validPath(path)) return {};
++  const [file, format] = await Promise.all([
++    cue ? null : artwork.getLocalFileInfo({ uri }),
++    indexFormat(path).catch((): SourceFormat => ({}))
++  ]);
++  const source = /\.(?:dsf|dff)$/i.test(path) && !format.dsdRate ? {} as SourceFormat : format;
++  return {
++    ...source,
++    bitDepth: /\.mp3$/i.test(path) ? undefined : source.bitDepth,
++    bitrate: file?.bitrate > 0 ? Math.round(file.bitrate / 1000) : undefined
++  };
++}
++
++export async function trackQuality(req: Request, res: Response) {
++  if (!isKiosk(req)) return res.sendStatus(404);
++  res.set('Cache-Control', 'no-store');
++  try {
++    const state = np.getPlayerState();
++    const uri = req.query.uri;
++    if (typeof uri !== 'string' || uri.length > 4096 || state?.uri !== uri || state.status === 'stop') {
++      return res.json({});
++    }
++    if (state.service === 'mpd') {
++      const quality = await localQuality(uri);
++      const current = np.getPlayerState();
++      return res.json(current?.uri === uri && current.status !== 'stop' ? quality : {});
++    }
++    if (state.service === 'yandex_music' || state.service === 'qobuz_custom') {
++      const playback = np.getMusicServicePlugin(state.service)?.playback;
++      const quality = playback?.lastQuality;
++      if (quality?.generation && quality.uri === uri && playback.current()) return res.json(quality);
++    }
++    return res.json({});
++  }
++  catch (error) {
++    np.getLogger().warn('[now-playing] Could not read source format');
++    return res.status(503).json({});
++  }
++}
+diff --git a/src/app/index.ts b/src/app/index.ts
+index fd93f43..a66401d 100644
+--- a/src/app/index.ts
++++ b/src/app/index.ts
+@@ -2,10 +2,14 @@ import express from 'express';
+ import cors from 'cors';
+ import type http from 'http';
+ import router from './Router';
++import encoder from './Encoder';
++import { trackQuality } from './TrackQuality';
+ import np from '../lib/NowPlayingContext';
+ 
+ const app = express();
+ 
++app.get('/kiosk/encoder', (req, res) => encoder.subscribe(req, res));
++app.get('/kiosk/quality', (req, res) => void trackQuality(req, res));
+ app.use(cors());
+ app.use(express.json());
+ //App.use(express.urlencoded({ extended: false }));
+@@ -37,6 +41,7 @@ export function start() {
+     const port = np.getConfigValue('port');
+     server = app.listen(port, () => {
+       np.getLogger().info(`[now-playing] App is listening on port ${port}.`);
++      encoder.start();
+       resolve();
+     })
+       .on('error', (err) => {
+@@ -48,6 +53,7 @@ export function start() {
+ 
+ export function stop() {
+   if (server) {
++    encoder.stop();
+     server.close();
+     server = null;
+   }
+diff --git a/src/lib/NowPlayingContext.ts b/src/lib/NowPlayingContext.ts
+index dde2071..814dbe4 100644
+--- a/src/lib/NowPlayingContext.ts
++++ b/src/lib/NowPlayingContext.ts
+@@ -104,6 +104,14 @@ class NowPlayingContext {
+     return this.#pluginContext.coreCommand.executeOnPlugin(type, plugin, 'getConfigParam', setting);
+   }
+ 
++  getArtworkOne(): any {
++    return this.#pluginContext.coreCommand.pluginManager.getPlugin('user_interface', 'artwork_one');
++  }
++
++  getPlayerState(): any {
++    return this.#pluginContext.coreCommand.stateMachine.getState();
++  }
++
+   getMusicServicePlugin(name: string): any {
+     return this.#pluginContext.coreCommand.pluginManager.getPlugin('music_service', name) || null;
+   }

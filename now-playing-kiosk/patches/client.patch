@@ -1,0 +1,911 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index 249eb5d..65fed73 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -26,6 +26,9 @@ import I18nLoader from './i18n/I18nLoader';
+ import { DefaultPerformanceSettings } from 'now-playing-common';
+ import { FontContextProvider } from './contexts/FontProvider';
+ 
++import { KioskController, KioskMenu } from './kiosk/Controls';
++import { isKiosk, KioskDataProvider } from './kiosk/Data';
++
+ function App() {
+   useEffect(() => {
+     const setRealVh = () => {
+@@ -65,28 +68,32 @@ function App() {
+                       <ServiceProvider>
+                         <WeatherProvider>
+                           <FontContextProvider>
+-                            <ScreenContextProvider>
+-                              <NowPlayingScreen
+-                                screenId="NowPlaying"
+-                                mountOnEnter
+-                                unmountOnExit={DefaultPerformanceSettings.unmountNowPlayingScreenOnExit} />
+-                              <BrowseScreen
+-                                screenId="Browse"
+-                                usesTrackBar
+-                                mountOnEnter
+-                                unmountOnExit={DefaultPerformanceSettings.unmountBrowseScreenOnExit} />
+-                              <QueueScreen
+-                                screenId="Queue"
+-                                float
+-                                usesTrackBar
+-                                mountOnEnter
+-                                unmountOnExit={DefaultPerformanceSettings.unmountQueueScreenOnExit} />
+-                              <VolumioScreen
+-                                screenId="Volumio"
+-                                mountOnEnter
+-                                unmountOnExit={DefaultPerformanceSettings.unmountVolumioScreenOnExit} />
+-                              <CommonModals />
+-                            </ScreenContextProvider>
++                            <KioskDataProvider>
++                              <ScreenContextProvider>
++                                <NowPlayingScreen
++                                  screenId="NowPlaying"
++                                  mountOnEnter
++                                  unmountOnExit={DefaultPerformanceSettings.unmountNowPlayingScreenOnExit} />
++                                <BrowseScreen
++                                  screenId="Browse"
++                                  usesTrackBar
++                                  mountOnEnter
++                                  unmountOnExit={DefaultPerformanceSettings.unmountBrowseScreenOnExit} />
++                                <QueueScreen
++                                  screenId="Queue"
++                                  float
++                                  usesTrackBar
++                                  mountOnEnter
++                                  unmountOnExit={DefaultPerformanceSettings.unmountQueueScreenOnExit} />
++                                <VolumioScreen
++                                  screenId="Volumio"
++                                  mountOnEnter
++                                  unmountOnExit={DefaultPerformanceSettings.unmountVolumioScreenOnExit} />
++                                {isKiosk ? <KioskMenu screenId="KioskMenu" mountOnEnter /> : null}
++                                {isKiosk ? <KioskController /> : null}
++                                <CommonModals />
++                              </ScreenContextProvider>
++                            </KioskDataProvider>
+                           </FontContextProvider>
+                         </WeatherProvider>
+                       </ServiceProvider>
+diff --git a/src/common/SyncedLyricsPanel.tsx b/src/common/SyncedLyricsPanel.tsx
+index 8f37d52..aca7d00 100644
+--- a/src/common/SyncedLyricsPanel.tsx
++++ b/src/common/SyncedLyricsPanel.tsx
+@@ -29,6 +29,21 @@ function currentLineReducer(currentValue: CurrentLine, newValue: Partial<Current
+   return currentValue;
+ }
+ 
++function syncedLineIndex(lyrics: MetadataSyncedLyrics, position: number) {
++  return lyrics.lines.findIndex((line, index) => {
++    const end = line.end ?? lyrics.lines[index + 1]?.start ?? -1;
++    return position >= line.start && (end < 0 || position < end);
++  });
++}
++
++export function CurrentLyric({ lyrics }: { lyrics: MetadataSyncedLyrics }) {
++  const { currentSeekPosition } = usePlayerSeek();
++  const { settings } = useSettings(CommonSettingsCategory.Performance);
++  const index = syncedLineIndex(lyrics, currentSeekPosition - settings.syncedLyricsDelay);
++  const text = lyrics.lines[index]?.text;
++  return text ? <div className="Kiosk-currentLyrics">{text}</div> : null;
++}
++
+ function SyncedLyricsPanel(props: SyncedLyricsPanelProps) {
+   const { lyrics } = props;
+   const { currentSeekPosition } = usePlayerSeek();
+@@ -61,11 +76,7 @@ function SyncedLyricsPanel(props: SyncedLyricsPanelProps) {
+   }, [ lyrics ]);
+ 
+   useEffect(() => {
+-    const p = currentSeekPosition - syncedLyricsDelay;
+-    const index = lyrics.lines.findIndex((line, index) => {
+-      const end = line.end !== undefined ? line.end : (lyrics.lines[index + 1] ? lyrics.lines[index + 1].start : -1);
+-      return p >= line.start && (end < 0 || p < end);
+-    });
++    const index = syncedLineIndex(lyrics, currentSeekPosition - syncedLyricsDelay);
+     if (index >= 0) {
+       setCurrentLine({ index, highlight: true });
+     }
+diff --git a/src/common/TrackInfoText.tsx b/src/common/TrackInfoText.tsx
+index 3eb2a5f..2ecc1c4 100644
+--- a/src/common/TrackInfoText.tsx
++++ b/src/common/TrackInfoText.tsx
+@@ -18,6 +18,7 @@ export interface TrackInfoTextProps extends StylesBundleProps {
+   };
+   trackInfoOrder?: Array<'title' | 'artist' | 'album' | 'mediaInfo'>;
+   marqueeTitle?: boolean;
++  sourceQuality?: string;
+   onClick?: HTMLProps<HTMLDivElement>['onClick'];
+ }
+ 
+@@ -38,7 +39,7 @@ function TrackInfoText(props: TrackInfoTextProps) {
+   const title = playerState.title || '';
+   const artist = playerState.artist || '';
+   const album = playerState.album || '';
+-  const formatResolution = getFormatResolution(playerState);
++  const formatResolution = props.sourceQuality ?? getFormatResolution(playerState);
+   const formatIcon = getFormatIcon(playerState.trackType, host);
+   const concatArtistAlbum = props.concatArtistAlbum !== undefined && props.concatArtistAlbum;
+   const visibility = props.trackInfoVisibility || DEFAULT_TRACK_INFO_VISIBILITY;
+@@ -163,12 +164,12 @@ function TrackInfoText(props: TrackInfoTextProps) {
+         return concatArtistAlbum ? null : <span key={key} className={getElementClassName('album')}>{album}</span>;
+ 
+       case 'mediaInfo':
+-        if (!visibility.mediaInfo) {
++        if (!visibility.mediaInfo || props.sourceQuality === '') {
+           return null;
+         }
+         return (
+           <div key={key} className={getElementClassName('format')}>
+-            {formatIcon ? <img src={formatIcon} className={getElementClassName('formatIcon')} alt="" /> : null}
++            {formatIcon && props.sourceQuality === undefined ? <img src={formatIcon} className={getElementClassName('formatIcon')} alt="" /> : null}
+             <span className={getElementClassName('formatResolution')}>{formatResolution}</span>
+           </div>
+         );
+diff --git a/src/contexts/ScreenContextProvider.tsx b/src/contexts/ScreenContextProvider.tsx
+index fc02bb1..e2e5ffb 100644
+--- a/src/contexts/ScreenContextProvider.tsx
++++ b/src/contexts/ScreenContextProvider.tsx
+@@ -13,7 +13,8 @@ export const SCREEN_IDS = [
+   'NowPlaying',
+   'Browse',
+   'Queue',
+-  'Volumio'
++  'Volumio',
++  'KioskMenu'
+ ] as const;
+ 
+ export type ScreenId = typeof SCREEN_IDS[number];
+diff --git a/src/contexts/player/PlayerStateProvider.tsx b/src/contexts/player/PlayerStateProvider.tsx
+index 4823d2f..1683af8 100644
+--- a/src/contexts/player/PlayerStateProvider.tsx
++++ b/src/contexts/player/PlayerStateProvider.tsx
+@@ -9,7 +9,8 @@ export interface PlayerState {
+   artist?: string;
+   album?: string;
+   albumart?: string;
+-  uri: '';
++  uri: string;
++  disableVolumeControl?: boolean;
+   trackType?: string;
+   seek?: number;
+   duration?: number;
+diff --git a/src/kiosk/Controls.tsx b/src/kiosk/Controls.tsx
+new file mode 100644
+index 0000000..bbba3bb
+--- /dev/null
++++ b/src/kiosk/Controls.tsx
+@@ -0,0 +1,139 @@
++import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
++import { useTranslation } from 'react-i18next';
++import { usePlayerState } from '../contexts/PlayerProvider';
++import { ScreenProps, useScreens } from '../contexts/ScreenContextProvider';
++import { useSocket } from '../contexts/SocketProvider';
++import { ACTION_PANEL, METADATA_MODAL } from '../modals/CommonModals';
++import { useModals } from '../contexts/ModalStateProvider';
++import { isKiosk, useKioskData } from './Data';
++import './Kiosk.scss';
++
++const ENCODER_EVENT = 'now-playing-encoder';
++type Gesture = { event: 'rotate' | 'short' | 'long' | 'double'; value?: number };
++
++export function useEncoderGesture(active: boolean, onGesture: (gesture: Gesture) => void) {
++  const handler = useRef(onGesture);
++  useLayoutEffect(() => {
++    handler.current = onGesture;
++  });
++  useEffect(() => {
++    if (!isKiosk || !active) return;
++    const receive = (event: Event) => handler.current((event as CustomEvent<Gesture>).detail);
++    window.addEventListener(ENCODER_EVENT, receive);
++    return () => window.removeEventListener(ENCODER_EVENT, receive);
++  }, [ active ]);
++}
++
++export const moveSelection = (index: number, delta: number, count: number) =>
++  Math.max(0, Math.min(index + delta, count - 1));
++
++export function reveal(row: HTMLElement | undefined) {
++  row?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
++}
++
++export function KioskController() {
++  const { socket } = useSocket();
++  const { activeScreenId, switchScreen } = useScreens();
++  const { closeModal } = useModals();
++  const { disableVolumeControl } = usePlayerState();
++  const receive = useRef<(gesture: Gesture) => void>();
++  const [ returnToPlayer, setReturnToPlayer ] = useState(0);
++
++  useLayoutEffect(() => {
++    receive.current = (gesture) => {
++      if (gesture.event === 'double') {
++        closeModal(ACTION_PANEL);
++        closeModal(METADATA_MODAL);
++        setReturnToPlayer((value) => value + 1);
++      }
++      else if (activeScreenId === 'NowPlaying') {
++        if (gesture.event === 'long') switchScreen({ screenId: 'KioskMenu' });
++        if (gesture.event === 'short' && socket?.connected) socket.emit('toggle');
++        if (gesture.event === 'rotate' && socket?.connected && !disableVolumeControl) {
++          const steps = gesture.value || 0;
++          for (let i = 0; i < Math.min(Math.abs(steps), 20); i++) socket.emit('volume', steps > 0 ? '+' : '-');
++        }
++      }
++      else if (activeScreenId) {
++        window.dispatchEvent(new CustomEvent(ENCODER_EVENT, { detail: gesture }));
++      }
++    };
++  });
++
++  useEffect(() => {
++    if (!isKiosk) return;
++    const input = new EventSource('/kiosk/encoder');
++    input.onmessage = (message) => receive.current?.(JSON.parse(message.data));
++    return () => input.close();
++  }, []);
++
++  useEffect(() => {
++    if (!returnToPlayer || !activeScreenId) return;
++    if (activeScreenId !== 'NowPlaying') {
++      switchScreen({ screenId: 'NowPlaying', screenProps: { view: 'basic' } });
++    }
++    else {
++      window.dispatchEvent(new CustomEvent(ENCODER_EVENT, { detail: { event: 'double' } }));
++      setReturnToPlayer(0);
++    }
++  }, [ returnToPlayer, activeScreenId, switchScreen ]);
++  return null;
++}
++
++type MenuProps = ScreenProps & { className?: string; style?: React.CSSProperties };
++
++export function KioskMenu({ className, style }: MenuProps) {
++  const { activeScreenId, switchScreen } = useScreens();
++  const { lyrics } = useKioskData();
++  const { i18n } = useTranslation();
++  const russian = i18n.language?.startsWith('ru');
++  const [ selected, select ] = useState(0);
++  const [ reading, read ] = useState(false);
++  const lyricsNode = useRef<HTMLDivElement>(null);
++  const active = activeScreenId === 'KioskMenu';
++  const showLyrics = reading && !!lyrics;
++  const options = [
++    { name: russian ? 'Очередь' : 'Queue', activate: () => switchScreen({ screenId: 'Queue' }) },
++    { name: russian ? 'Библиотека' : 'Library', activate: () => switchScreen({
++      screenId: 'Browse', screenProps: {
++        location: { type: 'browse', uri: '', service: null }, fromKioskMenu: true
++      }
++    }) }
++  ];
++  if (lyrics) options.push({ name: russian ? 'Текст песни' : 'Lyrics', activate: () => read(true) });
++  const selection = moveSelection(selected, 0, options.length);
++
++  useEffect(() => {
++    if (!active || !lyrics) read(false);
++  }, [ active, lyrics ]);
++
++  const back = () => {
++    if (showLyrics) read(false);
++    else switchScreen({ screenId: 'NowPlaying' });
++  };
++
++  useEncoderGesture(active, ({ event, value }) => {
++    if (event === 'long') back();
++    if (showLyrics) {
++      if (event === 'rotate') lyricsNode.current?.scrollBy(0, 48 * (value || 0));
++      return;
++    }
++    if (event === 'rotate') select((index) => moveSelection(Math.min(index, options.length - 1), value || 0, options.length));
++    if (event === 'short') options[selection]?.activate();
++  });
++
++  return <div className={`Viewport Kiosk-menu ${className || ''}`} style={style}>
++    <div className="Kiosk-menuBody">
++      <button type="button" className="Kiosk-back" onClick={back}>{russian ? 'Назад' : 'Back'}</button>
++      {showLyrics ? <div className="Kiosk-lyrics" ref={lyricsNode}>
++        {lyrics.type === 'plain' ? lyrics.lines.join('\n') : lyrics.type === 'synced' ?
++          lyrics.lines.map((line) => line.text).join('\n') :
++          new DOMParser().parseFromString(lyrics.lines.replace(/<br\s*\/?>/gi, '\n'), 'text/html').body.textContent}
++      </div> : options.map(({ name, activate }, index) =>
++        <button type="button" key={name} onClick={() => {
++          select(index); activate();
++        }}
++        data-encoder-selected={selection === index ? 'true' : undefined}>{name}</button>)}
++    </div>
++  </div>;
++}
+diff --git a/src/kiosk/Data.tsx b/src/kiosk/Data.tsx
+new file mode 100644
+index 0000000..bb750ea
+--- /dev/null
++++ b/src/kiosk/Data.tsx
+@@ -0,0 +1,98 @@
++import React, { createContext, useContext, useEffect, useState } from 'react';
++import type { MetadataLyrics } from 'now-playing-common';
++import { useAppContext } from '../contexts/AppContextProvider';
++import { usePlayerState } from '../contexts/PlayerProvider';
++import { useMetadataService } from '../contexts/ServiceProvider';
++import { useSocket } from '../contexts/SocketProvider';
++
++export const isKiosk = window.location.origin === 'http://localhost:4004';
++
++type Quality = {
++  bitrate?: number;
++  bitrateEstimated?: boolean;
++  sampleRate?: number;
++  dsdRate?: number;
++  bitDepth?: number;
++  channels?: number;
++};
++
++export function formatQuality(quality: Quality, russian: boolean) {
++  const { bitrate, bitrateEstimated, sampleRate, dsdRate, bitDepth, channels } = quality;
++  const number = new Intl.NumberFormat(russian ? 'ru' : 'en', { maximumFractionDigits: 3, useGrouping: false });
++  const units = russian ? [ 'кбит/с', 'кГц', 'МГц', 'бит' ] : [ 'kbps', 'kHz', 'MHz', 'bit' ];
++  const channelUnit = russian ? new Intl.PluralRules('ru').select(channels || 0) : '';
++  const channelLabel = russian ? (channelUnit === 'one' ? 'канал' : channelUnit === 'few' ? 'канала' : 'каналов') :
++    channels === 1 ? 'channel' : 'channels';
++  return [
++    bitrate && bitrate > 0 ? `${bitrateEstimated ? '≈' : ''}${number.format(bitrate)} ${units[0]}` : '',
++    dsdRate && dsdRate > 0 ? `DSD ${number.format(dsdRate / 1e6)} ${units[2]}` :
++      sampleRate && sampleRate > 0 ? `${number.format(sampleRate / 1000)} ${units[1]}` : '',
++    bitDepth && bitDepth > 0 ? `${number.format(bitDepth)} ${units[3]}` : '',
++    channels && channels > 0 ? `${number.format(channels)} ${channelLabel}` : ''
++  ].filter(Boolean).join(' · ');
++}
++
++const Data = createContext<{ quality: Quality; lyrics?: MetadataLyrics }>({ quality: {} });
++export const useKioskData = () => useContext(Data);
++
++export function KioskDataProvider({ children }: { children: React.ReactNode }) {
++  const { uri, service, status, title, artist, album, duration, position } = usePlayerState();
++  const { pluginInfo } = useAppContext();
++  const { socket } = useSocket();
++  const metadata = useMetadataService();
++  const active = status !== 'stop';
++  const key = JSON.stringify([ uri, service, title, artist, album, position, active ]);
++  const [ quality, setQuality ] = useState<{ key: string; data: Quality }>();
++  const [ lyrics, setLyrics ] = useState<{ key: string; data: MetadataLyrics }>();
++  const apiPath = pluginInfo?.apiPath;
++
++  useEffect(() => {
++    if (!isKiosk || !uri || !active) return;
++    let controller: AbortController | undefined;
++    const request = () => {
++      controller?.abort();
++      const pending = new AbortController();
++      controller = pending;
++      fetch(`/kiosk/quality?uri=${encodeURIComponent(uri)}`, { signal: pending.signal })
++        .then((response) => response.ok ? response.json() : {})
++        .then((data) => {
++          if (!pending.signal.aborted) setQuality({ key, data });
++        }).catch(() => undefined);
++    };
++    const changed = (event: { uri?: string }) => {
++      if (event?.uri === uri) request();
++    };
++    request();
++    socket?.on('connect', request);
++    socket?.on('reconnect', request);
++    socket?.on('pushYandexQuality', changed);
++    socket?.on('pushQobuzCustomQuality', changed);
++    return () => {
++      controller?.abort();
++      socket?.off('connect', request);
++      socket?.off('reconnect', request);
++      socket?.off('pushYandexQuality', changed);
++      socket?.off('pushQobuzCustomQuality', changed);
++      setQuality(undefined);
++    };
++  }, [ uri, key, active, socket ]);
++
++  useEffect(() => {
++    if (!isKiosk || !apiPath || !title || !uri || !active) return;
++    let current = true;
++    metadata.fetchSongInfo({ name: title, artist, album, duration, uri, service }).then((result) => {
++      if (!current || !result?.success) return;
++      const data = result.data.song?.lyrics;
++      if (data?.lines.length) setLyrics({ key, data });
++    }).catch(() => undefined);
++    return () => {
++      current = false;
++      setLyrics(undefined);
++    };
++  }, [ metadata, apiPath, key, active, uri, title, artist, album, duration, service ]);
++
++  return <Data.Provider value={{
++    quality: quality?.key === key ? quality.data : {},
++    lyrics: lyrics?.key === key ? lyrics.data : undefined
++  }}>{children}</Data.Provider>;
++}
+diff --git a/src/kiosk/Kiosk.scss b/src/kiosk/Kiosk.scss
+new file mode 100644
+index 0000000..5827a5d
+--- /dev/null
++++ b/src/kiosk/Kiosk.scss
+@@ -0,0 +1,58 @@
++.Kiosk-currentLyrics {
++  width: min(90%, 50rem);
++  margin: .35em auto;
++  text-align: center;
++  font-size: clamp(16px, 2.2vmin, 22px);
++  line-height: 1.25;
++  display: -webkit-box;
++  -webkit-line-clamp: 2;
++  -webkit-box-orient: vertical;
++  overflow: hidden;
++  overflow-wrap: anywhere;
++}
++
++[data-encoder-selected="true"] {
++  outline: 3px solid #ffd467;
++  outline-offset: -3px;
++  border-radius: 5px;
++}
++
++.Kiosk-menu {
++  display: grid;
++  place-items: center;
++  pointer-events: auto;
++  color: #f8f8f8;
++  background: rgba(14, 16, 19, .94);
++}
++
++.Kiosk-menuBody {
++  width: min(84vw, 34rem);
++  max-height: 80vh;
++  display: flex;
++  flex-direction: column;
++  gap: .65rem;
++
++  button {
++    padding: .65em .85em;
++    text-align: start;
++    font: inherit;
++    font-size: clamp(18px, 3vmin, 30px);
++    color: inherit;
++    border: 0;
++    border-radius: 5px;
++    background: #24292f;
++  }
++
++  .Kiosk-back {
++    align-self: start;
++    font-size: clamp(16px, 2.4vmin, 24px);
++  }
++}
++
++.Kiosk-lyrics {
++  overflow: auto;
++  white-space: pre-wrap;
++  overflow-wrap: anywhere;
++  font-size: clamp(18px, 3vmin, 26px);
++  line-height: 1.45;
++}
+diff --git a/src/screens/browse/BrowseScreen.tsx b/src/screens/browse/BrowseScreen.tsx
+index 33d82de..3f1d417 100644
+--- a/src/screens/browse/BrowseScreen.tsx
++++ b/src/screens/browse/BrowseScreen.tsx
+@@ -1,8 +1,10 @@
++import { isKiosk } from '../../kiosk/Data';
++import { moveSelection, reveal, useEncoderGesture } from '../../kiosk/Controls';
+ /// <reference types="../../declaration.d.ts" />
+ 
+ import { Scrollbars } from 'rc-scrollbars';
+ import md5 from 'md5';
+-import React, { HTMLProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
++import React, { HTMLProps, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+ import { useSocket } from '../../contexts/SocketProvider';
+ import styles from './BrowseScreen.module.scss';
+ import Section, { BrowseScreenSectionProps } from './Section';
+@@ -25,6 +27,7 @@ import { BrowseContentsList, BrowseContentsListItem, BrowseContentsPage, BrowseL
+ export interface BrowseScreenProps extends ScreenProps {
+   screenId: 'Browse';
+   location?: BrowseServiceLocation;
++  fromKioskMenu?: boolean;
+   className?: string;
+   style?: HTMLProps<HTMLDivElement>['style'];
+ }
+@@ -33,6 +36,7 @@ interface BrowseScreenRestoreState {
+   listView?: 'grid' | 'list';
+   searchQuery?: string;
+   scrollPosition?: number;
++  encoderSelection?: Map<string, { uri: string; index: number; occurrence: number }>;
+ }
+ 
+ const HOME: BrowseLocation = {
+@@ -65,9 +69,60 @@ function BrowseScreen(props: BrowseScreenProps) {
+   const currentLocation = useRef<BrowseServiceLocation>(HOME);
+   const scrollbarsRef = useRef<Scrollbars | null>(null);
+   const fakeLoadingBarRef = useRef<FakeLoadingBarElement>(null);
+-  const { switchScreen } = useScreens();
++  const { activeScreenId, switchScreen } = useScreens();
+   const toolbarEl = useRef<BrowseScreenToolbarElement | null>(null);
+-  const screenRef = useRef(null);
++  const screenRef = useRef<HTMLDivElement>(null);
++  const loading = useRef(false);
++  const active = isKiosk && activeScreenId === 'Browse';
++  const page = JSON.stringify(currentLocation.current);
++  const selections = restoreState.encoderSelection ||= new Map();
++
++  const browseRows = () => Array.from(screenRef.current?.querySelectorAll<HTMLElement>('[data-encoder-browse-row]') || []);
++  const getSelection = (rows: HTMLElement[]) => {
++    const saved = selections.get(page);
++    if (!saved) return 0;
++    const matches = rows.flatMap((row, index) => row.dataset.encoderBrowseRow === saved.uri ? [ index ] : []);
++    return matches[saved.occurrence] ?? moveSelection(saved.index, 0, rows.length);
++  };
++  const selectRow = (rows: HTMLElement[], index: number) => {
++    const row = rows[index];
++    const uri = row?.dataset.encoderBrowseRow;
++    if (!uri) return;
++    const occurrence = rows.slice(0, index).filter((previous) => previous.dataset.encoderBrowseRow === uri).length;
++    const oldest = selections.keys().next().value;
++    if (oldest && selections.size >= 64 && !selections.has(page)) selections.delete(oldest);
++    selections.set(page, { uri, index, occurrence });
++    for (const element of rows) element.removeAttribute('data-encoder-selected');
++    row.setAttribute('data-encoder-selected', 'true');
++    reveal(row);
++  };
++
++  useLayoutEffect(() => {
++    const rows = browseRows();
++    if (active && !loading.current) selectRow(rows, getSelection(rows));
++    else rows.forEach((row) => row.removeAttribute('data-encoder-selected'));
++  }, [ active, contents, listView, page ]);
++
++  useEncoderGesture(active, ({ event, value }) => {
++    if (event === 'long') {
++      if (loading.current) {
++        browseService.cancelPendingBrowse();
++        loading.current = false;
++        stopFakeLoadingBar();
++      }
++      else if (currentLocation.current.type === 'browse' && !currentLocation.current.uri) {
++        switchScreen({ screenId: 'KioskMenu' });
++      }
++      else browseService.goBack();
++      return;
++    }
++    if (loading.current) return;
++    const rows = browseRows();
++    if (!rows.length) return;
++    const index = getSelection(rows);
++    if (event === 'rotate') selectRow(rows, moveSelection(index, value || 0, rows.length));
++    if (event === 'short') rows[index]?.click();
++  });
+   const scrollPositionRef = useRef(0);
+   const [ screenMaximizable, setScreenMaximizable ] = useState(isScreenMaximizable());
+   const [ screenMaximized, maximizeScreen ] = useState(persistentStore.get(SCREEN_MAXIMIZED_KEY) || false);
+@@ -96,10 +151,12 @@ function BrowseScreen(props: BrowseScreenProps) {
+ 
+   useEffect(() => {
+     const handleContentsLoading = () => {
++      loading.current = true;
+       startFakeLoadingBar();
+     };
+ 
+     const handleContentsLoaded = (data: { contents: BrowseContentsPage, context: BrowseServiceContentsLoaderContext }) => {
++      loading.current = false;
+       const { contents, context } = data;
+       if (!context.isBack && !context.isRestore) {
+         browseService.addCurrentToHistory(getScrollPosition());
+@@ -110,10 +167,12 @@ function BrowseScreen(props: BrowseScreenProps) {
+     };
+ 
+     const handleContentsRefreshed = (data: { contents: BrowseContentsPage }) => {
++      loading.current = false;
+       setContents({ ...data.contents, __scroll: getScrollPosition() });
+     };
+ 
+     const handleError = (data: { message: any }) => {
++      loading.current = false;
+       showToast({
+         type: 'error',
+         message: data.message
+@@ -163,6 +222,14 @@ function BrowseScreen(props: BrowseScreenProps) {
+ 
+   scrollPositionRef.current = getScrollPosition();
+ 
++  useEffect(() => {
++    if (!active && props.fromKioskMenu && loading.current) {
++      browseService.cancelPendingBrowse();
++      loading.current = false;
++      stopFakeLoadingBar();
++    }
++  }, [ active, props.fromKioskMenu, browseService ]);
++
+   // Browse actions
+ 
+   const browse = useCallback((location: BrowseLocation, refresh = false) => {
+diff --git a/src/screens/browse/Item.tsx b/src/screens/browse/Item.tsx
+index 3e7d366..4e01b33 100644
+--- a/src/screens/browse/Item.tsx
++++ b/src/screens/browse/Item.tsx
+@@ -117,6 +117,7 @@ function Item(props: BrowseScreenItemProps) {
+       ref={itemRef}
+       key={index}
+       className={styles.Item}
++      data-encoder-browse-row={intersectedData.uri || undefined}
+       onClick={handleItemClicked}>
+       <div className={styles.Item__albumart}>{albumartContents}{playButton}</div>
+       <div className={styles.Item__titleAlbumArtist}>
+diff --git a/src/screens/now-playing/BasicView.tsx b/src/screens/now-playing/BasicView.tsx
+index 19fdafd..e262e4a 100644
+--- a/src/screens/now-playing/BasicView.tsx
++++ b/src/screens/now-playing/BasicView.tsx
+@@ -6,6 +6,9 @@ import PlayerButtonGroup from '../../common/PlayerButtonGroup';
+ import Seekbar from '../../common/Seekbar';
+ import classNames from 'classnames';
+ import Image from '../../common/Image';
++import { useTranslation } from 'react-i18next';
++import { CurrentLyric } from '../../common/SyncedLyricsPanel';
++import { formatQuality, isKiosk, useKioskData } from '../../kiosk/Data';
+ import styles from './BasicView.module.scss';
+ import { PlayerState } from '../../contexts/player/PlayerStateProvider';
+ 
+@@ -46,6 +49,9 @@ const DEFAULT_SEEKBAR_PROPS = {
+ };
+ 
+ function BasicView(props: BasicViewProps) {
++  const { i18n } = useTranslation();
++  const { quality, lyrics } = useKioskData();
++  const sourceQuality = isKiosk ? formatQuality(quality, i18n.language?.startsWith('ru')) : undefined;
+   const {
+     playerState,
+     trackInfoVisibility = DEFAULT_TRACK_INFO_VISIBILITY,
+@@ -92,10 +98,12 @@ function BasicView(props: BasicViewProps) {
+                 bundle: styles
+               }}
+               playerState={playerState}
++              sourceQuality={sourceQuality}
+               trackInfoVisibility={props.trackInfoVisibility}
+               trackInfoOrder={props.trackInfoOrder}
+               marqueeTitle={props.marqueeTitle} />
+             : null}
++          {lyrics?.type === 'synced' ? <CurrentLyric lyrics={lyrics} /> : null}
+           {widgetsVisibility.playbackButtons ?
+             <PlayerButtonGroup
+               className={playerButtonGroupClasses}
+diff --git a/src/screens/now-playing/NowPlayingScreen.tsx b/src/screens/now-playing/NowPlayingScreen.tsx
+index 69670b1..2b75006 100644
+--- a/src/screens/now-playing/NowPlayingScreen.tsx
++++ b/src/screens/now-playing/NowPlayingScreen.tsx
+@@ -1,3 +1,4 @@
++import { useEncoderGesture } from '../../kiosk/Controls';
+ /// <reference types="../../declaration.d.ts" />
+ 
+ import styles from './NowPlayingScreen.module.scss';
+@@ -92,6 +93,10 @@ function NowPlayingScreen(props: NowPlayingScreenProps) {
+   const startupView = !restoreState.previouslyMounted ? getStartupView(startupOptions) : undefined;
+   const [ view, setView ] = useState(startupView || restoreState.view || props.view || 'basic');
+ 
++  useEncoderGesture(activeScreenId === 'NowPlaying', ({ event }) => {
++    if (event === 'double') setView('basic');
++  });
++
+   useEffect(() => {
+     return () => {
+       restoreState.previouslyMounted = true;
+diff --git a/src/screens/queue/Item.tsx b/src/screens/queue/Item.tsx
+index 2a4e5ca..cf38826 100644
+--- a/src/screens/queue/Item.tsx
++++ b/src/screens/queue/Item.tsx
+@@ -11,6 +11,7 @@ export interface QueueScreenItemProps {
+   data: QueueItem;
+   index: number;
+   isPlaying: boolean;
++  selected?: boolean;
+   onClick: (index: number) => void;
+   onRemoveClick: (index: number) => void;
+ }
+@@ -48,6 +49,8 @@ function Item(props: QueueScreenItemProps) {
+     <div
+       key={index}
+       className={styles.Item}
++      data-encoder-row={index}
++      data-encoder-selected={props.selected ? 'true' : undefined}
+       onClick={handleItemClicked}>
+       <div className={styles.Item__albumart}>
+         <Image
+diff --git a/src/screens/queue/Items.tsx b/src/screens/queue/Items.tsx
+index 3a98ad6..e1364fa 100644
+--- a/src/screens/queue/Items.tsx
++++ b/src/screens/queue/Items.tsx
+@@ -8,6 +8,7 @@ import { QueueItem } from '../../services/QueueService';
+ export interface QueueScreenItemsProps {
+   items: QueueItem[];
+   currentPlayingPosition: number;
++  selectedPosition: number;
+   onItemClick: QueueScreenItemProps['onClick'];
+   onRemoveClick: QueueScreenItemProps['onRemoveClick'];
+ }
+@@ -20,11 +21,12 @@ const Items = React.memo((props: QueueScreenItemsProps) => {
+         styles={styles}
+         index={index}
+         data={item}
++        selected={props.selectedPosition === index}
+         isPlaying={props.currentPlayingPosition === index}
+         onClick={props.onItemClick}
+         onRemoveClick={props.onRemoveClick} />
+     ));
+-  }, [ props.items, props.currentPlayingPosition, props.onItemClick, props.onRemoveClick ]);
++  }, [ props.items, props.selectedPosition, props.currentPlayingPosition, props.onItemClick, props.onRemoveClick ]);
+ 
+   return (
+     <div className={styles.Layout}>{getItems()}</div>
+diff --git a/src/screens/queue/QueueScreen.tsx b/src/screens/queue/QueueScreen.tsx
+index 43dda69..3816104 100644
+--- a/src/screens/queue/QueueScreen.tsx
++++ b/src/screens/queue/QueueScreen.tsx
+@@ -1,7 +1,9 @@
++import { isKiosk } from '../../kiosk/Data';
++import { moveSelection, reveal, useEncoderGesture } from '../../kiosk/Controls';
+ /// <reference types="../../declaration.d.ts" />
+ 
+ import styles from './QueueScreen.module.scss';
+-import React, { HTMLProps, SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
++import React, { HTMLProps, SyntheticEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+ import classNames from 'classnames';
+ import { SwipeEventData, useSwipeable } from 'react-swipeable';
+ import { eventPathHasNoSwipe } from '../../utils/event';
+@@ -31,6 +33,18 @@ const SCREEN_MAXIMIZED_KEY = 'screen.queue.maximized';
+ 
+ const isScreenMaximizable = () => window.innerWidth >= 1024;
+ 
++const queueKey = (item: QueueItem) => JSON.stringify([ item.service, item.uri, item.title, item.name, item.artist, item.album ]);
++
++function sameQueueItem(snapshot: QueueItem[], index: number, current: QueueItem[]) {
++  if (!snapshot[index]) return -1;
++  if (snapshot === current || (snapshot.length === current.length &&
++    snapshot.every((item, i) => queueKey(item) === queueKey(current[i])))) return index;
++  const key = queueKey(snapshot[index]);
++  if (snapshot.filter((item) => queueKey(item) === key).length !== 1) return -1;
++  const matches = current.flatMap((item, i) => queueKey(item) === key ? [ i ] : []);
++  return matches.length === 1 ? matches[0] : -1;
++}
++
+ function QueueScreen(props: QueueScreenProps) {
+   const store = useStore();
+   const persistentStore = useStore('persistent');
+@@ -39,7 +53,42 @@ function QueueScreen(props: QueueScreenProps) {
+   const { openModal } = useModals();
+   const queueService = useQueueService();
+   const [ items, setItems ] = useState(queueService.getQueue());
+-  const { exitActiveScreen } = useScreens();
++  const { activeScreenId, exitActiveScreen, switchScreen } = useScreens();
++  const active = isKiosk && activeScreenId === 'Queue';
++  const rows = useRef<HTMLDivElement>(null);
++  const [ selection, setSelection ] = useState<{ snapshot: QueueItem[]; index: number }>();
++  const initialPosition = Number(playerState.position ?? 0);
++  const firstPosition = moveSelection(Number.isFinite(initialPosition) ? initialPosition : 0, 0, items.length);
++  const retained = selection ? sameQueueItem(selection.snapshot, selection.index, items) : -1;
++  const index = retained >= 0 ? retained : selection ? moveSelection(selection.index, 0, items.length) : firstPosition;
++
++  useLayoutEffect(() => {
++    if (!active) {
++      setSelection(undefined);
++      return;
++    }
++    if (items.length) reveal(rows.current?.querySelector<HTMLElement>(`[data-encoder-row="${index}"]`) || undefined);
++  }, [ active, items, index ]);
++
++  useEncoderGesture(active, ({ event, value }) => {
++    if (event === 'long') {
++      switchScreen({ screenId: 'KioskMenu' });
++      return;
++    }
++    if (!items.length) return;
++    if (event === 'rotate') {
++      setSelection((previous) => {
++        const previousIndex = previous ? sameQueueItem(previous.snapshot, previous.index, items) : index;
++        return { snapshot: items, index: moveSelection(previousIndex < 0 ? index : previousIndex, value || 0, items.length) };
++      });
++    }
++    if (event === 'short') {
++      const current = queueService.getQueue();
++      const target = sameQueueItem(selection?.snapshot || items, selection?.index ?? index, current);
++      if (target >= 0) queueService.playQueue(target);
++      setSelection({ snapshot: current, index: target >= 0 ? target : moveSelection(index, 0, current.length) });
++    }
++  });
+   const toolbarEl = useRef<QueueScreenToolbarElement | null>(null);
+   const scrollbarsRef = useRef<Scrollbars | null>(null);
+   const scrollPositionRef = useRef(0);
+@@ -171,9 +220,8 @@ function QueueScreen(props: QueueScreenProps) {
+     toolbarEl.current = el;
+   };
+ 
+-  const currentPlayingPosition = playerState.position &&
+-    !isNaN(playerState.position) &&
+-    playerState.status === 'play' ? playerState.position : -1;
++  const currentPlayingPosition = playerState.status !== 'stop' && playerState.position !== undefined ?
++    Number(playerState.position) : -1;
+ 
+   const layoutWrapperClasses = classNames([
+     styles.LayoutWrapper,
+@@ -183,6 +231,7 @@ function QueueScreen(props: QueueScreenProps) {
+ 
+   return (
+     <div
++      ref={rows}
+       className={layoutWrapperClasses}
+       style={props.style}
+       onClick={handleScreenClicked}>
+@@ -204,6 +253,7 @@ function QueueScreen(props: QueueScreenProps) {
+           <Items
+             items={items}
+             currentPlayingPosition={currentPlayingPosition}
++            selectedPosition={active ? index : -1}
+             onItemClick={handleItemClicked}
+             onRemoveClick={handleRemoveClicked} />
+         </Scrollbars>
+diff --git a/src/services/BrowseService.ts b/src/services/BrowseService.ts
+index 3d20270..18d8e29 100644
+--- a/src/services/BrowseService.ts
++++ b/src/services/BrowseService.ts
+@@ -332,7 +332,7 @@ export default class BrowseService extends EventEmitter {
+       this.#currentLoading = location;
+       const requestUrl = `${this.#host}/api/v1/browse?uri=${encodeURIComponent(encodeURIComponent(location.uri))}`;
+       this.#requestRestApi(requestUrl).then((data) => {
+-        if (this.#currentLoading && this.#currentLoading.type === 'browse' && this.compareLocations(this.#currentLoading, location)) {
++        if (this.#currentLoading === location) {
+           if (data.error) {
+             this.#pushError(data.error);
+           }
+@@ -396,6 +396,10 @@ export default class BrowseService extends EventEmitter {
+     }
+   }
+ 
++  cancelPendingBrowse() {
++    this.#currentLoading = null;
++  }
++
+   goBack() {
+     this.#pushLoading();
+     const prev = this.#backHistory.pop();
+diff --git a/src/services/MetadataService.ts b/src/services/MetadataService.ts
+index 1407e09..5b1bdba 100644
+--- a/src/services/MetadataService.ts
++++ b/src/services/MetadataService.ts
+@@ -36,6 +36,7 @@ export interface MetadataServiceGetInfoResult {
+ export default class MetadataService extends EventEmitter {
+ 
+   #apiPath: string | null;
++  #songRequests = new Map<string, ReturnType<typeof requestPluginApiEndpoint>>();
+ 
+   constructor() {
+     super();
+@@ -60,12 +61,26 @@ export default class MetadataService extends EventEmitter {
+     return result;
+   }
+ 
+-  async getSongInfo(params: MetadataServiceGetSongInfoParams) {
+-    if (!this.#apiPath) {
+-      return;
+-    }
++  async fetchSongInfo(params: MetadataServiceGetSongInfoParams) {
++    if (!this.#apiPath) return;
+     const payload = { ...this.#cleanParams(params), type: 'song' };
+-    const data = await requestPluginApiEndpoint(this.#apiPath, '/metadata/fetchInfo', payload);
++    const key = JSON.stringify([ this.#apiPath, params.name, params.artist, params.album,
++      params.duration, params.uri, params.service ]);
++    const existing = this.#songRequests.get(key);
++    if (existing) return existing;
++    const pending = requestPluginApiEndpoint(this.#apiPath, '/metadata/fetchInfo', payload);
++    this.#songRequests.set(key, pending);
++    try {
++      return await pending;
++    }
++    finally {
++      this.#songRequests.delete(key);
++    }
++  }
++
++  async getSongInfo(params: MetadataServiceGetSongInfoParams) {
++    const data = await this.fetchSongInfo(params);
++    if (!data) return;
+     if (data.success) {
+       this.#pushFetched({
+         song: params.name,
