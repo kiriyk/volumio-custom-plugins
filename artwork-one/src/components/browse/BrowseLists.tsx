@@ -8,9 +8,9 @@ import MusicRow from './MusicRow';
 import { artistLists, norm } from './ArtistHead';
 import VirtualItems, { VIRTUAL_FROM } from './VirtualItems';
 
-export interface ListsProps { lists: BrowseList[]; filter: string; sortDesc: boolean; isArtist: boolean; artistsPage: boolean; serviceSearch: boolean; activeMenu: string | null; onMenuOpen: (key: string, open: boolean) => void; base?: number }
+export interface ListsProps { lists: BrowseList[]; filter: string; sortDesc: boolean; isArtist: boolean; artistsPage: boolean; serviceSearch: boolean; activeMenu: string | null; onMenuOpen: (key: string, open: boolean) => void; base?: number; numberAlbumTracks?: boolean }
 
-export default function BrowseLists({ lists, filter, sortDesc, isArtist, artistsPage, serviceSearch, activeMenu, onMenuOpen, base }: ListsProps) {
+export default function BrowseLists({ lists, filter, sortDesc, isArtist, artistsPage, serviceSearch, activeMenu, onMenuOpen, base, numberAlbumTracks }: ListsProps) {
   const at = base || 0;   // the lists' place among the page's (the search page draws them shelf by shelf): keys and ids stay distinct
   const gridFor = useBrowse(s => s.gridFor);
   useBrowse(s => s.showGridView); useBrowse(s => s.showGridViewTracks);   // a change of either redraws
@@ -24,6 +24,11 @@ export default function BrowseLists({ lists, filter, sortDesc, isArtist, artists
   const matches = (it: BrowseItem, q: string) => [it.title || it.name, it.artist, onAlbumPage ? '' : it.album].some(f => norm(f).indexOf(q) > -1);
   const albumsIdx = isArtist ? artistLists(lists, 'albums').map(x => x.i) : [];
   const songsIdx = isArtist ? artistLists(lists, 'songs').map(x => x.i) : [];
+  const albumNumbers = useMemo(() => {
+    if (!numberAlbumTracks) return [];
+    let number = 0;
+    return lists.map(list => (list.items || []).map(item => item.type === 'song' ? ++number : undefined));
+  }, [lists, numberAlbumTracks]);
   // Z–A: rank every node on the page by its normalised title (the backend order is case-sensitive)
   let rank: Record<string, number> | null = null;
   if (sortDesc) {
@@ -38,7 +43,7 @@ export default function BrowseLists({ lists, filter, sortDesc, isArtist, artists
     const playing = !!playingUri && u === playingUri;
     return asGrid
       ? <MusicCard key={key} item={item} list={items} listIndex={at + li} itemIndex={ii} hidden={hidden} order={order} artistCounts={artistsPage} onMenuOpen={(o) => onMenuOpen(key, o)} />
-      : <MusicRow key={key} item={item} list={items} listIndex={at + li} itemIndex={ii} hidden={hidden} order={order} playing={playing} paused={playing && paused} fav={!!fav[u]} active={activeMenu === key} onMenuOpen={(o) => onMenuOpen(key, o)} />;
+      : <MusicRow key={key} item={item} list={items} listIndex={at + li} itemIndex={ii} displayNumber={albumNumbers[li]?.[ii]} hidden={hidden} order={order} playing={playing} paused={playing && paused} fav={!!fav[u]} active={activeMenu === key} onMenuOpen={(o) => onMenuOpen(key, o)} />;
   };
   return (
     <>

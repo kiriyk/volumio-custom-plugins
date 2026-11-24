@@ -3,8 +3,7 @@ import { useRef, useState } from 'react';
 import Icon from '../Icon';
 import ItemMenu from './ItemMenu';
 import { albumart } from '../../core/api';
-import { localAlbumUri } from '../../core/localMusicUri';
-import { useLocalAlbumCover } from '../../core/store/localMusic';
+import { useLocalBrowseCover } from '../../core/store/localMusic';
 import { librarySectionArtwork } from '../../core/libraryArtwork';
 import { type BrowseItem, useBrowse } from '../../core/store/browse';
 import { usePlayer } from '../../core/store/player';
@@ -18,7 +17,7 @@ import { formatLocalQuality } from '../../core/localQuality';
 import { artistCountLabel, formatRecordingQuality } from '../../core/recordingQuality';
 import { useRecordingQuality } from '../../core/store/recordingQuality';
 
-export interface RowProps { item: BrowseItem; list: BrowseItem[]; listIndex: number; itemIndex: number; hidden?: boolean; order?: number; playing?: boolean; paused?: boolean; fav?: boolean; active?: boolean; onMenuOpen?: (open: boolean) => void }
+export interface RowProps { item: BrowseItem; list: BrowseItem[]; listIndex: number; itemIndex: number; displayNumber?: number; hidden?: boolean; order?: number; playing?: boolean; paused?: boolean; fav?: boolean; active?: boolean; onMenuOpen?: (open: boolean) => void }
 
 // a badge only for Hi-Res and DSD (handoff 8b); everything else stays plain
 export function QualityPill({ item }: { item: BrowseItem }) {
@@ -29,7 +28,7 @@ export function QualityPill({ item }: { item: BrowseItem }) {
   return <div className={'item__quality mono aw-q aw-q--' + q}><span className="aw-q__num">{num}</span>{unit && unit !== num ? <span className="aw-q__unit">{unit}</span> : null}</div>;
 }
 
-export default function MusicRow({ item, list, listIndex, itemIndex, hidden, order, playing, paused, fav, active, onMenuOpen }: RowProps) {
+export default function MusicRow({ item, list, listIndex, itemIndex, displayNumber, hidden, order, playing, paused, fav, active, onMenuOpen }: RowProps) {
   const req = useBrowse(s => s.request);
   const artistsPage = (req ? req.uri : '') === 'artists://';
   const rowRef = useRef<HTMLDivElement>(null);
@@ -45,7 +44,7 @@ export default function MusicRow({ item, list, listIndex, itemIndex, hidden, ord
   const favVisible = A.showPlayButton(item) && (item.type === 'song' || item.type === 'folder-with-favourites') && (req ? req.uri : '') !== 'favourites';
   const noMenu = !A.showHamburgerMenu(item);
   const libraryCover = librarySectionArtwork(item);
-  const musicCover = useLocalAlbumCover(localAlbumUri(item.uri), item.albumart, rowRef);
+  const musicCover = useLocalBrowseCover(item.uri, item.albumart, rowRef);
   const cover = libraryCover || musicCover;
   // a folder of the file browser (USB, NAS, internal storage) is opened, never played from its row:
   // no play button and no number (albums://, playlists and genres keep both)
@@ -64,7 +63,7 @@ export default function MusicRow({ item, list, listIndex, itemIndex, hidden, ord
         <div className={'item__play' + (!A.showPlayButton(item) || isDir ? ' hidden' : '')} onClick={stop}>
           <button type="button" className="ghost-btn play-btn" onClick={playBtnClick}><Icon name={playing ? 'pause' : 'play_arrow'} className="play-btn__icon" /></button>
         </div>
-        <div className="item__number">{item.tracknumber || (itemIndex + 1)}<span className="item__number-dot">.</span>{browserLoading ? <Spinner size={16} className="aw-loading-spin" /> : null}</div>
+        <div className="item__number">{displayNumber ?? (item.tracknumber || itemIndex + 1)}<span className="item__number-dot">.</span>{browserLoading ? <Spinner size={16} className="aw-loading-spin" /> : null}</div>
         <div className={'item__image' + (!cover && !item.icon ? ' hidden' : '')}>
           <div className={'item__albumart' + (!cover ? ' hidden' : '')}><img className="item__image__img" src={cover} alt="" /></div>
           <div className={'item__albumart-icon' + (!item.icon || libraryCover ? ' hidden' : '')}><Icon name={A.faIcon(item.icon)} /></div>

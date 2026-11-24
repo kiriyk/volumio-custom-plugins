@@ -2,7 +2,7 @@ import { useEffect, useState, type RefObject } from 'react';
 import { create } from 'zustand';
 import { albumart, pluginRest } from '../api';
 import { on } from '../socket';
-import { localPlayingAlbumKey, localPlayingUri } from '../localMusicUri';
+import { localAlbumUri, localArtistUri, localPlayingAlbumKey, localPlayingUri } from '../localMusicUri';
 
 export interface AlbumInfo {
   text?: string;
@@ -24,6 +24,7 @@ interface Cover {
   url?: string;
   id?: string;
   jpeg?: string;
+  credit?: { url: string; author?: string; license?: string };
 }
 
 type Data = { cover: Cover; artistInfo: ArtistInfo; albumInfo: AlbumInfo };
@@ -85,7 +86,7 @@ function store(key: string, value: Entry, field: Field) {
       if (value.value) {
         const cover = value.value as Cover;
         value.blobUrl = addBlob(cover);
-        value.value = { id: cover.id, url: cover.url };
+        value.value = { id: cover.id, url: cover.url, credit: cover.credit };
       }
       removeBlob((entries[key]?.value as Cover | undefined)?.id);
     }
@@ -136,9 +137,15 @@ function request<F extends Field>(key: string, uri: string, field: F, kind: 'alb
       const retryAt = result?.retryAt ?? Date.now() + RETRY;
       if (result?.status === 'found') {
         const partial = field === 'albumInfo' && (result.value as AlbumInfo)?.summaryStatus === 'temporaryError';
-        store(key, { value: result.value, until: partial || result.retryAt ? retryAt : Date.now() + REGULAR_TTL }, field);
+        const value = partial && hit?.value ? { ...hit.value, ...result.value } : result.value;
+        store(key, { value, until: partial || result.retryAt ? retryAt : Date.now() + REGULAR_TTL }, field);
       } else if (result?.status !== 'temporaryError' && answer.error !== 'temporaryError') {
-        store(key, { until: Date.now() + REGULAR_TTL }, field);
+        const until = Date.now() + REGULAR_TTL;
+        if (field === 'cover' && result?.status === 'notFound' && hit?.value) {
+          useEntries.setState(state => ({ entries: { ...state.entries, [key]: { ...hit, until } } }));
+        } else {
+          store(key, { until }, field);
+        }
       } else if (hit?.value) {
         useEntries.setState(state => ({ entries: { ...state.entries, [key]: { ...hit, until: retryAt } } }));
       } else {
@@ -187,6 +194,17 @@ function useEntry<F extends Field>(uri: string | undefined, field: F, ref?: RefO
 
 export function useLocalAlbumCover(uri?: string, stock?: string, ref?: RefObject<HTMLElement | null>): string {
   const data = useEntry(uri, 'cover', ref);
+  return data?.blobUrl || albumart(data?.value?.url || stock);
+}
+
+export function useLocalArtistCover(uri?: string) {
+  const data = useEntry(uri, 'cover', undefined, 'artist');
+  return { url: data?.blobUrl || albumart(data?.value?.url), credit: data?.value?.credit };
+}
+
+export function useLocalBrowseCover(uri?: string, stock?: string, ref?: RefObject<HTMLElement | null>): string {
+  const artist = localArtistUri(uri);
+  const data = useEntry(artist || localAlbumUri(uri), 'cover', ref, artist ? 'artist' : 'album');
   return data?.blobUrl || albumart(data?.value?.url || stock);
 }
 

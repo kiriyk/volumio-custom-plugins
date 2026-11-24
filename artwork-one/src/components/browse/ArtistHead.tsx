@@ -12,8 +12,9 @@ import ItemMenu from './ItemMenu';
 import { useCrumbs, goCrumb } from './AlbumHead';
 import MusicInformation from '../MusicInformation';
 import { localAlbumUri, localArtistUri } from '../../core/localMusicUri';
-import { useLocalAlbumCover, useLocalArtistInfo } from '../../core/store/localMusic';
+import { useLocalAlbumCover, useLocalArtistCover, useLocalArtistInfo } from '../../core/store/localMusic';
 import { albumart } from '../../core/api';
+import { plainText } from '../../core/plainText';
 import { useBrowse, type BrowseItem, type BrowseList } from '../../core/store/browse';
 import * as A from '../../core/browseActions';
 import { formatRecordingQuality } from '../../core/recordingQuality';
@@ -63,7 +64,9 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
   const info = useBrowse(s => s.info) || {};
   const lists = useBrowse(s => s.lists);
   const artistUri = useBrowse(s => s.currentUri);
-  const localArtist = useLocalArtistInfo(localArtistUri(artistUri));
+  const localUri = localArtistUri(artistUri);
+  const localArtist = useLocalArtistInfo(localUri);
+  const portrait = useLocalArtistCover(localUri);
   const crumbs = useCrumbs();
   const everything = useMemo(() => artistAlbums(lists), [lists]);
   const albums = useMemo(() => everything.filter(a => a.kind === 'album'), [everything]);
@@ -71,10 +74,13 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
   // a service's page keeps its own groups (Albums, EPs & singles): the first is ALBUMS, the others carry the list's name
   const groups = useMemo(() => { const seen: number[] = []; albums.forEach(a => { if (seen.indexOf(a.listIndex) < 0) { seen.push(a.listIndex); } }); return seen; }, [albums]);
   // the artist's picture: a size the service does not serve (Tidal's artists have no 640) is asked for once more at 750, then a glyph stands in
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const [imgTried, setImgTried] = useState(false);
-  const picture = imgSrc === null ? albumart(info.albumart) : imgSrc;
-  const onImgError = () => { if (!imgTried && /\/640x640\./.test(picture)) { setImgTried(true); setImgSrc(picture.replace('/640x640.', '/750x750.')); } else { setImgSrc(''); } };
+  const [imageFallback, setImageFallback] = useState<{ source: string; picture: string }>();
+  const imageSource = portrait.url || albumart(info.albumart);
+  const picture = imageFallback?.source === imageSource ? imageFallback.picture : imageSource;
+  const onImgError = () => setImageFallback({
+    source: imageSource,
+    picture: /\/640x640\./.test(picture) ? picture.replace('/640x640.', '/750x750.') : ''
+  });
   const trackCount = useMemo(() => artistLists(lists, 'songs').reduce((n, { l }) => n + (l.items || []).length, 0), [lists]);
   const hasYears = albums.some(a => a.year);
   const sorted = useMemo(() => {
@@ -94,7 +100,7 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
         </label>} />
 
       <div className="aw-artist__hero">
-        {picture ? <img className="aw-artist__img" src={picture} alt="" onError={onImgError} /> : <div className="aw-artist__img aw-artist__img--glyph" aria-hidden="true"><Icon name="person" /></div>}
+        {picture ? <img key={picture} className="aw-artist__img" src={picture} alt="" onError={onImgError} /> : <div className="aw-artist__img aw-artist__img--glyph" aria-hidden="true"><Icon name="person" /></div>}
         <div className="aw-artist__body">
           <div className="aw-artist__eyebrow mono">ИСПОЛНИТЕЛЬ</div>
           <h1 className="aw-artist__name">{info.title}</h1>
@@ -105,6 +111,9 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
               {trackCount ? <span className="mono">{trackCount} треков</span> : null}
             </div>
           ) : null}
+          {portrait.credit && picture === portrait.url ? <a className="aw-music-info__source" href={portrait.credit.url} target="_blank" rel="noopener">
+            {[plainText(portrait.credit.author), portrait.credit.license, 'Wikimedia Commons'].filter(Boolean).join(' · ')}
+          </a> : null}
         </div>
         {info.disablePlayButton !== true ? <div className="aw-artist__actions">
           <button type="button" className="aw-artist__play" onClick={() => A.playItemsList(info as BrowseItem)}><Icon name="play_arrow" /><span>Воспроизвести</span></button>

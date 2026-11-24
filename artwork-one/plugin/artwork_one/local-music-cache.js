@@ -22,20 +22,20 @@ class LocalMusicCache {
     this.generation = 0;
   }
 
-  result(key, lookup) {
+  result(key, lookup, { needsRefresh } = {}) {
     const id = digest(JSON.stringify([1, key]));
     if (this.inflight.has(id)) return this.inflight.get(id);
-    const result = this.readThrough(id, lookup, this.generation).finally(() => {
+    const result = this.readThrough(id, lookup, this.generation, needsRefresh).finally(() => {
       if (this.inflight.get(id) === result) this.inflight.delete(id);
     });
     this.inflight.set(id, result);
     return result;
   }
 
-  async readThrough(id, lookup, generation) {
+  async readThrough(id, lookup, generation, needsRefresh) {
     await this.writes;
     const hit = await this.read(id);
-    if (hit?.freshUntil > this.now()) return hit.result;
+    if (hit?.freshUntil > this.now() && (hit.result.retryAt || !needsRefresh?.(hit.result.value))) return hit.result;
     let result;
     let retryAt;
     try {

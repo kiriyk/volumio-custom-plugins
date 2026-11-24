@@ -132,8 +132,11 @@ class LocalMusicLibrary {
     if (kind === 'artist') {
       if (source?.kind !== 'artist') return null;
       const nav = await this.browse(source.uri);
-      if (nav?.info?.type !== 'artist' || !trackList(nav).length) return null;
-      return { kind, artist: field(nav.info.title), key: JSON.stringify(['artist', nav.info.title]) };
+      const tracks = trackList(nav);
+      if (nav?.info?.type !== 'artist' || !tracks.length) return null;
+      const artist = field(nav.info.title, source.artist);
+      const representative = tracks.find(t => t.album && field(t.albumartist, t.artist) === artist);
+      return { kind, artist, track: representative?.uri, art: normalizedArt(nav.info.albumart), key: JSON.stringify(['artist', artist]) };
     }
     if (source?.kind === 'album') return this.albumPage(source);
 

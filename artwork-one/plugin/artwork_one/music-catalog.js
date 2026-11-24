@@ -50,6 +50,7 @@ async function remote(url, { fetcher = fetch, maxBytes = 2 * 1024 * 1024, allowH
     if (error || RETRYABLE.has(response.status)) {
       const retry = response?.headers.get('retry-after');
       error ||= new Error('provider HTTP ' + response.status);
+      error.provider = target.hostname;
       const retryAt = retry == null ? NaN : /^\d+$/.test(retry) ? Date.now() + 1000 * Number(retry) : Date.parse(retry);
       if (Number.isFinite(retryAt)) error.retryAfter = retryAt;
       if (!response?.bodyUsed) await response?.body?.cancel();
@@ -75,7 +76,7 @@ async function remote(url, { fetcher = fetch, maxBytes = 2 * 1024 * 1024, allowH
       return null;
     }
     await response.body?.cancel();
-    throw new Error(response.ok ? 'provider response too large' : 'provider HTTP ' + response.status);
+    throw Object.assign(new Error(response.ok ? 'provider response too large' : 'provider HTTP ' + response.status), { provider: target.hostname });
   }
 }
 
@@ -152,7 +153,7 @@ function confirmedRelease(releases, hints) {
 }
 
 class MusicCatalog {
-  constructor({ fetcher = fetch, interval = 1000, musicBrainzProxy } = {}) {
+  constructor({ fetcher = fetch, interval = 1250, musicBrainzProxy } = {}) {
     this.fetcher = fetcher;
     this.musicBrainzProxy = musicBrainzProxy;
     this.interval = interval;
@@ -165,7 +166,12 @@ class MusicCatalog {
 
   async json(url, hosts, fetcher = this.fetcher) {
     const response = await remote(url, { fetcher, allowHost: hosts, allowMissing: true });
-    return response ? JSON.parse(response.body.toString('utf8')) : null;
+    if (!response) return null;
+    try { return JSON.parse(response.body.toString('utf8')); }
+    catch (error) {
+      error.provider = new URL(url).hostname;
+      throw error;
+    }
   }
 
   mb(entity, params) {
@@ -273,10 +279,14 @@ class MusicCatalog {
     };
   }
 
-  async summary(entity, id, locale) {
+  async wikidataId(entity, id) {
     const row = await this.mb(entity + '/' + id, { inc: 'url-rels' });
     const wikidata = list(row?.relations).find(x => x.type === 'wikidata')?.url?.resource;
-    const qid = /\/(Q\d+)$/.exec(wikidata || '')?.[1];
+    return /\/(Q\d+)$/.exec(wikidata || '')?.[1] || null;
+  }
+
+  async summary(entity, id, locale, qid) {
+    if (qid === undefined) qid = await this.wikidataId(entity, id);
     if (!qid) return null;
     const wiki = locale + 'wiki';
     const wd = await this.json('https://www.wikidata.org/w/api.php?' + new URLSearchParams({
@@ -293,6 +303,29 @@ class MusicCatalog {
     const text = page?.extract?.split(/\n\s*\n|\n/).map(s => s.trim()).find(Boolean)?.slice(0, 1400);
     if (!text || !page.fullurl || new URL(page.fullurl).hostname !== host) return null;
     return { text, url: page.fullurl };
+  }
+
+  async artistImage(qid) {
+    const wd = await this.json('https://www.wikidata.org/w/api.php?' + new URLSearchParams({
+      action: 'wbgetclaims', entity: qid, property: 'P18', format: 'json'
+    }), host => host === 'www.wikidata.org');
+    const claims = list(wd?.claims?.P18).filter(x => x.rank !== 'deprecated');
+    const name = (claims.find(x => x.rank === 'preferred') || claims[0])?.mainsnak?.datavalue?.value;
+    if (typeof name !== 'string' || !name) return null;
+    const commons = await this.json('https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({
+      action: 'query', prop: 'imageinfo', iiprop: 'url|extmetadata', iiurlwidth: '500',
+      iiextmetadatafilter: 'Artist|LicenseShortName', titles: 'File:' + name, redirects: '1', format: 'json', formatversion: '2'
+    }), host => host === 'commons.wikimedia.org');
+    const info = commons?.query?.pages?.[0]?.imageinfo?.[0];
+    if (!info?.thumburl || !info.descriptionurl?.startsWith('https://commons.wikimedia.org/wiki/File:')) return null;
+    const image = await remote(info.thumburl, {
+      fetcher: this.fetcher, maxBytes: 4 * 1024 * 1024, allowMissing: true,
+      allowHost: host => host === 'thumb.wikimedia.org' || host === 'upload.wikimedia.org'
+    });
+    return image && {
+      ...image,
+      credit: { url: info.descriptionurl, author: info.extmetadata?.Artist?.value, license: info.extmetadata?.LicenseShortName?.value }
+    };
   }
 
   async image(kind, id) {

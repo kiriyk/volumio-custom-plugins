@@ -243,7 +243,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
             <div id="browse-page">
               {(b.isBrowsing || b.isSearching) && b.lists && !isDownloads ? (isLandingSearch
                 ? <SearchResults lists={listsShown} filter="" sortDesc={sortDesc} isArtist={false} artistsPage={false} serviceSearch={false} activeMenu={activeMenu} onMenuOpen={onMenuOpen} />
-                : <BrowseLists lists={listsShown} filter={filter} sortDesc={sortDesc} isArtist={isArtist} artistsPage={artistsPage} serviceSearch={!localFilter} activeMenu={activeMenu} onMenuOpen={onMenuOpen} />) : null}
+                : <BrowseLists lists={listsShown} filter={filter} sortDesc={sortDesc} isArtist={isArtist} artistsPage={artistsPage} serviceSearch={!localFilter} activeMenu={activeMenu} onMenuOpen={onMenuOpen} numberAlbumTracks={!!albumUri} />) : null}
             </div>
 
             {isPlainList && letters.length > 1 ? (

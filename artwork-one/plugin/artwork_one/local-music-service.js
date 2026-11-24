@@ -8,7 +8,7 @@ const { LocalMusicCache, digest } = require('./local-music-cache');
 const MAX_IMAGE = 256 * 1024;
 const FIELDS = ['cover', 'albumInfo', 'artistInfo'];
 const LOCAL_ART = 'http://127.0.0.1:3000';
-const CONTROLS = ['/albumart', '/albumart?path=&icon=dot-circle-o&metadata=false'];
+const CONTROLS = ['/albumart', '/albumart?path=&icon=dot-circle-o&metadata=false', '/albumart?web=&icon=fa-user'];
 const YEAR = /^\d{4}/;
 const MB_ENTITY = /^(?:artist|release|release-group|recording)\/(?:[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12})?$/i;
 const MB_INCLUDES = new Set(['url-rels', 'artist-rels', 'work-rels', 'work-level-rels', 'release-groups', 'labels', 'artist-credits']);
@@ -57,7 +57,12 @@ function validate(data) {
     ['artist', 'album'].includes(data.kind) && typeof data.uri === 'string' && data.uri.length <= 4096 &&
     /^[a-z]{2,3}$/.test(data.locale) && Array.isArray(data.fields) && data.fields.length &&
     data.fields.length <= FIELDS.length && data.fields.every(field => FIELDS.includes(field)) &&
-    (data.kind === 'album' || data.fields.every(field => field === 'artistInfo'));
+    (data.kind === 'album' || !data.fields.includes('albumInfo'));
+}
+
+function resolved(result) {
+  if (result.status === 'temporaryError') throw Object.assign(new Error('catalog unavailable'), { retryAfter: result.retryAt });
+  return result.value ?? null;
 }
 
 class LocalMusicService {
@@ -68,6 +73,10 @@ class LocalMusicService {
     this.image = image;
     this.cache = cache || new LocalMusicCache(cacheDir, { maxBytes, onError: (error, operation) => {
       if (operation !== 'lookup') logger?.warn('[artwork_one] local music cache ' + operation + ' failed (' + (error.code || error.name) + ')');
+      else if (error.provider) {
+        const status = /^provider HTTP (\d{3})$/.exec(error.message)?.[1] || error.name;
+        logger?.warn('[artwork_one] local music provider ' + error.provider + ' failed (' + status + ')');
+      }
     } });
     this.resolutions = new Map();
     this.probes = new Map();
@@ -105,7 +114,7 @@ class LocalMusicService {
       const requested = [...new Set(data.fields)];
       const results = await Promise.all(requested.map(async name => {
         try {
-          if (name === 'cover') return await this.cover(entity);
+          if (name === 'cover') return entity.kind === 'artist' ? await this.artistCover(entity) : await this.cover(entity);
           if (name === 'albumInfo') return await this.albumInfo(entity, data.locale);
           return await this.artistInfo(entity, data.locale);
         } catch {
@@ -167,14 +176,18 @@ class LocalMusicService {
     });
   }
 
+  async stockCover(url) {
+    if (!url) return null;
+    const art = await this.loadLocalArt(url);
+    if (!art || !imageKind(art.body) || (await this.albumsArtControl()).includes(digest(art.body))) return null;
+    return this.image(art);
+  }
+
   async cover(entity) {
     return this.cache.result(['cover', entity.key], async () => {
-      if (entity.art) {
-        const art = await this.loadLocalArt(entity.art);
-        if (art && imageKind(art.body) && !(await this.albumsArtControl()).includes(digest(art.body)) && await this.image(art)) {
-          return { source: 'volumio', url: entity.art };
-        }
-      }
+      let stockError;
+      const stock = await this.stockCover(entity.art).catch(error => { stockError = error; });
+      if (stock) return { ...this.coverValue(stock, 'volumio'), url: entity.art };
       const local = await this.probe(entity);
       if (Number.isInteger(local?.picture)) {
         const jpeg = await this.image({ file: local.file, stream: local.picture });
@@ -182,7 +195,10 @@ class LocalMusicService {
       }
       const match = await this.match(entity);
       if (match.status === 'temporaryError') throw Object.assign(new Error('album match unavailable'), { retryAfter: match.retryAt });
-      if (match.status !== 'found') return null;
+      if (match.status !== 'found') {
+        if (stockError) throw stockError;
+        return null;
+      }
       const { releaseId, groupId } = match.value;
       if (releaseId) {
         const candidate = await this.catalog.image('release', releaseId);
@@ -191,12 +207,31 @@ class LocalMusicService {
       }
       const candidate = await this.catalog.image('release-group', groupId);
       const jpeg = candidate && await this.image(candidate);
-      return jpeg ? this.coverValue(jpeg, 'releaseGroup', groupId) : null;
+      if (jpeg) return this.coverValue(jpeg, 'releaseGroup', groupId);
+      if (stockError) throw stockError;
+      return null;
+    }, {
+      needsRefresh: value => value?.source === 'volumio' && !value.jpeg
+    });
+  }
+
+  async artistCover(entity) {
+    return this.cache.result(['artist cover', entity.key], async () => {
+      let stockError;
+      const stock = await this.stockCover(entity.art).catch(error => { stockError = error; });
+      if (stock) return this.coverValue(stock, 'volumio');
+      const artistId = resolved(await this.artistIdentity(entity));
+      const qid = artistId && resolved(await this.artistWikidata(artistId));
+      const image = qid && await this.catalog.artistImage(qid);
+      const jpeg = image && await this.image(image);
+      if (jpeg) return { ...this.coverValue(jpeg, 'commons'), credit: image.credit };
+      if (stockError) throw stockError;
+      return null;
     });
   }
 
   coverValue(jpeg, source, mbid) {
-    return { source, mbid, id: digest(jpeg), jpeg: jpeg.toString('base64') };
+    return { source, id: digest(jpeg), jpeg: jpeg.toString('base64'), ...(mbid ? { mbid } : {}) };
   }
 
   async albumInfo(entity, locale) {
@@ -214,19 +249,34 @@ class LocalMusicService {
     return summary;
   }
 
-  async artistInfo(entity, locale) {
+  async artistIdentity(entity) {
     if (!entity.artist) return { status: 'notFound' };
-    let artistId;
     if (entity.kind === 'album') {
       const match = await this.match(entity);
-      artistId = match.value?.artistId;
+      if (match.value?.artistId) return { status: 'found', value: match.value.artistId };
     }
-    if (!artistId) {
-      const identity = await this.cache.result(['artist match', entity.artist], () => this.catalog.artist(entity.artist));
-      if (identity.status !== 'found') return identity;
-      artistId = identity.value;
-    }
-    const summary = await this.cache.result(['artist summary', artistId, locale], () => this.catalog.summary('artist', artistId, locale));
+    const identity = await this.cache.result(['artist match', entity.artist], () => this.catalog.artist(entity.artist));
+    if (identity.status === 'found' || entity.kind !== 'artist' || !entity.track) return identity;
+    const fromAlbum = await this.cache.result(['artist from album', entity.key, entity.track], async () => {
+      const album = await this.library.resolve({ kind: 'album', uri: entity.track });
+      if (!album || album.artist !== entity.artist) return null;
+      return resolved(await this.match(album))?.artistId || null;
+    });
+    return fromAlbum.status === 'found' || identity.status === 'notFound' ? fromAlbum : identity;
+  }
+
+  artistWikidata(artistId) {
+    return this.cache.result(['artist wikidata', artistId], () => this.catalog.wikidataId('artist', artistId));
+  }
+
+  async artistInfo(entity, locale) {
+    const identity = await this.artistIdentity(entity);
+    if (identity.status !== 'found') return identity;
+    const artistId = identity.value;
+    const summary = await this.cache.result(['artist summary', artistId, locale], async () => {
+      const qid = resolved(await this.artistWikidata(artistId));
+      return this.catalog.summary('artist', artistId, locale, qid);
+    });
     return summary.status === 'found' ? { ...summary, value: { ...summary.value, artistId, artist: entity.artist } } : summary;
   }
 

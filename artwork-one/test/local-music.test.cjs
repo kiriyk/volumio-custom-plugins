@@ -94,6 +94,71 @@ test('clearing the cache removes its files and drops writes from older lookups',
   assert.equal(await cache.usage(), 0);
 });
 
+test('artist page and portrait share an identity disambiguated by the local album', async t => {
+  const dir = await cleanup(t);
+  const artist = {
+    kind: 'artist', artist: 'Band', track: localEntity.track, key: 'artist-band',
+    art: '/albumart?web=Band&icon=fa-user'
+  };
+  let links = 0;
+  const catalog = {
+    artist: async () => null,
+    album: async () => ({ groupId: 'record', artistId: 'band' }),
+    wikidataId: async (kind, id) => {
+      assert.deepEqual([kind, id], ['artist', 'band']);
+      links++;
+      return 'Q42';
+    },
+    summary: async (kind, id, locale, qid) => {
+      assert.deepEqual([kind, id, locale, qid], ['artist', 'band', 'en', 'Q42']);
+      return { text: 'Biography', url: 'https://en.wikipedia.org/wiki/Band' };
+    },
+    artistImage: async qid => {
+      assert.equal(qid, 'Q42');
+      return { body: jpeg, credit: { url: 'https://commons.wikimedia.org/wiki/File:Band.jpg', license: 'CC BY-SA 4.0' } };
+    }
+  };
+  const service = new LocalMusicService({}, dir, {
+    library: { resolve: async ({ kind }) => kind === 'artist' ? artist : localEntity, fileMetadata: async () => null },
+    catalog,
+    fetcher: async url => {
+      if (url.searchParams.get('web')) return new Response(null, { status: 404 });
+      return new Response(jpeg);
+    },
+    image: async image => image.body
+  });
+  const info = await service.resolve(request(['cover', 'artistInfo'], { kind: 'artist', uri: 'artists://Band' }));
+  assert.equal(info.fields.cover.value.source, 'commons');
+  assert.equal(info.fields.cover.value.credit.license, 'CC BY-SA 4.0');
+  assert.equal(info.fields.artistInfo.value.text, 'Biography');
+  assert.equal(links, 1);
+});
+
+test('artist portraits use the selected Wikidata image and Commons thumbnail with credit', async () => {
+  const hosts = [];
+  const catalog = new MusicCatalog({ fetcher: async url => {
+    hosts.push(url.hostname);
+    if (url.hostname === 'www.wikidata.org') return Response.json({ claims: { P18: [
+      { rank: 'normal', mainsnak: { datavalue: { value: 'Old.jpg' } } },
+      { rank: 'preferred', mainsnak: { datavalue: { value: 'Portrait.jpg' } } }
+    ] } });
+    if (url.hostname === 'commons.wikimedia.org') {
+      assert.equal(url.searchParams.get('titles'), 'File:Portrait.jpg');
+      return Response.json({ query: { pages: [{ imageinfo: [{
+        thumburl: 'https://thumb.wikimedia.org/portrait.jpg',
+        descriptionurl: 'https://commons.wikimedia.org/wiki/File:Portrait.jpg',
+        extmetadata: { Artist: { value: 'Photographer' }, LicenseShortName: { value: 'CC BY 4.0' } }
+      }] }] } });
+    }
+    return new Response(jpeg, { headers: { 'Content-Type': 'image/jpeg' } });
+  } });
+  const image = await catalog.artistImage('Q42');
+  assert.deepEqual(image.body, jpeg);
+  assert.equal(image.credit.author, 'Photographer');
+  assert.equal(image.credit.license, 'CC BY 4.0');
+  assert.deepEqual(hosts, ['www.wikidata.org', 'commons.wikimedia.org', 'thumb.wikimedia.org']);
+});
+
 test('Volumio CUE album and playing track share an identity when the displayed artist is blank', async () => {
   const track = 'USB/Drive/Record/Band.cue/track0001';
   const track2 = 'USB/Drive/Record/Band.cue/track0002';
@@ -300,17 +365,47 @@ test('cover order skips the HTTP 200 stock placeholder and uses embedded JPEG be
   assert.deepEqual(Buffer.from(reply.fields.cover.value.jpeg, 'base64'), jpeg);
 });
 
-test('working Volumio art retains its URL and never opens the audio file', async t => {
+test('Volumio art caches the JPEG, upgrades old URL-only entries and survives failed refreshes', async t => {
   const dir = await cleanup(t);
+  let now = Date.now();
+  let online = true;
+  let downloads = 0;
+  const legacy = { source: 'volumio', url: localEntity.art };
+  const cache = new LocalMusicCache(dir, { now: () => now });
+  await cache.result(['cover', localEntity.key], () => legacy);
   const service = new LocalMusicService({}, dir, {
-    library: { resolve: async () => localEntity, fileMetadata: async () => assert.fail('stock art has priority') },
-    catalog: { album: async () => assert.fail('stock art has priority'), stop() {} },
+    cache,
+    library: { resolve: async () => localEntity, fileMetadata: async () => {
+      assert.equal(online, false, 'stock art has priority');
+      return null;
+    } },
+    catalog: { album: async () => null },
     image: async () => jpeg,
-    fetcher: async url => new Response(String(url).endsWith(localEntity.art) ? jpeg : Buffer.from([255, 216, 255, 219, 7]),
-      { headers: { 'Content-Type': 'image/jpeg' } })
+    fetcher: async url => {
+      if (String(url).endsWith(localEntity.art)) {
+        downloads++;
+        return online ? new Response(jpeg) : new Response(null, { status: 403 });
+      }
+      return new Response(Buffer.from([255, 216, 255, 219, 7]));
+    }
   });
-  const reply = await service.resolve(request(['cover']));
-  assert.deepEqual(reply.fields.cover, { status: 'found', value: { source: 'volumio', url: localEntity.art } });
+  const get = async () => (await service.resolve(request(['cover']))).fields.cover;
+  const first = await get();
+  assert.equal(first.status, 'found');
+  assert.equal(first.value.source, 'volumio');
+  assert.equal(first.value.url, localEntity.art);
+  assert.deepEqual(Buffer.from(first.value.jpeg, 'base64'), jpeg);
+  assert.equal(downloads, 1);
+
+  online = false;
+  assert.deepEqual(await get(), first);
+  assert.equal(downloads, 1);
+  now += 91 * DAY;
+  const stale = await get();
+  assert.deepEqual(stale.value, first.value);
+  assert(stale.retryAt > now);
+  assert.deepEqual(await get(), stale);
+  assert.equal(downloads, 2);
 });
 
 test('one result can contain a JPEG, local year and a temporary metadata error', async t => {
