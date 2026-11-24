@@ -19,6 +19,16 @@
     "PROXY_URL": "Proxy URL",
     "PROXY_DOC": "Enter an HTTP CONNECT proxy URL. Leave the field blank to keep the saved URL.",
     "PROXY_SAVED": "MusicBrainz proxy settings saved",
-    "PROXY_ERROR": "Could not save the proxy. Enter a valid HTTP CONNECT proxy URL."
+    "PROXY_ERROR": "Could not save the proxy. Enter a valid HTTP CONNECT proxy URL.",
+    "CACHE_SECTION": "Local library cache",
+    "CACHE_USAGE": "Cache usage",
+    "CACHE_USAGE_VALUE": "{used} of {limit} MiB",
+    "CACHE_SIZE": "Cache limit (MiB)",
+    "CACHE_SAVE": "Save limit",
+    "CACHE_SAVED": "Cache limit saved",
+    "CACHE_CLEAR": "Clear cache",
+    "CACHE_CLEAR_CONFIRM": "Clear cached covers, metadata and file quality for the local library?",
+    "CACHE_CLEARED": "Local library cache cleared",
+    "CACHE_ERROR": "Could not update the cache. Enter a limit from 1 to 4096 MiB."
   }
 }

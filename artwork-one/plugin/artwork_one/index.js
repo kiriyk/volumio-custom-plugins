@@ -40,6 +40,7 @@ var path = require('path');
 var randomUUID = require('node:crypto').randomUUID;
 var execFileSync = require('child_process').execFileSync;
 var LocalMusicService = require('./local-music-service').LocalMusicService;
+var { DEFAULT_CACHE_MIB, MIB } = require('./local-music-cache');
 
 var THEMES = ['dark', 'light', 'system'];
 var DELAYS = [-1, 0, 1, 2, 5, 10];   // -1: always in ambient
@@ -316,31 +317,36 @@ ArtworkOne.prototype.switchTo = function () {
 
 ArtworkOne.prototype.t = function (key) {
   var lang = this.commandRouter.sharedVars.get('language_code');
-  var strings = this.readJson(path.join(__dirname, 'i18n', 'strings_' + lang + '.json'), null) || this.readJson(path.join(__dirname, 'i18n', 'strings_en.json'), {});
-  return (strings.ARTWORK_ONE && strings.ARTWORK_ONE[key]) || key;
+  var strings = this.readJson(path.join(__dirname, 'i18n', 'strings_' + lang + '.json'), null);
+  return strings?.ARTWORK_ONE?.[key] || this.readJson(path.join(__dirname, 'i18n', 'strings_en.json'), {}).ARTWORK_ONE?.[key] || key;
 };
 ArtworkOne.prototype.onRestart = function () {};
 
 // --- the settings page: one line that says where the settings really are -------------------
 
 ArtworkOne.prototype.getUIConfig = function () {
-  var defer = libQ.defer();
-  var self = this;
-  var lang = this.commandRouter.sharedVars.get('language_code');
-  this.commandRouter.i18nJson(
-    path.join(__dirname, 'i18n', 'strings_' + lang + '.json'),
-    path.join(__dirname, 'i18n', 'strings_en.json'),
-    path.join(__dirname, 'UIConfig.json')
-  ).then(function (uiconf) {
-    try {
-      var active = self.isActive();
-      var status = uiconf.sections[0].content[0]; status.value = self.t(active ? 'ACTIVE' : 'INACTIVE');
-      if (active) { uiconf.sections[0].content[1].hidden = true; }   // nothing to switch to
-      uiconf.sections[1].content[0].value = fs.existsSync(self.paths.MUSICBRAINZ_PROXY);
-    } catch (e) { self.logger.warn('[artwork_one] ui config: ' + e); }
-    defer.resolve(uiconf);
-  }).fail(function (e) { defer.reject(new Error(e)); });
-  return defer.promise;
+  return libQ.resolve((async () => {
+    const lang = this.commandRouter.sharedVars.get('language_code');
+    const uiconf = await this.commandRouter.i18nJson(
+      path.join(__dirname, 'i18n', 'strings_' + lang + '.json'),
+      path.join(__dirname, 'i18n', 'strings_en.json'),
+      path.join(__dirname, 'UIConfig.json')
+    );
+    const active = this.isActive();
+    const status = uiconf.sections[0].content[0];
+    status.value = this.t(active ? 'ACTIVE' : 'INACTIVE');
+    if (active) uiconf.sections[0].content[1].hidden = true;
+    uiconf.sections[1].content[0].value = fs.existsSync(this.paths.MUSICBRAINZ_PROXY);
+    const cache = this.localMusic?.cache;
+    const limit = cache ? cache.maxBytes / MIB : this.musicCacheSize();
+    const usage = cache ? await cache.usage() : 0;
+    const [filled, size] = uiconf.sections[2].content;
+    filled.value = this.t('CACHE_USAGE_VALUE')
+      .replace('{used}', new Intl.NumberFormat(String(lang || 'en').replace('_', '-'), { maximumFractionDigits: 2 }).format(usage / MIB))
+      .replace('{limit}', limit);
+    size.value = limit;
+    return uiconf;
+  })());
 };
 
 ArtworkOne.prototype.setUIConfig = function () {};
@@ -502,7 +508,9 @@ ArtworkOne.prototype.saveMusicBrainzProxy = function (data) {
 ArtworkOne.prototype.startLocalMusic = function () {
   if (this.localMusic) return;
   var musicBrainzProxy = readMusicBrainzProxy(this.paths.MUSICBRAINZ_PROXY);
-  this.localMusic = new LocalMusicService(this.commandRouter, this.paths.MUSIC_CACHE, { logger: this.logger, musicBrainzProxy });
+  this.localMusic = new LocalMusicService(this.commandRouter, this.paths.MUSIC_CACHE, {
+    logger: this.logger, musicBrainzProxy, maxBytes: this.musicCacheSize() * MIB
+  });
   MUSIC_ENDPOINTS.forEach(endpoint => this.commandRouter.addPluginRestEndpoint(endpoint));
 };
 
@@ -520,6 +528,47 @@ ArtworkOne.prototype.getLocalMusicInfo = function (data) {
 
 ArtworkOne.prototype.getMusicBrainz = function (data) {
   return this.localMusic?.musicBrainz(data);
+};
+
+ArtworkOne.prototype.getLocalFileInfo = function (data) {
+  const uri = typeof data?.uri === 'string' ? data.uri : '';
+  return libQ.resolve((async () => {
+    const info = await this.localMusic?.fileInfo(uri);
+    return { message: 'pushArtworkLocalFileInfo', payload: { uri, ...info } };
+  })());
+};
+
+ArtworkOne.prototype.musicCacheSize = function () {
+  const size = this.config.get('musicCacheMiB');
+  return Number.isSafeInteger(size) && size >= 1 && size <= 4096 ? size : DEFAULT_CACHE_MIB;
+};
+
+ArtworkOne.prototype.changeMusicCache = async function (success, action) {
+  try {
+    if (!this.localMusic) throw new Error('Cache is unavailable');
+    await action(this.localMusic.cache);
+    this.commandRouter.broadcastMessage('pushUiConfig', await this.getUIConfig());
+    this.commandRouter.pushToastMessage('success', UI_PRETTY_NAME, this.t(success));
+  } catch (error) {
+    this.logger.warn('[artwork_one] cache settings: ' + (error.code || error.message));
+    this.commandRouter.pushToastMessage('error', UI_PRETTY_NAME, this.t('CACHE_ERROR'));
+  }
+};
+
+ArtworkOne.prototype.saveMusicCacheSize = function (data) {
+  return libQ.resolve(this.changeMusicCache('CACHE_SAVED', async cache => {
+    const size = Number(data?.cacheSize);
+    if (!Number.isSafeInteger(size) || size < 1 || size > 4096) throw new Error('Invalid cache size');
+    await cache.resize(size * MIB);
+    this.config.set('musicCacheMiB', size);
+  }));
+};
+
+ArtworkOne.prototype.clearMusicCache = function () {
+  return libQ.resolve(this.changeMusicCache('CACHE_CLEARED', async cache => {
+    await cache.clear();
+    this.commandRouter.broadcastMessage('pushArtworkCacheCleared', {});
+  }));
 };
 
 // callMethod → answered to the caller only

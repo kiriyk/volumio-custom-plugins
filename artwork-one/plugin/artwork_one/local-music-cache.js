@@ -6,29 +6,34 @@ const { createHash, randomUUID } = require('node:crypto');
 
 const DAY = 24 * 60 * 60 * 1000;
 const RETRY = 15 * 60 * 1000;
-const FRESH = { found: 30 * DAY, notFound: DAY, temporaryError: RETRY };
+const FRESH = { found: 90 * DAY, notFound: DAY, temporaryError: RETRY };
 const MIB = 1024 * 1024;
+const DEFAULT_CACHE_MIB = 64;
 const digest = data => createHash('sha256').update(data).digest('hex');
 
 class LocalMusicCache {
-  constructor(dir, { maxBytes = 64 * MIB, now = Date.now, onError = () => {} } = {}) {
+  constructor(dir, { maxBytes = DEFAULT_CACHE_MIB * MIB, now = Date.now, onError = () => {} } = {}) {
     this.dir = dir;
     this.maxBytes = maxBytes;
     this.now = now;
     this.onError = onError;
     this.inflight = new Map();
     this.writes = Promise.resolve();
+    this.generation = 0;
   }
 
   result(key, lookup) {
     const id = digest(JSON.stringify([1, key]));
     if (this.inflight.has(id)) return this.inflight.get(id);
-    const result = this.readThrough(id, lookup).finally(() => this.inflight.delete(id));
+    const result = this.readThrough(id, lookup, this.generation).finally(() => {
+      if (this.inflight.get(id) === result) this.inflight.delete(id);
+    });
     this.inflight.set(id, result);
     return result;
   }
 
-  async readThrough(id, lookup) {
+  async readThrough(id, lookup, generation) {
+    await this.writes;
     const hit = await this.read(id);
     if (hit?.freshUntil > this.now()) return hit.result;
     let result;
@@ -39,10 +44,11 @@ class LocalMusicCache {
     } catch (error) {
       this.onError(error, 'lookup');
       result = hit?.result.status === 'found' ? hit.result : { status: 'temporaryError' };
-      retryAt = Math.max(this.now() + RETRY, Number(error.retryAfter) || 0);
+      const now = this.now();
+      retryAt = Number.isFinite(error.retryAfter) ? Math.max(now + 1000, error.retryAfter) : now + RETRY;
       result = { ...result, retryAt };
     }
-    await this.write(id, { result, freshUntil: retryAt ?? this.now() + FRESH[result.status] });
+    await this.write(id, { result, freshUntil: retryAt ?? this.now() + FRESH[result.status] }, generation);
     return result;
   }
 
@@ -60,8 +66,15 @@ class LocalMusicCache {
     }
   }
 
-  write(id, data) {
-    const run = this.writes.then(async () => {
+  enqueue(work) {
+    const run = this.writes.then(work);
+    this.writes = run.catch(() => {});
+    return run;
+  }
+
+  write(id, data, generation) {
+    return this.enqueue(async () => {
+      if (generation !== this.generation) return;
       const json = JSON.stringify(data);
       const size = Buffer.byteLength(json);
       if (size > this.maxBytes) return;
@@ -78,27 +91,50 @@ class LocalMusicCache {
         await fs.rm(temp, { force: true });
       }
     }).catch(error => this.onError(error, 'write'));
-    this.writes = run;
-    return run;
   }
 
-  async prune(replacedId, addedSize) {
-    let used = addedSize;
-    const entries = [];
-    for (const name of await fs.readdir(this.dir)) {
-      if (!/^[a-f0-9]{64}\.json$/.test(name) || name === replacedId + '.json') continue;
+  async entries(replacedId) {
+    const names = await fs.readdir(this.dir, { withFileTypes: true }).catch(error => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    return Promise.all(names.filter(entry => entry.isFile() && /^[a-f0-9]{64}\.json$/.test(entry.name)
+      && entry.name !== replacedId + '.json').map(async ({ name }) => {
       const file = path.join(this.dir, name);
       const stat = await fs.stat(file);
-      used += stat.size;
-      entries.push({ file, size: stat.size, time: stat.mtimeMs });
-    }
+      return { file, size: stat.size, time: stat.mtimeMs };
+    }));
+  }
+
+  usage() {
+    return this.enqueue(async () => (await this.entries()).reduce((sum, entry) => sum + entry.size, 0));
+  }
+
+  resize(maxBytes) {
+    return this.enqueue(async () => {
+      await this.prune(undefined, 0, maxBytes);
+      this.maxBytes = maxBytes;
+    });
+  }
+
+  clear() {
+    this.generation++;
+    this.inflight.clear();
+    return this.enqueue(async () => {
+      for (const { file } of await this.entries()) await fs.rm(file, { force: true });
+    });
+  }
+
+  async prune(replacedId, addedSize, limit = this.maxBytes) {
+    const entries = await this.entries(replacedId);
+    let used = entries.reduce((sum, entry) => sum + entry.size, addedSize);
     entries.sort((a, b) => a.time - b.time);
     for (const entry of entries) {
-      if (used <= this.maxBytes) break;
+      if (used <= limit) break;
       await fs.rm(entry.file, { force: true });
       used -= entry.size;
     }
   }
 }
 
-module.exports = { LocalMusicCache, digest };
+module.exports = { LocalMusicCache, DEFAULT_CACHE_MIB, MIB, digest };

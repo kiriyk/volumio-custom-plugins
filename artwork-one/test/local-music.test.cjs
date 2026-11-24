@@ -22,6 +22,78 @@ const cleanup = async t => {
   return dir;
 };
 
+test('remote requests retry four times and respect Retry-After', async () => {
+  let calls = 0;
+  const delays = [];
+  const reply = await remote('https://example.test', {
+    fetcher: async () => {
+      calls++;
+      if (calls === 1) return new Response(null, { status: 503, headers: { 'Retry-After': '3' } });
+      if (calls === 2) throw new TypeError('fetch failed');
+      if (calls <= 4) return new Response(null, { status: 429 });
+      return new Response('complete');
+    },
+    wait: async delay => delays.push(delay)
+  });
+  assert.equal(reply.body.toString(), 'complete');
+  assert.equal(calls, 5);
+  assert(delays[0] >= 2900 && delays[0] <= 3000);
+  assert.deepEqual(delays.slice(1), [2000, 4000, 8000]);
+
+  const until = new Date(Date.now() + 60_000).toUTCString();
+  await assert.rejects(remote('https://example.test', {
+    fetcher: async () => new Response(null, { status: 503, headers: { 'Retry-After': until } }),
+    wait: () => assert.fail('long server cooldown must be returned to the cache')
+  }), { retryAfter: Date.parse(until) });
+
+  await assert.rejects(remote('https://example.test', {
+    fetcher: async () => new Response(null, { status: 403 }),
+    wait: () => assert.fail('a permanent client error should not be retried')
+  }), /403/);
+});
+
+test('track size and bitrate are cached by complete file identity and survive reopening', async t => {
+  const dir = await cleanup(t);
+  const tracks = ['First', 'Second'].map(album => 'INTERNAL/' + album + '/One.flac');
+  for (const [i, track] of tracks.entries()) {
+    await fs.mkdir(path.dirname(path.join(dir, track)), { recursive: true });
+    await fs.writeFile(path.join(dir, track), Buffer.alloc(i + 10));
+  }
+  const cacheDir = path.join(dir, 'cache');
+  const library = new LocalMusicLibrary({}, { mountRoot: dir, probe: async file => ({
+    format: { bit_rate: file.includes('/First/') ? 100000 : 200000 }
+  }) });
+  const service = new LocalMusicService({}, cacheDir, { library });
+  assert.deepEqual(await service.fileInfo('mnt/' + tracks[0]), { size: 10, bitrate: 100000 });
+  assert.deepEqual(await service.fileInfo('mnt/' + tracks[1]), { size: 11, bitrate: 200000 });
+  library.probe = async () => ({ format: { bit_rate: 300000 } });
+  const reopened = new LocalMusicService({}, cacheDir, { library });
+  assert.deepEqual(await reopened.fileInfo('music-library/' + tracks[0]), { size: 10, bitrate: 100000 });
+  await fs.appendFile(path.join(dir, tracks[0]), 'changed');
+  assert.deepEqual(await reopened.fileInfo('mnt/' + tracks[0]), { size: 17, bitrate: 300000 });
+});
+
+test('clearing the cache removes its files and drops writes from older lookups', async t => {
+  const dir = await cleanup(t);
+  const cache = new LocalMusicCache(dir);
+  await cache.result('cover', () => 'jpeg');
+  assert(await cache.usage() > 0);
+  let finish;
+  let started;
+  const waiting = new Promise(resolve => { started = resolve; });
+  const pending = cache.result('pending', () => new Promise(resolve => { finish = resolve; started(); }));
+  await waiting;
+  await fs.writeFile(path.join(dir, 'unrelated'), 'keep');
+  await cache.clear();
+  finish('old');
+  await pending;
+  assert.equal(await cache.usage(), 0);
+  assert.deepEqual(await fs.readdir(dir), ['unrelated']);
+  await cache.result('cover', () => 'x'.repeat(100));
+  await cache.resize(1);
+  assert.equal(await cache.usage(), 0);
+});
+
 test('Volumio CUE album and playing track share an identity when the displayed artist is blank', async () => {
   const track = 'USB/Drive/Record/Band.cue/track0001';
   const track2 = 'USB/Drive/Record/Band.cue/track0002';
@@ -185,7 +257,9 @@ test('persistent cache distinguishes misses from errors, shares concurrent calle
   assert.equal(lookups, 1);
   const reopened = new LocalMusicCache(dir, { now: () => now });
   assert.deepEqual(await reopened.result('cover', () => assert.fail('cache not used')), first);
-  now += 31 * DAY;
+  now += 89 * DAY;
+  assert.deepEqual(await reopened.result('cover', () => assert.fail('expired before 90 days')), first);
+  now += 2 * DAY;
   const retryAt = now + DAY;
   const offline = () => { throw Object.assign(new Error('503'), { retryAfter: retryAt }); };
   assert.deepEqual(await reopened.result('cover', offline), { ...first, retryAt });

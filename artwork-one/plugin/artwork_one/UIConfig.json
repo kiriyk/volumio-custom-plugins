@@ -44,6 +44,30 @@
         { "id": "proxyEnabled", "element": "switch", "label": "TRANSLATE.ARTWORK_ONE.PROXY_ENABLED", "value": false },
         { "id": "proxyUrl", "element": "input", "type": "password", "label": "TRANSLATE.ARTWORK_ONE.PROXY_URL", "doc": "TRANSLATE.ARTWORK_ONE.PROXY_DOC", "value": "" }
       ]
+    },
+    {
+      "id": "section_music_cache",
+      "element": "section",
+      "label": "TRANSLATE.ARTWORK_ONE.CACHE_SECTION",
+      "icon": "fa-database",
+      "onSave": { "type": "controller", "endpoint": "user_interface/artwork_one", "method": "saveMusicCacheSize" },
+      "saveButton": { "label": "TRANSLATE.ARTWORK_ONE.CACHE_SAVE", "data": ["cacheSize"] },
+      "content": [
+        { "id": "cacheUsage", "element": "input", "type": "text", "label": "TRANSLATE.ARTWORK_ONE.CACHE_USAGE", "value": "", "attributes": [{ "readonly": true }] },
+        { "id": "cacheSize", "element": "input", "type": "number", "label": "TRANSLATE.ARTWORK_ONE.CACHE_SIZE", "value": 64, "attributes": [{ "min": 1, "max": 4096, "step": 1 }] },
+        {
+          "id": "clearMusicCache",
+          "element": "button",
+          "label": "TRANSLATE.ARTWORK_ONE.CACHE_CLEAR",
+          "onClick": {
+            "type": "plugin",
+            "endpoint": "user_interface/artwork_one",
+            "method": "clearMusicCache",
+            "data": {},
+            "askForConfirm": { "title": "TRANSLATE.ARTWORK_ONE.CACHE_CLEAR", "message": "TRANSLATE.ARTWORK_ONE.CACHE_CLEAR_CONFIRM" }
+          }
+        }
+      ]
     }
   ]
 }

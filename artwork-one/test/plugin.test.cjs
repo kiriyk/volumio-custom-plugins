@@ -52,6 +52,32 @@ test('MusicBrainz settings store the URL privately and never return it to the UI
   } finally { fs.rmSync(pathname, { force: true }); }
 });
 
+test('local library settings report usage, save the cache limit and clear cached data', async t => {
+  const { ctx, calls } = fakeVolumio();
+  const plugin = new Plugin(ctx);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'artwork-cache-settings-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const { LocalMusicCache } = require('../plugin/artwork_one/local-music-cache');
+  const cache = new LocalMusicCache(dir);
+  plugin.localMusic = { cache, fileInfo: async () => ({ size: 250, bitrate: 192000 }) };
+  const settings = new Map();
+  plugin.config = settings;
+  await cache.result('cover', () => 'x'.repeat(1024 * 128));
+  const config = await plugin.getUIConfig();
+  const section = config.sections.find(s => s.id === 'section_music_cache');
+  assert.equal(section.content[0].value, '0.13 of 64 MiB');
+  assert.equal(section.content[1].value, 64);
+  await plugin.saveMusicCacheSize({ cacheSize: '2' });
+  assert.equal(settings.get('musicCacheMiB'), 2);
+  assert.equal(cache.maxBytes, 2 * 1024 * 1024);
+  assert.deepEqual(await plugin.getLocalFileInfo({ uri: 'mnt/USB/Drive/One.flac' }), {
+    message: 'pushArtworkLocalFileInfo', payload: { uri: 'mnt/USB/Drive/One.flac', size: 250, bitrate: 192000 }
+  });
+  await plugin.clearMusicCache();
+  assert.equal(await cache.usage(), 0);
+  assert(calls.some(call => call[1] === 'pushArtworkCacheCleared'));
+});
+
 test('onStart registers the interface; onStop takes it out and switches a player that showed it', async () => {
   const { ctx, calls } = fakeVolumio();
   const p = new Plugin(ctx);

@@ -9,6 +9,10 @@ const EDITION = /(?:[\s,–—-]+|[\s]*[([])(?<edition>(?:(?:super[\s-]*)?deluxe
 const LIVE = /\b(?:live(?:\s+(?:at|in|on|from|album|edition))?|in concert|concert recording|concert edition)\b/i;
 const COUNTRY = { us: 'US', uk: 'GB', jp: 'JP', japan: 'JP', japanese: 'JP', eu: 'XE', european: 'XE', de: 'DE', fr: 'FR' };
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const RETRIES = 4;
+const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
+const ATTEMPT_TIMEOUT = 7000;
+const REQUEST_BUDGET = 55_000;
 const baseTitle = s => String(s || '').normalize('NFKC').toLowerCase().replace(/\+/g, '&')
   .replace(/[^\p{L}\p{N}&]+/gu, ' ').replace(/\s*&\s*/g, ' & ').trim();
 const lucene = s => '"' + String(s).replace(/["\\]/g, '\\$&') + '"';
@@ -24,14 +28,42 @@ function unique(items) {
   return [...new Map(items.filter(x => x?.id).map(x => [x.id, x])).values()];
 }
 
-async function remote(url, { fetcher = fetch, maxBytes = 2 * 1024 * 1024, allowHost, allowMissing = false } = {}) {
-  const signal = AbortSignal.timeout(7000);
+async function remote(url, { fetcher = fetch, maxBytes = 2 * 1024 * 1024, allowHost, allowMissing = false, wait = sleep } = {}) {
   let target = new URL(url);
-  for (let hops = 0; hops <= 4; hops++) {
+  let hops = 0;
+  const deadline = Date.now() + REQUEST_BUDGET;
+  for (let attempt = 0; ; ) {
     if (target.protocol !== 'https:' && target.hostname !== '127.0.0.1') throw new Error('unsupported URL protocol');
     if (allowHost && !allowHost(target.hostname)) throw new Error('unexpected redirect host');
-    const response = await fetcher(target, { signal, redirect: 'manual', headers: { 'User-Agent': USER_AGENT } });
+    let response;
+    let error;
+    try {
+      const timeout = Math.max(1, Math.min(ATTEMPT_TIMEOUT, deadline - Date.now()));
+      response = await fetcher(target, { signal: AbortSignal.timeout(timeout), redirect: 'manual', headers: { 'User-Agent': USER_AGENT } });
+      if (response.ok && Number(response.headers.get('content-length')) <= maxBytes) {
+        return await readBody(response, maxBytes);
+      }
+    } catch (cause) {
+      if (!(cause instanceof TypeError) && !['TimeoutError', 'AbortError'].includes(cause.name)) throw cause;
+      error = cause;
+    }
+    if (error || RETRYABLE.has(response.status)) {
+      const retry = response?.headers.get('retry-after');
+      error ||= new Error('provider HTTP ' + response.status);
+      const retryAt = retry == null ? NaN : /^\d+$/.test(retry) ? Date.now() + 1000 * Number(retry) : Date.parse(retry);
+      if (Number.isFinite(retryAt)) error.retryAfter = retryAt;
+      if (!response?.bodyUsed) await response?.body?.cancel();
+      const delay = Math.max(1000 * 2 ** attempt, (error.retryAfter || 0) - Date.now());
+      if (attempt === RETRIES || Date.now() + delay + ATTEMPT_TIMEOUT > deadline) throw error;
+      attempt++;
+      await wait(delay);
+      continue;
+    }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
+      if (++hops > 4) {
+        await response.body?.cancel();
+        throw new Error('too many redirects');
+      }
       const next = response.headers.get('location');
       await response.body?.cancel();
       if (!next) throw new Error('missing redirect URL');
@@ -42,15 +74,15 @@ async function remote(url, { fetcher = fetch, maxBytes = 2 * 1024 * 1024, allowH
       await response.body?.cancel();
       return null;
     }
-    if (!response.ok || Number(response.headers.get('content-length')) > maxBytes) {
-      const error = new Error('provider HTTP ' + response.status);
-      const retry = response.headers.get('retry-after');
-      if (retry !== null) error.retryAfter = /^\d+$/.test(retry) ? Date.now() + 1000 * Number(retry) : Date.parse(retry);
-      await response.body?.cancel();
-      throw error;
-    }
-    const chunks = [];
-    let size = 0;
+    await response.body?.cancel();
+    throw new Error(response.ok ? 'provider response too large' : 'provider HTTP ' + response.status);
+  }
+}
+
+async function readBody(response, maxBytes) {
+  const chunks = [];
+  let size = 0;
+  if (response.body) {
     const reader = response.body.getReader();
     try {
       while (true) {
@@ -61,11 +93,10 @@ async function remote(url, { fetcher = fetch, maxBytes = 2 * 1024 * 1024, allowH
         chunks.push(Buffer.from(value));
       }
     } finally {
-      await reader.cancel();
+      await reader.cancel().catch(() => {});
     }
-    return { body: Buffer.concat(chunks), type: response.headers.get('content-type') || '' };
   }
-  throw new Error('too many redirects');
+  return { body: Buffer.concat(chunks), type: response.headers.get('content-type') || '' };
 }
 
 function folderEdition(track) {
@@ -142,13 +173,16 @@ class MusicCatalog {
     this.waiting++;
     const request = this.chain.then(async () => {
       if (this.retryAfter > Date.now()) throw Object.assign(new Error('catalog cooling down'), { retryAfter: this.retryAfter });
-      const delay = Math.max(0, this.nextRequest - Date.now());
-      if (delay) await sleep(delay);
-      if (this.closed) throw new Error('catalog closed');
-      this.nextRequest = Date.now() + this.interval;
       try {
         const proxy = this.musicBrainzProxy;
-        const fetcher = proxy ? (url, options) => this.fetcher(url, { ...options, dispatcher: proxy }) : this.fetcher;
+        const fetcher = async (url, options) => {
+          const delay = this.nextRequest - Date.now();
+          if (delay > 0) await sleep(delay);
+          options.signal.throwIfAborted();
+          if (this.closed) throw new Error('catalog closed');
+          this.nextRequest = Date.now() + this.interval;
+          return this.fetcher(url, proxy ? { ...options, dispatcher: proxy } : options);
+        };
         return await this.json('https://musicbrainz.org/ws/2/' + entity + '?' + new URLSearchParams({ ...params, fmt: 'json' }), host => host === 'musicbrainz.org', fetcher);
       } catch (error) {
         if (Number.isFinite(error.retryAfter)) this.retryAfter = Math.max(this.retryAfter, error.retryAfter);

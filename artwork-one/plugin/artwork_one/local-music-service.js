@@ -1,7 +1,7 @@
 'use strict';
 
 const { spawn } = require('node:child_process');
-const { LocalMusicLibrary, field } = require('./local-music-library');
+const { LocalMusicLibrary, field, localPath } = require('./local-music-library');
 const { MusicCatalog, remote } = require('./music-catalog');
 const { LocalMusicCache, digest } = require('./local-music-cache');
 
@@ -61,12 +61,12 @@ function validate(data) {
 }
 
 class LocalMusicService {
-  constructor(router, cacheDir, { logger, library, catalog, cache, fetcher = fetch, image = convertImage, musicBrainzProxy } = {}) {
+  constructor(router, cacheDir, { logger, library, catalog, cache, fetcher = fetch, image = convertImage, musicBrainzProxy, maxBytes } = {}) {
     this.library = library || new LocalMusicLibrary(router);
     this.catalog = catalog || new MusicCatalog({ fetcher, musicBrainzProxy });
     this.fetcher = fetcher;
     this.image = image;
-    this.cache = cache || new LocalMusicCache(cacheDir, { onError: (error, operation) => {
+    this.cache = cache || new LocalMusicCache(cacheDir, { maxBytes, onError: (error, operation) => {
       if (operation !== 'lookup') logger?.warn('[artwork_one] local music cache ' + operation + ' failed (' + (error.code || error.name) + ')');
     } });
     this.resolutions = new Map();
@@ -122,6 +122,22 @@ class LocalMusicService {
 
   probe(entity) {
     return this.remember(this.probes, entity.key, () => this.library.fileMetadata(entity.track));
+  }
+
+  async fileInfo(uri) {
+    if (typeof uri !== 'string' || uri.length > 4096 || this.closed) return null;
+    const track = localPath(uri);
+    if (!track) return null;
+    const source = await this.library.audioSource(track);
+    if (!source) return null;
+    const { file, stat } = source;
+    const key = ['track quality', track, file, stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs];
+    const result = await this.cache.result(key, async () => {
+      const metadata = await this.library.probeAudio(file);
+      const bitrate = Number(metadata.format?.bit_rate);
+      return { size: stat.size, bitrate: Number.isFinite(bitrate) && bitrate > 0 ? bitrate : null };
+    });
+    return { size: stat.size, bitrate: result.value?.bitrate ?? null };
   }
 
   async match(entity) {

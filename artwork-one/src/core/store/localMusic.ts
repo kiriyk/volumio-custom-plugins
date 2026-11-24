@@ -1,6 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react';
 import { create } from 'zustand';
 import { albumart, pluginRest } from '../api';
+import { on } from '../socket';
 import { localPlayingAlbumKey, localPlayingUri } from '../localMusicUri';
 
 export interface AlbumInfo {
@@ -42,9 +43,19 @@ const useEntries = create<{ entries: Record<string, Entry> }>(() => ({ entries: 
 const liveEntries = new Map<string, number>();
 const images = new Map<string, { url: string; count: number }>();
 const pending = new Set<string>();
-const queue: Array<{ key: string; priority: boolean; run: () => Promise<void> }> = [];
+const queue: Array<{ key: string; priority: boolean; generation: number; run: () => Promise<void> }> = [];
 let sequence = 0;
 let active = 0;
+let generation = 0;
+
+on('pushArtworkCacheCleared', () => {
+  generation++;
+  queue.length = 0;
+  pending.clear();
+  for (const image of images.values()) URL.revokeObjectURL(image.url);
+  images.clear();
+  useEntries.setState({ entries: {} });
+});
 
 function removeBlob(id?: string) {
   if (!id) return;
@@ -98,13 +109,13 @@ function drain() {
     if (high < 0 && active >= 3) return;
     const [job] = queue.splice(Math.max(high, 0), 1);
     if (!liveEntries.has(job.key)) {
-      pending.delete(job.key);
+      if (job.generation === generation) pending.delete(job.key);
       continue;
     }
     active++;
     void job.run().finally(() => {
       active--;
-      pending.delete(job.key);
+      if (job.generation === generation) pending.delete(job.key);
       drain();
     });
   }
@@ -114,13 +125,15 @@ function request<F extends Field>(key: string, uri: string, field: F, kind: 'alb
   const hit = useEntries.getState().entries[key];
   if (pending.has(key) || (hit && hit.until > Date.now())) return;
   pending.add(key);
-  queue.push({ key, priority, run: async () => {
+  const requestedGeneration = generation;
+  queue.push({ key, priority, generation: requestedGeneration, run: async () => {
     const requestId = 'music-' + ++sequence;
     try {
       const answer = await pluginRest<Response<F>>('artworkOneLocalMusicInfo', { requestId, uri, kind, fields: [field] });
+      if (generation !== requestedGeneration) return;
       if (answer.requestId !== requestId) throw new Error('Unexpected local music response');
       const result = answer.fields?.[field];
-      const retryAt = Math.max(Date.now() + RETRY, result?.retryAt || 0);
+      const retryAt = result?.retryAt ?? Date.now() + RETRY;
       if (result?.status === 'found') {
         const partial = field === 'albumInfo' && (result.value as AlbumInfo)?.summaryStatus === 'temporaryError';
         store(key, { value: result.value, until: partial || result.retryAt ? retryAt : Date.now() + REGULAR_TTL }, field);
@@ -132,6 +145,7 @@ function request<F extends Field>(key: string, uri: string, field: F, kind: 'alb
         store(key, { until: retryAt }, field);
       }
     } catch {
+      if (generation !== requestedGeneration) return;
       if (hit?.value) useEntries.setState(state => ({ entries: { ...state.entries, [key]: { ...hit, until: Date.now() + RETRY } } }));
       else store(key, { until: Date.now() + RETRY }, field);
     }

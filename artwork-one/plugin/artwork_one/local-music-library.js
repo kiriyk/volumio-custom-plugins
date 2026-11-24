@@ -90,7 +90,7 @@ function naturalPath(a, b) {
 
 async function ffprobe(file) {
   const { stdout } = await exec('/usr/bin/ffprobe', [
-    '-v', 'error', '-show_entries', 'format_tags:stream=index:stream_disposition=attached_pic:stream_tags=comment,title',
+    '-v', 'error', '-show_entries', 'format=bit_rate:format_tags:stream=index:stream_disposition=attached_pic:stream_tags=comment,title',
     '-of', 'json', file
   ], { timeout: 5000, maxBuffer: 256 * 1024 });
   return JSON.parse(stdout);
@@ -101,6 +101,8 @@ class LocalMusicLibrary {
     this.router = router;
     this.mountRoot = mountRoot;
     this.probe = probe;
+    this.activeProbes = 0;
+    this.waitingProbes = [];
   }
 
   mpd() {
@@ -190,8 +192,13 @@ class LocalMusicLibrary {
   }
 
   async audioFile(track) {
+    const source = await this.audioSource(track);
+    return source && source.file;
+  }
+
+  async audioSource(track) {
     const cue = CUE.exec(track);
-    if (!cue) return AUDIO.test(track) ? (await this.checkedFile(track))?.file : null;
+    if (!cue) return AUDIO.test(track) ? (await this.checkedFile(track)) || undefined : null;
     const sheet = await this.checkedFile(cue[1]);
     if (!sheet || sheet.stat.size > 256 * 1024) return null;
     const content = await fs.readFile(sheet.file, { encoding: 'utf8', signal: AbortSignal.timeout(2000) });
@@ -213,15 +220,25 @@ class LocalMusicLibrary {
     }
     const name = requested ? selected : first;
     if (!name || !AUDIO.test(name) || path.posix.isAbsolute(name) || name.split('/').includes('..')) return null;
-    const linked = await this.checkedFile(path.posix.join(path.posix.dirname(cue[1]), name));
-    return linked?.file;
+    return (await this.checkedFile(path.posix.join(path.posix.dirname(cue[1]), name))) || undefined;
+  }
+
+  async probeAudio(file) {
+    if (this.activeProbes >= 3) await new Promise(resolve => this.waitingProbes.push(resolve));
+    else this.activeProbes++;
+    try { return await this.probe(file); }
+    finally {
+      const next = this.waitingProbes.shift();
+      if (next) next();
+      else this.activeProbes--;
+    }
   }
 
   async fileMetadata(track) {
     const file = await this.audioFile(track);
     if (!file) return null;
     let metadata;
-    try { metadata = await this.probe(file); }
+    try { metadata = await this.probeAudio(file); }
     catch (error) {
       if (error.code === 1 && !error.killed) return null;
       throw error;
