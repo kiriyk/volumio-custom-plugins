@@ -38,6 +38,7 @@ var VConf = core('v-conf');
 var fs = require('fs');
 var path = require('path');
 var execFileSync = require('child_process').execFileSync;
+var LocalMusicService = require('./local-music-service').LocalMusicService;
 
 var THEMES = ['dark', 'light', 'system'];
 var DELAYS = [-1, 0, 1, 2, 5, 10];   // -1: always in ambient
@@ -53,6 +54,7 @@ var UI_PRETTY_NAME = 'Artwork One';
 var ROOT = process.env.ARTWORK_ONE_TEST_ROOT || '';
 var PATHS = {
   UI_DIR: ROOT ? path.join(ROOT, 'ui') : path.join(__dirname, 'ui'),
+  MUSIC_CACHE: ROOT + '/data/artwork-one-music-cache',
   UI_LIST: ROOT + '/data/thirdPartyUisList.json',
   ACTIVE_UI: ROOT + '/data/active_volumio_ui',
   CORE_UI_LIST: ROOT + '/volumio/volumioUisList.json',
@@ -62,6 +64,10 @@ var PATHS = {
   CORE_TEMP: ROOT + '/data/temp'                    // where it unpacks it; removed when the update ends, well or not
 };
 var PLUGIN_NAME = 'artwork_one';
+var MUSIC_ENDPOINTS = [
+  { endpoint: 'artworkOneLocalMusicInfo', type: 'user_interface', name: PLUGIN_NAME, method: 'getLocalMusicInfo' },
+  { endpoint: 'artworkOneMusicBrainz', type: 'user_interface', name: PLUGIN_NAME, method: 'getMusicBrainz' }
+];
 var UPDATE_POLL = 1000, UPDATE_GIVE_UP = 10 * 60 * 1000;
 
 module.exports = ArtworkOne;
@@ -92,6 +98,7 @@ ArtworkOne.prototype.onStart = function () {
     self.takeOverScriptInstall();
     self.registerUI();
     if (fresh) { self.introduce(); } else { self.comeBack(); }
+    self.startLocalMusic();
   } catch (e) {
     self.logger.error('[artwork_one] start failed: ' + e);
     return libQ.reject(new Error('Artwork One could not register its interface: ' + e));
@@ -110,6 +117,7 @@ ArtworkOne.prototype.onStart = function () {
 ArtworkOne.prototype.onStop = function () {
   var self = this;
   try {
+    self.stopLocalMusic();
     var active = self.isActive();
     self.config.set('wasActive', active);
     if (self.isBeingUpdated()) {
@@ -435,6 +443,28 @@ ArtworkOne.prototype.cleanAmbient = function (a) {
 };
 
 function isTime(v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(v || '')); }
+
+ArtworkOne.prototype.startLocalMusic = function () {
+  if (this.localMusic) return;
+  this.localMusic = new LocalMusicService(this.commandRouter, this.paths.MUSIC_CACHE, { logger: this.logger });
+  MUSIC_ENDPOINTS.forEach(endpoint => this.commandRouter.addPluginRestEndpoint(endpoint));
+};
+
+ArtworkOne.prototype.stopLocalMusic = function () {
+  if (!this.localMusic) return;
+  this.localMusic.stop();
+  this.localMusic = null;
+  MUSIC_ENDPOINTS.forEach(endpoint => this.commandRouter.removePluginRestEndpoint(endpoint));
+};
+
+ArtworkOne.prototype.getLocalMusicInfo = function (data) {
+  var language = String(this.commandRouter.sharedVars.get('language_code') || 'en').toLowerCase().split(/[-_]/)[0];
+  return this.localMusic ? this.localMusic.resolve({ locale: language, ...data }) : { requestId: data?.requestId, error: 'temporaryError' };
+};
+
+ArtworkOne.prototype.getMusicBrainz = function (data) {
+  return this.localMusic?.musicBrainz(data);
+};
 
 // callMethod → answered to the caller only
 ArtworkOne.prototype.getSettings = function () {

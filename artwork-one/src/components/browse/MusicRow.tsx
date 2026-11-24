@@ -3,6 +3,8 @@ import { useRef, useState } from 'react';
 import Icon from '../Icon';
 import ItemMenu from './ItemMenu';
 import { albumart } from '../../core/api';
+import { localAlbumUri } from '../../core/localMusicUri';
+import { useLocalAlbumCover } from '../../core/store/localMusic';
 import { librarySectionArtwork } from '../../core/libraryArtwork';
 import { type BrowseItem, useBrowse } from '../../core/store/browse';
 import { usePlayer } from '../../core/store/player';
@@ -43,7 +45,8 @@ export default function MusicRow({ item, list, listIndex, itemIndex, hidden, ord
   const favVisible = A.showPlayButton(item) && (item.type === 'song' || item.type === 'folder-with-favourites') && (req ? req.uri : '') !== 'favourites';
   const noMenu = !A.showHamburgerMenu(item);
   const libraryCover = librarySectionArtwork(item);
-  const cover = libraryCover || albumart(item.albumart);
+  const musicCover = useLocalAlbumCover(localAlbumUri(item.uri), item.albumart, rowRef);
+  const cover = libraryCover || musicCover;
   // a folder of the file browser (USB, NAS, internal storage) is opened, never played from its row:
   // no play button and no number (albums://, playlists and genres keep both)
   const isDir = /^(folder|remdisk|internal-folder)$/.test(String(item.type || '')) && /^music-library(\/|$)/.test(String(item.uri || ''));

@@ -6,10 +6,10 @@
  */
 import { create } from 'zustand';
 import { usePlayer } from './player';
+import { pluginRest } from '../api';
+import { localPlayingUri } from '../localMusicUri';
 
 const KEEP = 40;
-const MB = 'https://musicbrainz.org/ws/2/';
-const MB_GAP = 1100;
 const WIKI_SUMMARY = 'https://en.wikipedia.org/api/rest_v1/page/summary/';
 const WIKIDATA = 'https://www.wikidata.org/w/api.php';
 const LB_SIMILAR = 'https://labs.api.listenbrainz.org/similar-artists/json';
@@ -53,15 +53,11 @@ async function related(mbid: string): Promise<Related[]> {
   } catch { return []; }
 }
 const order: [Record<string, any>, string][] = [];
-let mbLast = 0; let mbChain: Promise<any> = Promise.resolve();
 let lastKeys = '';
 
 const json = async (url: string, params: Record<string, string>) => { const r = await fetch(url + '?' + new URLSearchParams(params).toString(), { headers: { Accept: 'application/json' } }); if (!r.ok) { throw new Error(String(r.status)); } return r.json(); };
 function mb(path: string, params: Record<string, string>): Promise<any> {
-  const run = async () => { const wait = Math.max(0, mbLast + MB_GAP - Date.now()); await new Promise(res => setTimeout(res, wait)); mbLast = Date.now(); return json(MB + path, { fmt: 'json', ...params }); };
-  const p = mbChain.then(run, run);
-  mbChain = p.catch(() => {});
-  return p;
+  return pluginRest('artworkOneMusicBrainz', { entity: path, params });
 }
 const lucene = (v: any) => '"' + String(v).replace(/["\\]/g, ' ').trim() + '"';
 
@@ -147,18 +143,19 @@ function keys(): [string, string, string] {
 }
 function refresh() {
   const [artist, album, title] = keys();
-  const sig = artist + '|' + album + '|' + title;
+  const local = !!localPlayingUri(usePlayer.getState().state);
+  const sig = [artist, album, title, local].join('|');
   if (sig === lastKeys) { return; }
-  const albumSame = lastKeys.split('|').slice(0, 2).join('|') === artist + '|' + album;
+  const albumSame = lastKeys.split('|').slice(0, 2).join('|') === artist + '|' + album && lastKeys.endsWith('|' + local);
   lastKeys = sig;
   // the same record, the next track: the artist and the album stay on the screen
   useAbout.setState(albumSame ? { track: null } : { artist: null, album: null, track: null });
   if (!artist) { return; }
-  if (!albumSame) {
-    lookupArtist(artist).then(a => { if (keys()[0] === artist) { useAbout.setState({ artist: a }); } });
-    if (album) { lookupAlbum(artist, album).then(a => { if (keys()[1] === album) { useAbout.setState({ album: a }); } }); }
+  if (!local && !albumSame) {
+    lookupArtist(artist).then(a => { if (!localPlayingUri(usePlayer.getState().state) && keys()[0] === artist) { useAbout.setState({ artist: a }); } });
+    if (album) { lookupAlbum(artist, album).then(a => { if (!localPlayingUri(usePlayer.getState().state) && keys()[0] === artist && keys()[1] === album) { useAbout.setState({ album: a }); } }); }
   }
-  if (title) { lookupTrack(artist, title, album).then(t => { if (keys()[2] === title) { useAbout.setState({ track: t }); } }); }
+  if (title) { lookupTrack(artist, title, album).then(t => { if (lastKeys === sig) { useAbout.setState({ track: t }); } }); }
 }
 usePlayer.subscribe((s, prev) => { if (s.state !== prev.state) { refresh(); } });
 refresh();

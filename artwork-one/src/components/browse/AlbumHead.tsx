@@ -3,7 +3,6 @@ import { customCrumbs } from '../../core/customNavigation';
 import Icon from '../Icon';
 import PageHead from '../PageHead';
 import Crumbs from './Crumbs';
-import { albumart } from '../../core/api';
 import { useBrowse, type BrowseItem } from '../../core/store/browse';
 import * as A from '../../core/browseActions';
 import { runtime } from '../../core/format';
@@ -45,7 +44,7 @@ export function AlbumPageHead({ filter, onFilter }: { filter?: string; onFilter?
   );
 }
 
-export default function AlbumHead() {
+export default function AlbumHead({ cover }: { cover: string }) {
   const info = useBrowse(s => s.info) || {};
   const lists = useBrowse(s => s.lists);
   const isPlaylist = isPlaylistInfo(info as BrowseItem);
@@ -59,7 +58,7 @@ export default function AlbumHead() {
   return (
     <div className={'aw-albumhead' + (isPlaylist ? ' aw-albumhead--playlist' : '')}>
       <div className={'aw-albumhead__cover' + (String(info.albumart || '').indexOf('sourceicon') > -1 ? ' aw-albumhead__cover--icon' : '')}>
-        {info.albumart ? <img src={albumart(info.albumart)} alt={info.album || ''} /> : null}
+        {cover ? <img src={cover} alt={info.album || ''} /> : null}
       </div>
       <div className="aw-albumhead__body">
         <h1 className="aw-albumhead__title">{title}</h1>

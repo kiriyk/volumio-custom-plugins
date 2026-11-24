@@ -3,13 +3,16 @@
  * name + real counts, actions; an albums grid built from the artist's own lists (year and
  * track count from the tracks that name the album); the TRACKS head over Volumio's rows.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
 import PageHead from '../PageHead';
 import Dropdown from '../Dropdown';
 import Crumbs from './Crumbs';
 import ItemMenu from './ItemMenu';
 import { useCrumbs, goCrumb } from './AlbumHead';
+import MusicInformation from '../MusicInformation';
+import { localAlbumUri, localArtistUri } from '../../core/localMusicUri';
+import { useLocalAlbumCover, useLocalArtistInfo } from '../../core/store/localMusic';
 import { albumart } from '../../core/api';
 import { useBrowse, type BrowseItem, type BrowseList } from '../../core/store/browse';
 import * as A from '../../core/browseActions';
@@ -27,7 +30,8 @@ export function artistLists(lists: BrowseList[] | null, kind: 'songs' | 'albums'
 }
 export interface ArtistAlbum { item: BrowseItem; uri: string; listIndex: number; itemIndex: number; year: number | null; tracks: number; kind: 'album' | 'artist' }
 // a service's artist page lists other artists too (Tidal's "Similar artists"): the uri says so, as it does on the search page
-const isArtistItem = (it: BrowseItem) => it.type === 'artist' || /(^|[:/])artists?([:/@]|$)/.test(String(it.uri || '').toLowerCase());
+const isArtistItem = (it: BrowseItem) =>
+  it.type === 'artist' || (!localAlbumUri(it.uri) && /(^|[:/])artists?([:/@]|$)/.test(String(it.uri || '').toLowerCase()));
 export function artistAlbums(lists: BrowseList[] | null): ArtistAlbum[] {
   const tracks = ([] as BrowseItem[]).concat(...artistLists(lists, 'songs').map(({ l }) => l.items || []));
   const byAlbum: Record<string, { tracks: number; year: number | null }> = {};
@@ -46,11 +50,20 @@ export function artistAlbums(lists: BrowseList[] | null): ArtistAlbum[] {
   return out;
 }
 
+function ArtistAlbumCover({ item }: { item: BrowseItem }) {
+  const ref = useRef<HTMLImageElement>(null);
+  const cover = useLocalAlbumCover(localAlbumUri(item.uri), item.albumart, ref);
+  return cover ? <img ref={ref} key={cover} src={cover} alt="" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+    : <img ref={ref} alt="" />;
+}
+
 export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newest, onToggleOrder, visibleTracks, onMenuOpen }:
   { filter: string; onFilter: (v: string) => void; showAll: boolean; onShowAll: () => void; newest: boolean; onToggleOrder: () => void; visibleTracks: number; onMenuOpen?: (key: string, open: boolean) => void }) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);   // the album tile whose menu is open is raised over its later siblings
   const info = useBrowse(s => s.info) || {};
   const lists = useBrowse(s => s.lists);
+  const artistUri = useBrowse(s => s.currentUri);
+  const localArtist = useLocalArtistInfo(localArtistUri(artistUri));
   const crumbs = useCrumbs();
   const everything = useMemo(() => artistAlbums(lists), [lists]);
   const albums = useMemo(() => everything.filter(a => a.kind === 'album'), [everything]);
@@ -102,6 +115,8 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
         </div> : null}
       </div>
 
+      <MusicInformation info={localArtist} />
+
       {groups.map((g, gi) => {
         const inGroup = sorted.filter(a => a.listIndex === g);
         const title = gi === 0 ? 'АЛЬБОМЫ' : String((lists || [])[g]?.title || 'ЕЩЁ').toUpperCase();
@@ -119,7 +134,7 @@ export default function ArtistHead({ filter, onFilter, showAll, onShowAll, newes
                 return (
                   <div key={a.uri} className={'aw-artist-album' + (hidden ? ' aw-hidden' : '') + (openMenu === a.listIndex + ':' + a.itemIndex ? ' is-menu-open' : '')} onClick={() => A.clickListItem(a.item, list, a.itemIndex)}>
                     <div className="aw-artist-album__cover">
-                      <img src={albumart(a.item.albumart)} alt="" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+                      <ArtistAlbumCover item={a.item} />
                       <div className="aw-artist-album__overlay" aria-hidden="true" />
                       <div className="aw-artist-album__actions" onClick={(e) => e.stopPropagation()}>
                         <ItemMenu item={a.item} id={`hamburgerMenuBtn-${a.listIndex}-${a.itemIndex}`} toggleClass="ghost-btn action-btn aw-artist-album__more" glyph="more_horiz" onOpenChange={(o) => { setOpenMenu(o ? a.listIndex + ':' + a.itemIndex : null); if (onMenuOpen) { onMenuOpen(a.listIndex + ':' + a.itemIndex, o); } }} />

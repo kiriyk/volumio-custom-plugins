@@ -19,6 +19,7 @@ import { useSignal } from '../core/store/signal';
 import { playbackEngineView } from '../core/playbackEngine';
 import { useUi, isQueueDocked, canDockQueue } from '../core/store/ui';
 import { albumart } from '../core/api';
+import { usePlayingMusicUri, useLocalAlbumCover } from '../core/store/localMusic';
 import { quality, format, signal, rateLine, shownTitle } from '../core/format';
 import { useLyrics } from '../core/store/lyrics';
 import { useTrackInfo } from '../core/store/trackInfo';
@@ -53,6 +54,7 @@ function readView(): View {
 
 export default function NowPlaying() {
   const { st } = useHeldTrack();   // the short stop between two tracks does not flash the empty page
+  const cover = useLocalAlbumCover(usePlayingMusicUri(st), st.albumart);
   const localInfo = useLocalFileInfo(st.uri, st.service === 'mpd');
   const localQuality = localInfo ? formatLocalQuality({ size: localInfo.size ?? null, bitrate: localInfo.bitrate ?? null }) : '';
   const fav = usePlayer(s => s.favourite.favourite);
@@ -250,7 +252,7 @@ export default function NowPlaying() {
       {topbar}
 
       <div id="np-hero">
-        <div id="np-cover">{st.albumart ? <img src={albumart(st.albumart)} alt={st.album || ''} /> : null}</div>
+        <div id="np-cover">{cover ? <img src={cover} alt={st.album || ''} /> : null}</div>
         <div id="np-meta" className={lyricsOn ? 'np-meta--lyrics' : ''}>
           {/* the heart has a fixed spot at the end of the face switch's row (handoff 16B): a long title never moves it */}
           <div className="np-tabrow">

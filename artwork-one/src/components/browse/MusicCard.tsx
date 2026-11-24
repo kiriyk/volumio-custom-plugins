@@ -3,6 +3,8 @@ import { useRef, useState } from 'react';
 import Icon from '../Icon';
 import ItemMenu from './ItemMenu';
 import { albumart } from '../../core/api';
+import { localAlbumUri } from '../../core/localMusicUri';
+import { useLocalAlbumCover } from '../../core/store/localMusic';
 import { librarySectionArtwork } from '../../core/libraryArtwork';
 import { type BrowseItem, useBrowse } from '../../core/store/browse';
 import * as A from '../../core/browseActions';
@@ -29,7 +31,8 @@ export default function MusicCard({ item, list, listIndex, itemIndex, hidden, or
   const favVisible = A.showPlayButton(item) && (item.type === 'song' || item.type === 'folder-with-favourites') && (req ? req.uri : '') !== 'favourites';
   const noMenu = !A.showHamburgerMenu(item);
   const libraryCover = librarySectionArtwork(item);
-  const cover = libraryCover || albumart(item.albumart);
+  const musicCover = useLocalAlbumCover(localAlbumUri(item.uri), item.albumart, ref);
+  const cover = libraryCover || musicCover;
   return (
     <div className={'music-card__wrapper' + (hidden ? ' aw-hidden' : '') + (menuOpen ? ' is-menu-open' : '')} ref={ref} style={order ? { order } : undefined}>
       <div className="music-card" onClick={() => A.clickListItem(item, list, itemIndex)}>

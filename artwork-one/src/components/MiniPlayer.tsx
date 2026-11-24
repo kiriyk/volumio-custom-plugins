@@ -11,7 +11,8 @@ import { useQueue } from '../core/store/queue';
 import { leftOver } from '../core/useHeldTrack';
 import { OutputPill, QueuePill } from './BarPills';
 import { useUi } from '../core/store/ui';
-import { albumart, IDLE_ART } from '../core/api';
+import { IDLE_ART } from '../core/api';
+import { usePlayingMusicUri, useLocalAlbumCover } from '../core/store/localMusic';
 import { quality, rateLine, formatLabel, shownTitle } from '../core/format';
 import { useExternalSource } from '../core/external';
 
@@ -23,7 +24,7 @@ export default function MiniPlayer() {
   const live = usePlayer(s => s.state);
   const queueEmpty = useQueue(s => !s.queue.length);
   const st = leftOver(live, queueEmpty) ? { ...live, title: '', artist: '', album: '', albumart: '' } : live;
-  const art = st.title ? st.albumart : IDLE_ART;   // nothing playing: Volumio's cover, not an empty spot
+  const art = useLocalAlbumCover(usePlayingMusicUri(st), st.title ? st.albumart : IDLE_ART);   // nothing playing: Volumio's cover, not an empty spot
   const ready = usePlayer(s => s.ready);
   const fav = usePlayer(s => s.favourite.favourite);
   const queueOpen = useUi(s => s.queueOpen);
@@ -41,7 +42,7 @@ export default function MiniPlayer() {
           {/* the whole zone opens Now Playing, the gap before the transport too — not only the cover and the words */}
           <div className="mini-identity" onClick={() => nav('/playback')}>
             <div id="trackInfo-compact">
-              {art ? <div className="trackInfo-album-art-wrapper"><img className="album-art" src={albumart(art)} alt={st.album || ''} /></div> : null}
+              {art ? <div className="trackInfo-album-art-wrapper"><img className="album-art" src={art} alt={st.album || ''} /></div> : null}
               {st.title ? <div id="trackInfo-title" title="Трек">{shownTitle(st)}</div> : null}
               <div className="mini-byline">
                 <div id="trackInfo-artist-album">{st.artist ? <span id="trackInfo-artist">{st.artist}</span> : null}</div>

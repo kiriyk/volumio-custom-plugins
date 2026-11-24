@@ -21,6 +21,8 @@ function fakeVolumio() {
     sharedVars,
     pluginManager: { getConfigurationFile: () => path.join(tmp, 'config.json') },
     registerThirdPartyUI: (d) => calls.push(['register', d]),
+    addPluginRestEndpoint: (d) => calls.push(['rest-add', d]),
+    removePluginRestEndpoint: (d) => calls.push(['rest-remove', d]),
     executeOnPlugin: (t, c, m, d) => calls.push(['exec', t, c, m, d]),
     broadcastMessage: (e, p) => calls.push(['broadcast', e, p]),
     pushToastMessage: (t, a, b) => calls.push(['toast', t, a, b]),
@@ -37,10 +39,15 @@ test('onStart registers the interface; onStop takes it out and switches a player
   const list = JSON.parse(fs.readFileSync(p.paths.UI_LIST, 'utf8'));
   assert.equal(list.length, 1); assert.equal(list[0].uiName, 'artwork'); assert.ok(list[0].uiPath.endsWith('/ui'));
   assert.ok(calls.some(c => c[0] === 'register'));
+  assert.deepEqual(calls.filter(c => c[0] === 'rest-add').map(c => [c[1].endpoint, c[1].method]), [
+    ['artworkOneLocalMusicInfo', 'getLocalMusicInfo'], ['artworkOneMusicBrainz', 'getMusicBrainz']
+  ]);
+  assert.equal((await p.getLocalMusicInfo({ requestId: 'bad' })).error, 'invalidRequest');
   // the player shows it
   fs.writeFileSync(p.paths.ACTIVE_UI, JSON.stringify(p.uiEntry()));
   fs.writeFileSync(p.paths.CORE_UI_LIST, JSON.stringify([{ uiPrettyName: 'Manifest', uiName: 'manifest', uiPath: tmp }]));
   await p.onStop();
+  assert.equal(calls.filter(c => c[0] === 'rest-remove').length, 2);
   assert.deepEqual(JSON.parse(fs.readFileSync(p.paths.UI_LIST, 'utf8')), []);
   assert.ok(calls.some(c => c[0] === 'exec' && c[3] === 'setVolumio3UI' && c[4].volumio3_ui.value === 'manifest'));
 });

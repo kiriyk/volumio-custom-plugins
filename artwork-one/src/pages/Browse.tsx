@@ -19,7 +19,9 @@ import ArtistHead, { artistLists, norm } from '../components/browse/ArtistHead';
 import BrowseLists from '../components/browse/BrowseLists';
 import SearchResults from '../components/browse/SearchResults';
 import { isCustomMusicRoot, needsCustomMusicListHead } from '../core/customMusicSources';
-import { albumart } from '../core/api';
+import { localAlbumUri } from '../core/localMusicUri';
+import { useLocalAlbumCover, useLocalAlbumInfo } from '../core/store/localMusic';
+import MusicInformation from '../components/MusicInformation';
 import { emit } from '../core/socket';
 import { useBrowse } from '../core/store/browse';
 
@@ -165,7 +167,10 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
     isAlbum ? 'browsing-album' : '', isPlaylist ? 'browsing-playlist' : '',
     (!b.isBrowsing && !b.isSearching) ? 'browsing-home' : '', isLandingSearch ? 'browsing-search' : '',
     artistsPage ? 'browsing-artists' : '', isArtist ? 'browsing-artist' : '', (showAll || filter) ? 'aw-artist-all' : '', isPlainList ? 'browsing-list' : '', isTrackList ? 'aw-tracklist' : ''].filter(Boolean).join(' ');
-  const showAlbumBg = !!(info && !hideInfo && info.albumart && (isAlbum || info.type === 'song' || isPlaylist));
+  const albumUri = isAlbum && !hideInfo ? localAlbumUri(b.currentUri) : undefined;
+  const localAlbum = useLocalAlbumInfo(albumUri);
+  const cover = useLocalAlbumCover(albumUri, info?.albumart);
+  const showAlbumBg = !!(info && !hideInfo && cover && (isAlbum || info.type === 'song' || isPlaylist));
 
   // the list's own order; beside a service's genre menu it joins that group, so both sit on one line
   const localSort = (
@@ -175,7 +180,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
   );
   return (
     <div id="browse" className={cls}>
-      {showAlbumBg && artRoot ? createPortal(<div className="aw-albumhead__bg" aria-hidden="true"><img src={albumart(info!.albumart)} alt="" /></div>, artRoot) : null}
+      {showAlbumBg && artRoot ? createPortal(<div className="aw-albumhead__bg" aria-hidden="true"><img src={cover} alt="" /></div>, artRoot) : null}
       <div className="panel panel-default">
         <div className={'body-content new-browse' + (dedicated && !b.isBrowsing ? ' with-search-header' : '')}>
           <div id="browseTablesWrapper" ref={scroller} onScroll={onScroll}>
@@ -198,9 +203,11 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
             {info && !hideInfo ? (
               <div className="aw-headwrap">
                 {isArtist ? <ArtistHead filter={filter} onFilter={setFilter} showAll={showAll} onShowAll={() => setShowAll(v => !v)} newest={newest} onToggleOrder={() => setNewest(v => !v)} visibleTracks={visibleTracks} onMenuOpen={onMenuOpen} /> : null}
-                {isAlbum || info.type === 'song' || isPlaylist ? <AlbumHead /> : null}
+                {isAlbum || info.type === 'song' || isPlaylist ? <AlbumHead cover={cover} /> : null}
               </div>
             ) : null}
+
+            <MusicInformation info={localAlbum} />
 
             {isPlainList ? (
               <PageHead variant="list" back={() => b.goBack()}

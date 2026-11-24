@@ -12,6 +12,8 @@ import { addToPlaylist } from '../../core/browseActions';
 import { useLocalPlayback } from '../../core/localPlayback';
 import { useStopAfter } from '../../core/store/stopAfter';
 import Spinner from '../Spinner';
+import { useLocalAlbumInfo, useLocalArtistInfo, usePlayingMusicUri } from '../../core/store/localMusic';
+import { albumFacts, MusicSummary } from '../MusicInformation';
 
 async function metavolumio(data: Record<string, string>): Promise<any> {
   const ctl = new AbortController(); const t = window.setTimeout(() => ctl.abort(), 7000);
@@ -31,6 +33,10 @@ export default function TrackActionsSheet() {
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [err, setErr] = useState<Record<string, boolean>>({});
   const close = () => useModal.getState().close();
+  const [showInfo, setShowInfo] = useState(false);
+  const localUri = usePlayingMusicUri(st);
+  const album = useLocalAlbumInfo(showInfo ? localUri : undefined);
+  const artist = useLocalArtistInfo(showInfo ? localUri : undefined, 'album');
   const lp = useLocalPlayback();
   const here = lp.enabled && lp.mine;
   const stopAfter = useStopAfter(s => typeof st.position === 'number' && s.isMarked(st.position));
@@ -73,6 +79,34 @@ export default function TrackActionsSheet() {
       <Icon name={icon} /><span className="aw-track__label">{label}{err[key] ? ' · Не найдено' : ''}</span>{busy[key] ? <Spinner size={16} className="aw-track__spin" /> : null}
     </button>
   );
+  if (showInfo && localUri) {
+    const facts = albumFacts(album);
+    return (
+      <div className="aw-sheet aw-sheet--track">
+        <div className="aw-confirm__head">
+          <div className="aw-confirm__tile"><Icon name="info" /></div>
+          <div className="aw-confirm__title">Информация</div>
+        </div>
+        <div className="aw-track__rows">
+          {artist ? (
+            <section className="aw-music-info">
+              <h2>{artist.artist || st.artist}</h2>
+              <MusicSummary text={artist.text} url={artist.url} />
+            </section>
+          ) : null}
+          {album?.text || facts.length ? (
+            <section className="aw-music-info">
+              <h2>{st.album}</h2>
+              {facts.length ? <p className="aw-music-info__facts">{facts.join(' · ')}</p> : null}
+              <MusicSummary text={album?.text} url={album?.url} />
+            </section>
+          ) : null}
+          <button type="button" className="aw-power__cancel" onClick={() => setShowInfo(false)}><span>Назад</span></button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="aw-sheet aw-sheet--track">
       <div className="aw-confirm__head">
@@ -89,6 +123,7 @@ export default function TrackActionsSheet() {
         <button type="button" className="aw-track__tile" onClick={() => { close(); addToPlaylist({ uri: String(st.uri || ''), service: st.service, type: 'song', title: st.title, artist: st.artist, album: st.album, albumart: st.albumart }); }} title="В плейлист" disabled={!!st.disableUi}><Icon name="playlist_add" /></button>
       </div>
       <div className="aw-track__rows">
+        {localUri ? row('localInfo', 'info', 'Информация', () => setShowInfo(true)) : null}
         {/^qobuz_custom\/track\/\d+$/.test(st.uri || '') ? row('download','download','Скачать на внешний диск',()=>{downloadQobuz(st.uri);close();}) : null}
         {row('credits', 'info', 'Участники записи альбома', () => ask('credits', { mode: 'creditsAlbum', artist: st.artist, album: st.album }, st.album, true))}
         {row('album', 'album', 'Об альбоме', () => ask('album', { mode: 'storyAlbum', artist: st.artist, album: st.album }, st.album))}

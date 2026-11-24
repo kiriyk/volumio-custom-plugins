@@ -13,6 +13,7 @@ import { useMultiroom } from '../core/store/multiroom';
 import { useTrackInfo } from '../core/store/trackInfo';
 import { useSleep } from '../core/store/sleep';
 import { albumart, IDLE_ART } from '../core/api';
+import { usePlayingMusicUri, useLocalAlbumCover } from '../core/store/localMusic';
 import { signal, format, quality } from '../core/format';
 
 const mmss = (ms: number) => { const s = Math.floor(ms / 1000), m = Math.floor(s / 60), r = s % 60; return m + ':' + (r < 10 ? '0' : '') + r; };
@@ -62,7 +63,7 @@ export default function AmbientDisplay() {
   const night = useAmbient.getState().isNight();
   const paused = st.status === 'pause';
   const stopped = !st.status || st.status === 'stop' || !st.title;
-  const cover = st.albumart ? albumart(st.albumart) : '';
+  const cover = useLocalAlbumCover(usePlayingMusicUri(st), st.albumart);
   // the place in the queue (#21): the album's track number for one album, but not for a mixed queue — Appearance › Ambient display
   const trackNo = queueNo && queue.length > 1 && typeof st.position === 'number' ? '#' + (st.position + 1) : '';
   let next = '';

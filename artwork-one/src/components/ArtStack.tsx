@@ -4,7 +4,7 @@ import { usePlayer } from '../core/store/player';
 import { useQueue } from '../core/store/queue';
 import { leftOver } from '../core/useHeldTrack';
 import { useTheme } from '../core/store/theme';
-import { albumart } from '../core/api';
+import { usePlayingMusicUri, useLocalAlbumCover } from '../core/store/localMusic';
 import { sampleCover } from '../core/palette';
 import { bakedCover, bakedCoverSync } from '../core/artBlur';
 import { useState } from 'react';
@@ -15,8 +15,10 @@ const washBox = () => Math.max(window.innerWidth, window.innerHeight) * 1.5;   /
 
 export default function ArtStack() {
   const queueEmpty = useQueue(s => !s.queue.length);
-  const art = usePlayer(s => leftOver(s.state, queueEmpty) ? '' : s.state.albumart);
-  const url = albumart(art);
+  const st = usePlayer(s => s.state);
+  const showing = !leftOver(st, queueEmpty);
+  const uri = usePlayingMusicUri(showing ? st : undefined);
+  const url = useLocalAlbumCover(uri, showing ? st.albumart : undefined);
   const choice = useTheme(s => s.choice);
   const followed = useTheme(s => s.followed);
   const light = useTheme.getState().isLight();

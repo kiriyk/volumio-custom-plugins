@@ -695,3 +695,14 @@ body#artwork .aw-head--home .aw-scope .aw-scope__btn { height: 38px; border-radi
 /* the artist page: a picture the service cannot serve gives way to a glyph; the similar artists are round tiles without play or menu */
 body#artwork .aw-artist__img--glyph { display: grid; place-items: center; color: var(--ink-dim); .material-symbols-rounded { font-size: 48px; } }
 body#artwork .aw-artist-album--artist { .aw-artist-album__cover, .aw-artist-album__cover img { border-radius: 50%; } .aw-artist-album__title { text-align: center; } }
+
+.aw-music-info {
+  max-width: 68ch;
+  margin: 22px 0;
+  color: var(--ink-2);
+
+  h2 { margin: 0 0 8px; font-size: 16px; color: var(--ink); }
+  &__facts { margin: 6px 0; color: var(--ink-muted); }
+}
+.aw-music-info__summary { margin: 6px 0; font-size: 14px; line-height: 1.55; color: var(--ink-2); text-wrap: pretty; }
+.aw-music-info__source { color: var(--ink-muted); font-size: 12px; }

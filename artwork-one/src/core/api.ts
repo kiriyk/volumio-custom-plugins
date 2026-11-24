@@ -21,3 +21,16 @@ export async function rest<T = any>(path: string, params?: Record<string, string
     return null;
   }
 }
+
+export async function pluginRest<T>(endpoint: string, data: unknown): Promise<T> {
+  const response = await fetch(HOST + '/api/v1/pluginEndpoint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint, data }),
+    signal: AbortSignal.timeout(60_000)
+  });
+  if (!response.ok) throw new Error('Volumio HTTP ' + response.status);
+  const result = await response.json();
+  if (!result.success) throw new Error('Volumio plugin request failed');
+  return result.data as T;
+}
