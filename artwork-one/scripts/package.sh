@@ -9,6 +9,7 @@ VERSION="${1:-$(git describe --tags --always 2>/dev/null || echo dev)}"
 [ -f dist/index.html ] || { echo "error: no dist/ - run npm run build first" >&2; exit 1; }
 rm -rf build/artwork_one && mkdir -p build
 cp -a plugin/artwork_one build/artwork_one
+npm ci --prefix build/artwork_one --omit=dev --ignore-scripts --no-audit --no-fund
 rm -rf build/artwork_one/ui
 cp -a dist build/artwork_one/ui
 echo "$VERSION" > build/artwork_one/ui/VERSION

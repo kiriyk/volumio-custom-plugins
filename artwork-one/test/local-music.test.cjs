@@ -103,6 +103,24 @@ function group(id, title, type, artist = 'Arctic Monkeys') {
   ] };
 }
 
+test('only MusicBrainz uses the configured proxy and stopping closes it', async () => {
+  const calls = [];
+  let closed = false;
+  const proxy = { async destroy() { closed = true; } };
+  const catalog = new MusicCatalog({ musicBrainzProxy: proxy, fetcher: async (url, options) => {
+    calls.push([url.hostname, options.dispatcher]);
+    return new Response('{}');
+  } });
+  await catalog.mb('artist/', { query: 'artist:Band' });
+  await catalog.image('release-group', 'group');
+  await catalog.json('https://www.wikidata.org/w/api.php', host => host === 'www.wikidata.org');
+  assert.deepEqual(calls, [
+    ['musicbrainz.org', proxy], ['coverartarchive.org', undefined], ['www.wikidata.org', undefined]
+  ]);
+  catalog.stop();
+  assert.equal(closed, true);
+});
+
 test('plus/ampersand album title collision with a single selects the full-length group for 11 local tracks', async () => {
   const catalog = new MusicCatalog();
   const queries = [];

@@ -31,6 +31,27 @@ function fakeVolumio() {
   return { ctx: { coreCommand, logger: { info() {}, warn() {}, error() {} }, configManager: {} }, calls };
 }
 
+test('MusicBrainz settings store the URL privately and never return it to the UI', async () => {
+  const { ctx, calls } = fakeVolumio();
+  const p = new Plugin(ctx);
+  const pathname = p.paths.MUSICBRAINZ_PROXY;
+  fs.mkdirSync(path.dirname(pathname), { recursive: true });
+  const url = 'http://example-user:example-password@proxy.example.test:8000';
+  try {
+    p.saveMusicBrainzProxy({ proxyEnabled: true, proxyUrl: url });
+    assert.equal(fs.statSync(pathname).mode & 0o777, 0o600);
+    assert.equal(fs.readFileSync(pathname, 'utf8').trim(), url + '/');
+    const config = await p.getUIConfig();
+    assert.equal(config.sections[1].content[0].value, true);
+    assert.equal(config.sections[1].content[1].value, '');
+    assert(!JSON.stringify(calls).includes('example-password'));
+    p.saveMusicBrainzProxy({ proxyEnabled: true, proxyUrl: '' });
+    assert(fs.existsSync(pathname));
+    p.saveMusicBrainzProxy({ proxyEnabled: false, proxyUrl: '' });
+    assert(!fs.existsSync(pathname));
+  } finally { fs.rmSync(pathname, { force: true }); }
+});
+
 test('onStart registers the interface; onStop takes it out and switches a player that showed it', async () => {
   const { ctx, calls } = fakeVolumio();
   const p = new Plugin(ctx);

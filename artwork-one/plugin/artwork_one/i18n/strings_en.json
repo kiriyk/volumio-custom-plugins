@@ -12,6 +12,13 @@
     "INACTIVE": "Another interface is active; Artwork One is ready",
     "SWITCHED": "Artwork One is now the interface",
     "SWITCHED_BACK": "Switched back to {name}",
-    "ERROR": "Artwork One"
+    "ERROR": "Artwork One",
+    "PROXY_SECTION": "MusicBrainz proxy",
+    "PROXY_SAVE": "Save",
+    "PROXY_ENABLED": "Use proxy",
+    "PROXY_URL": "Proxy URL",
+    "PROXY_DOC": "Enter an HTTP CONNECT proxy URL. Leave the field blank to keep the saved URL.",
+    "PROXY_SAVED": "MusicBrainz proxy settings saved",
+    "PROXY_ERROR": "Could not save the proxy. Enter a valid HTTP CONNECT proxy URL."
   }
 }

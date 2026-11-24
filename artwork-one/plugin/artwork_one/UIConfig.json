@@ -32,6 +32,18 @@
           "attributes": [{ "readonly": true }]
         }
       ]
+    },
+    {
+      "id": "section_musicbrainz_proxy",
+      "element": "section",
+      "label": "TRANSLATE.ARTWORK_ONE.PROXY_SECTION",
+      "icon": "fa-globe",
+      "onSave": { "type": "controller", "endpoint": "user_interface/artwork_one", "method": "saveMusicBrainzProxy" },
+      "saveButton": { "label": "TRANSLATE.ARTWORK_ONE.PROXY_SAVE", "data": ["proxyEnabled", "proxyUrl"] },
+      "content": [
+        { "id": "proxyEnabled", "element": "switch", "label": "TRANSLATE.ARTWORK_ONE.PROXY_ENABLED", "value": false },
+        { "id": "proxyUrl", "element": "input", "type": "password", "label": "TRANSLATE.ARTWORK_ONE.PROXY_URL", "doc": "TRANSLATE.ARTWORK_ONE.PROXY_DOC", "value": "" }
+      ]
     }
   ]
 }

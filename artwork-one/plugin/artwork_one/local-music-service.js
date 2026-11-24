@@ -61,9 +61,9 @@ function validate(data) {
 }
 
 class LocalMusicService {
-  constructor(router, cacheDir, { logger, library, catalog, cache, fetcher = fetch, image = convertImage } = {}) {
+  constructor(router, cacheDir, { logger, library, catalog, cache, fetcher = fetch, image = convertImage, musicBrainzProxy } = {}) {
     this.library = library || new LocalMusicLibrary(router);
-    this.catalog = catalog || new MusicCatalog({ fetcher });
+    this.catalog = catalog || new MusicCatalog({ fetcher, musicBrainzProxy });
     this.fetcher = fetcher;
     this.image = image;
     this.cache = cache || new LocalMusicCache(cacheDir, { onError: (error, operation) => {

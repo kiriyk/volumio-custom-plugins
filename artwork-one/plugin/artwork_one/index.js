@@ -24,8 +24,8 @@
  * and its own when it stops — switching the player to another interface first when it is the
  * active one, so nobody is left on a page that no longer exists.
  *
- * kew and v-conf, the only modules, are declared in package.json: Volumio installs them with the
- * plugin. A copy put in place by hand, without node_modules, gets them from the core tree.
+ * kew and v-conf are declared in package.json. A copy put in place by hand without node_modules
+ * gets them from the core tree. The optional MusicBrainz proxy uses the bundled undici module.
  */
 
 // kew and v-conf are declared in package.json (Volumio installs them with the plugin); the core
@@ -37,6 +37,7 @@ var libQ = core('kew');
 var VConf = core('v-conf');
 var fs = require('fs');
 var path = require('path');
+var randomUUID = require('node:crypto').randomUUID;
 var execFileSync = require('child_process').execFileSync;
 var LocalMusicService = require('./local-music-service').LocalMusicService;
 
@@ -55,6 +56,7 @@ var ROOT = process.env.ARTWORK_ONE_TEST_ROOT || '';
 var PATHS = {
   UI_DIR: ROOT ? path.join(ROOT, 'ui') : path.join(__dirname, 'ui'),
   MUSIC_CACHE: ROOT + '/data/artwork-one-music-cache',
+  MUSICBRAINZ_PROXY: ROOT + '/data/configuration/user_interface/artwork_one/musicbrainz-proxy',
   UI_LIST: ROOT + '/data/thirdPartyUisList.json',
   ACTIVE_UI: ROOT + '/data/active_volumio_ui',
   CORE_UI_LIST: ROOT + '/volumio/volumioUisList.json',
@@ -334,6 +336,7 @@ ArtworkOne.prototype.getUIConfig = function () {
       var active = self.isActive();
       var status = uiconf.sections[0].content[0]; status.value = self.t(active ? 'ACTIVE' : 'INACTIVE');
       if (active) { uiconf.sections[0].content[1].hidden = true; }   // nothing to switch to
+      uiconf.sections[1].content[0].value = fs.existsSync(self.paths.MUSICBRAINZ_PROXY);
     } catch (e) { self.logger.warn('[artwork_one] ui config: ' + e); }
     defer.resolve(uiconf);
   }).fail(function (e) { defer.reject(new Error(e)); });
@@ -444,9 +447,62 @@ ArtworkOne.prototype.cleanAmbient = function (a) {
 
 function isTime(v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(v || '')); }
 
+function musicBrainzProxyUrl(value) {
+  try {
+    var proxy = new URL(value);
+    if (['http:', 'https:'].includes(proxy.protocol) && proxy.pathname === '/' && !proxy.search && !proxy.hash) return proxy.href;
+  } catch {}
+  throw new Error('Invalid MusicBrainz HTTP proxy URL');
+}
+
+function readMusicBrainzProxy(filename) {
+  var value;
+  try { value = fs.readFileSync(filename, 'utf8').trim(); }
+  catch (error) {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
+  }
+  try {
+    return new (require('undici').ProxyAgent)(musicBrainzProxyUrl(value));
+  } catch {
+    throw new Error('Unable to configure MusicBrainz HTTP proxy');
+  }
+}
+
+ArtworkOne.prototype.saveMusicBrainzProxy = function (data) {
+  var filename = this.paths.MUSICBRAINZ_PROXY;
+  var value = typeof data?.proxyUrl === 'string' ? data.proxyUrl.trim() : '';
+  var proxy;
+  try {
+    if (typeof data?.proxyEnabled !== 'boolean') throw new Error('Invalid proxy setting');
+    if (!data.proxyEnabled) {
+      fs.rmSync(filename, { force: true });
+      this.localMusic?.catalog.setProxy(undefined);
+    } else if (value) {
+      var url = musicBrainzProxyUrl(value);
+      if (this.localMusic) proxy = new (require('undici').ProxyAgent)(url);
+      var temp = filename + '.' + randomUUID();
+      try {
+        fs.writeFileSync(temp, url + '\n', { mode: 0o600, flag: 'wx' });
+        fs.renameSync(temp, filename);
+      } finally { fs.rmSync(temp, { force: true }); }
+      this.localMusic?.catalog.setProxy(proxy);
+    } else if (!fs.existsSync(filename)) {
+      throw new Error('A proxy URL is required');
+    }
+    this.commandRouter.pushToastMessage('success', UI_PRETTY_NAME, this.t('PROXY_SAVED'));
+  } catch {
+    void proxy?.destroy().catch(() => {});
+    this.commandRouter.pushToastMessage('error', UI_PRETTY_NAME, this.t('PROXY_ERROR'));
+  }
+  this.getUIConfig().then(config => this.commandRouter.broadcastMessage('pushUiConfig', config))
+    .fail(() => this.logger.warn('[artwork_one] could not refresh proxy settings'));
+};
+
 ArtworkOne.prototype.startLocalMusic = function () {
   if (this.localMusic) return;
-  this.localMusic = new LocalMusicService(this.commandRouter, this.paths.MUSIC_CACHE, { logger: this.logger });
+  var musicBrainzProxy = readMusicBrainzProxy(this.paths.MUSICBRAINZ_PROXY);
+  this.localMusic = new LocalMusicService(this.commandRouter, this.paths.MUSIC_CACHE, { logger: this.logger, musicBrainzProxy });
   MUSIC_ENDPOINTS.forEach(endpoint => this.commandRouter.addPluginRestEndpoint(endpoint));
 };
 

@@ -39,6 +39,8 @@
 
 Внешний запрос передаёт только данные, нужные для сопоставления, например имя, название и каталожный номер. Пути, имена файлов и содержимое тегов целиком остаются на Pi. Все запросы MusicBrainz из Artwork One проходят через одну очередь с указанным `User-Agent` и интервалом не менее одной секунды между началами запросов. [Лимиты MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting)
 
+HTTP CONNECT-прокси настраивается в Volumio в настройках плагина Artwork One. Только запросы к MusicBrainz используют этот прокси. URL хранится на устройстве в `/data/configuration/user_interface/artwork_one/musicbrainz-proxy` с правами `0600`. Поле в настройках всегда открывается пустым. Пустое поле при включённом прокси сохраняет текущий URL. Выключение удаляет сохранённый URL. Изменения применяются без перезапуска Volumio.
+
 ## Интеграция и контракт
 
 - Серверный модуль запускается и останавливается с `plugin/artwork_one/index.js`. Зарегистрировать асинхронные endpoints Volumio через `addPluginRestEndpoint`: `artworkOneLocalMusicInfo` и `artworkOneMusicBrainz`. Клиент вызывает их через `POST /api/v1/pluginEndpoint`. Ответ получает вызвавший HTTP-клиент. Диск и сеть обслуживает плагин. Существующие функции MusicBrainz идут через ту же серверную очередь. При остановке удалить endpoints.

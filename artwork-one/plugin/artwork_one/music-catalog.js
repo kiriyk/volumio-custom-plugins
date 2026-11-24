@@ -121,8 +121,9 @@ function confirmedRelease(releases, hints) {
 }
 
 class MusicCatalog {
-  constructor({ fetcher = fetch, interval = 1000 } = {}) {
+  constructor({ fetcher = fetch, interval = 1000, musicBrainzProxy } = {}) {
     this.fetcher = fetcher;
+    this.musicBrainzProxy = musicBrainzProxy;
     this.interval = interval;
     this.nextRequest = 0;
     this.retryAfter = 0;
@@ -131,8 +132,8 @@ class MusicCatalog {
     this.closed = false;
   }
 
-  async json(url, hosts) {
-    const response = await remote(url, { fetcher: this.fetcher, allowHost: hosts, allowMissing: true });
+  async json(url, hosts, fetcher = this.fetcher) {
+    const response = await remote(url, { fetcher, allowHost: hosts, allowMissing: true });
     return response ? JSON.parse(response.body.toString('utf8')) : null;
   }
 
@@ -146,7 +147,9 @@ class MusicCatalog {
       if (this.closed) throw new Error('catalog closed');
       this.nextRequest = Date.now() + this.interval;
       try {
-        return await this.json('https://musicbrainz.org/ws/2/' + entity + '?' + new URLSearchParams({ ...params, fmt: 'json' }), host => host === 'musicbrainz.org');
+        const proxy = this.musicBrainzProxy;
+        const fetcher = proxy ? (url, options) => this.fetcher(url, { ...options, dispatcher: proxy }) : this.fetcher;
+        return await this.json('https://musicbrainz.org/ws/2/' + entity + '?' + new URLSearchParams({ ...params, fmt: 'json' }), host => host === 'musicbrainz.org', fetcher);
       } catch (error) {
         if (Number.isFinite(error.retryAfter)) this.retryAfter = Math.max(this.retryAfter, error.retryAfter);
         throw error;
@@ -265,8 +268,16 @@ class MusicCatalog {
     });
   }
 
+  setProxy(proxy) {
+    const previous = this.musicBrainzProxy;
+    this.musicBrainzProxy = proxy;
+    this.retryAfter = 0;
+    void previous?.destroy().catch(() => {});
+  }
+
   stop() {
     this.closed = true;
+    this.setProxy(undefined);
   }
 }
 
