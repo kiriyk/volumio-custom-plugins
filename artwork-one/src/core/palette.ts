@@ -3,6 +3,8 @@
  * the browser paints its own bands with (status bar, overscroll). Dark and light sample the
  * cover to different ends of the scale.
  */
+import { canvasCoverUrl } from './albumartUrl';
+
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -67,6 +69,5 @@ export function sampleCover(url: string, light: boolean): void {
       root.setProperty('--aw-band', css);
     } catch { /* cross-origin taint: the fixed scrim stays */ }
   };
-  // a distinct URL for the CORS request, so Safari does not reuse the plain <img> load
-  img.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'aw=palette';
+  img.src = canvasCoverUrl(url, 'palette');
 }

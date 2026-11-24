@@ -1,9 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeAlbumartPath } from '../src/core/albumartUrl.ts';
+import { canvasCoverUrl, normalizeAlbumartPath } from '../src/core/albumartUrl.ts';
 
 const cue = '/mnt/USB/External_HD/Adele - 30 - 2021 [Japan]/Adele - 30.cue';
 const directory = '/mnt/USB/External_HD/Adele - 30 - 2021 [Japan]';
+
+test('canvas cover requests keep cached JPEG object URLs intact', () => {
+  for (const url of ['blob:http://volumio.local/cover-id', 'data:image/jpeg;base64,abc']) {
+    assert.equal(canvasCoverUrl(url, 'bake'), url);
+    assert.equal(canvasCoverUrl(url, 'palette'), url);
+  }
+  assert.equal(canvasCoverUrl('/albumart', 'bake'), '/albumart?aw=bake');
+  assert.equal(canvasCoverUrl('/albumart?web=A/B#cover', 'palette'), '/albumart?web=A/B&aw=palette#cover');
+});
 
 test('CUE album cover requests search their directory while preserving other query bytes', () => {
   const before = '/albumart?cacheid=260&web=Adele/30/extralarge&path=' + encodeURIComponent(cue) + '&icon=dot-circle-o&metadata=false';

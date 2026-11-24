@@ -4,6 +4,8 @@
  * edges, then saturated), and stretched back. The browser never blurs a full-screen layer —
  * Safari does that in software and pays ~700ms every time its layer tree changes.
  */
+import { canvasCoverUrl } from './albumartUrl';
+
 const N = 64;              // the box, in cells
 const cache = new Map<string, Promise<string>>();
 const done = new Map<string, string>();   // the same, once resolved: for a second stack that must not wait a frame
@@ -68,7 +70,7 @@ export function bakedCover(url: string, saturate: number, boxPx: number): Promis
       } catch (e) { reject(e); }
     };
     img.onerror = () => reject(new Error('cover'));
-    img.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'aw=bake';
+    img.src = canvasCoverUrl(url, 'bake');
   });
   cache.set(key, p); p.then(src => done.set(key, src), () => cache.delete(key));
   return p;
