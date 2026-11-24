@@ -53,7 +53,14 @@ class Manager {
     await this.aplayer.recover();
     await this.refreshDevices();this.installHooks();
     if(this.settings.managed){
-      try {await this.stopPlayback();await this.runtime.stopRenderer();await this.prepare(this.settings,this.device());this.ready=true;}
+      try {
+        // Volumio may still reconnect its MPD client during boot. A stopped
+        // state needs no MPD command before prepare() regenerates the output.
+        if (['play', 'pause'].includes(this.router.stateMachine.currentStatus)) await this.router.stateMachine.stop();
+        await this.runtime.stopRenderer();
+        await this.prepare(this.settings, this.device());
+        this.ready = true;
+      }
       catch(e){this.error=e.code || 'ENGINE_ERROR';this.ready=false;await this.runtime.outputPolicy('album_player').catch(()=>{});}
     } else this.ready=true;
     this.publish();

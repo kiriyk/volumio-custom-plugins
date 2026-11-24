@@ -97,6 +97,20 @@ test('reapplying a remembered DAC after reconnect restores readiness without res
   assert.equal(e.manager.ready,true);assert.equal(e.manager.status().error,null);assert.equal(e.sm.currentStatus,'stop');
 });
 
+test('managed startup configures MPD while the native client reconnects', async t => {
+  const e = environment(t);
+  const settings = defaults();
+  settings.managed = true;
+  settings.device = { key: e.card.key, label: e.card.label };
+  fs.writeFileSync(path.join(e.dir, 'settings.json'), JSON.stringify(settings));
+  e.sm.currentStatus = 'stop';
+  e.manager.mpd.stop = async () => { throw new Error('MPD client reconnecting'); };
+  await e.manager.start();
+  t.after(() => e.manager.close());
+  assert.equal(e.manager.status().ready, true);
+  assert.deepEqual(e.calls, ['renderer-stop', 'mpd-restart', 'outputs-mpd']);
+});
+
 test('startup with missing saved DAC stops playback and disables MPD outputs',async t=>{
   const e=environment(t);const next=defaults();next.managed=true;next.device={key:e.card.key,label:e.card.label};
   fs.writeFileSync(path.join(e.dir,'settings.json'),JSON.stringify(next));e.setDevices([]);
