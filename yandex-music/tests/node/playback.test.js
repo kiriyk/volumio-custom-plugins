@@ -31,7 +31,7 @@ test('reports the actual codec for the current resolved Yandex track', async () 
     streamUrl: path => `http://127.0.0.1:17899${path}` });
   env.playback.onQuality = info => events.push(info);
   await env.playback.clearAddPlayTrack(track);
-  assert.deepEqual(events.at(-1), { uri: track.uri, codec: 'flac-mp4' });
+  assert.deepEqual(events.at(-1), { uri: track.uri, generation: 1, codec: 'flac-mp4' });
 });
 
 test('reports measured audio format only while the same track is current', async () => {
@@ -42,7 +42,7 @@ test('reports measured audio format only while the same track is current', async
   env.playback.probeQuality = async () => ({ sampleRate: 44100, bitDepth: 16 });
   await env.playback.clearAddPlayTrack(track);
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(events.at(-1), { uri: track.uri, codec: 'flac-mp4', sampleRate: 44100, bitDepth: 16 });
+  assert.deepEqual(events.at(-1), { uri: track.uri, generation: 1, codec: 'flac-mp4', sampleRate: 44100, bitDepth: 16 });
 });
 
 test('stop suppresses a delayed resolution', async () => {

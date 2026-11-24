@@ -270,7 +270,7 @@ class Provider:
                 if data.get('mime_type') != 'audio/flac' or data.get('format_id') not in (6, 7, 27):
                     raise ServiceError('UNAVAILABLE', 'FLAC is unavailable', 422)
                 self.secret = secret
-                return {'url': data['url'], 'codec': 'flac', 'bitrate': None,
+                return {'url': data['url'], 'codec': 'flac', 'bitrate': None, 'format_id': data['format_id'],
                         'sampleRate': round(float(data.get('sampling_rate') or 0) * 1000),
                         'bitDepth': int(data.get('bit_depth') or 0)}
         raise ServiceError('UNAVAILABLE', 'FLAC is unavailable', 422)

@@ -7,7 +7,7 @@ const Q = require('kew');
 const ApiClient = require('./lib/api-client');
 const Browse = require('./lib/browse');
 const Playback = require('./lib/playback');
-const { createTransportWithManager } = require('./lib/transport');
+const { createTransportWithManager, probeStream } = require('./lib/transport');
 const { LocalFileInfo } = require('./lib/local-file-info');
 
 function kew(promise) {
@@ -94,15 +94,7 @@ class ControllerYandexMusic {
       const transport = createTransportWithManager(configFile, { mpd, sm: this.router.stateMachine, service: 'yandex_music', onError, getManager: () => this.router.pluginManager.getPlugin('audio_interface', 'playback_engines') });
       this.playback = new Playback(api, mpd, this.router.stateMachine, onError, () => this.quality, transport);
       this.playback.onQuality = info => this.router.broadcastMessage('pushYandexQuality', info);
-      this.playback.probeQuality = async url => {
-        const { stdout } = await execFile('/usr/bin/ffprobe', ['-v', 'error', '-select_streams', 'a:0',
-          '-show_entries', 'stream=sample_rate,bits_per_raw_sample', '-of', 'json', url],
-          { timeout: 15000, maxBuffer: 16384 });
-        const stream = JSON.parse(stdout).streams?.[0] || {};
-        const sampleRate = Number(stream.sample_rate), bitDepth = Number(stream.bits_per_raw_sample);
-        return { ...(Number.isFinite(sampleRate) && sampleRate > 0 ? { sampleRate } : {}),
-          ...(Number.isFinite(bitDepth) && bitDepth > 0 ? { bitDepth } : {}) };
-      };
+      this.playback.probeQuality = probeStream;
       this.started = true;
       this.router.volumioAddToBrowseSources({ name: 'Яндекс Музыка', uri: 'yandex_music',
         plugin_type: 'music_service', plugin_name: 'yandex_music', icon: 'fa-music' });

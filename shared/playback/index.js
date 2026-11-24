@@ -1,5 +1,6 @@
 'use strict';
 const fs = require('node:fs');
+const streamQuality = require('./stream-quality');
 const MpdTransport = require('./mpd');
 const AlbumPlayerTransport = require('./album-player');
 const { SoapClient, error } = require('./soap');
@@ -39,4 +40,4 @@ function createTransportWithManager(filename, options = {}) {
     close: () => { managed?.close(); fallback?.close(); active = null; },
   };
 }
-module.exports = { createTransportWithManager, createTransport, createTransportFromFile, MpdTransport, AlbumPlayerTransport, SoapClient, mpdArgument: MpdTransport.mpdArgument };
+module.exports = { ...streamQuality, createTransportWithManager, createTransport, createTransportFromFile, MpdTransport, AlbumPlayerTransport, SoapClient, mpdArgument: MpdTransport.mpdArgument };

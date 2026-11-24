@@ -1,5 +1,5 @@
 'use strict';
-const { createTransport } = require('./transport');
+const { createTransport, StreamQuality, positive } = require('./transport');
 
 class Playback {
   constructor(api, mpd, stateMachine, onError, quality = () => '27', transport) {
@@ -7,6 +7,7 @@ class Playback {
     this.generation = 0; this.serial = Promise.resolve(); this.track = null; this.started = false;
     this.lastQuality = null; this.onQuality = () => {};
     this.probeQuality = null;
+    this.qualityCache = new StreamQuality();
     this.transport = transport || createTransport({ mpd, sm: stateMachine });
   }
   current(track = this.track) {
@@ -24,6 +25,7 @@ class Playback {
   async clearAddPlayTrack(track) {
     const generation = ++this.generation;
     this.track = track; this.started = false; this.lastQuality = null;
+    this.onQuality({ uri: track.uri, generation });
     const valid = () => generation === this.generation && this.current(track);
     try {
       const match = /^qobuz_custom\/track\/(\d+(?:%3A\d+)?)$/i.exec(track.uri);
@@ -38,16 +40,29 @@ class Playback {
           () => this.track === track && this.current(track));
         if (!played || !valid()) return;
         this.started = true;
-        if (valid()) {
-          this.lastQuality = { uri: track.uri, codec: result.codec, sampleRate: result.sampleRate, bitDepth: result.bitDepth };
-          this.onQuality(this.lastQuality);
-          if (this.probeQuality) {
-            Promise.resolve(this.probeQuality(url)).then(measured => {
-              if (!valid() || !this.lastQuality || this.lastQuality.uri !== track.uri) return;
-              this.lastQuality = { ...this.lastQuality, ...measured };
-              this.onQuality(this.lastQuality);
-            }).catch(() => {});
-          }
+        const { codec } = result;
+        const bitrate = codec === 'mp3' ? positive(result.bitrate) : undefined;
+        const initial = { uri: track.uri, generation, codec, ...(bitrate && { bitrate }) };
+        if (positive(result.sampleRate)) initial.sampleRate = Number(result.sampleRate);
+        if (positive(result.bitDepth)) initial.bitDepth = Number(result.bitDepth);
+        if (positive(result.format_id)) initial.format_id = Number(result.format_id);
+        this.lastQuality = initial;
+        this.onQuality(initial);
+        if (this.probeQuality) {
+          const key = JSON.stringify(['qobuz_custom', match[1], codec, initial.format_id]);
+          const stillPlaying = () => this.current(track) && this.lastQuality?.generation === generation;
+          this.qualityCache.measure(key, url, this.probeQuality).then(measured => {
+            if (!stillPlaying()) return;
+            const quality = { ...initial };
+            for (const field of ['sampleRate', 'bitDepth', 'channels', 'bitrate']) {
+              if (!quality[field] && positive(measured[field]) && !(codec === 'mp3' && field === 'bitDepth')) {
+                quality[field] = Number(measured[field]);
+              }
+            }
+            if (quality.bitrate && !initial.bitrate) quality.bitrateEstimated = true;
+            this.lastQuality = quality;
+            this.onQuality(quality);
+          }).catch(() => {});
         }
       });
     } catch (error) {
@@ -57,6 +72,7 @@ class Playback {
   stop() {
     const track = this.track;
     this.cancel(); this.track = null; this.started = false; this.lastQuality = null;
+    if (track && this.current(track)) this.onQuality({ uri: track.uri, generation: this.generation });
     const generation = this.generation;
     return this.enqueue(async () => {
       if (generation !== this.generation || !this.current(track)) return;

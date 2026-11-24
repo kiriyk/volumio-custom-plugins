@@ -58,7 +58,7 @@ class Streaming:
         while len(self.tickets) > 128:
             self.tickets.popitem(last=False)
         return {'path': f'/stream/{key}', 'codec': stream['codec'], 'bitrate': stream['bitrate'],
-                'sampleRate': stream.get('sampleRate'), 'bitDepth': stream.get('bitDepth')}
+                'format_id': stream.get('format_id'), 'sampleRate': stream.get('sampleRate'), 'bitDepth': stream.get('bitDepth')}
 
     async def _open(self, method, url, headers):
         for _ in range(4):
