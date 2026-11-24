@@ -69,7 +69,8 @@ var PATHS = {
 var PLUGIN_NAME = 'artwork_one';
 var MUSIC_ENDPOINTS = [
   { endpoint: 'artworkOneLocalMusicInfo', type: 'user_interface', name: PLUGIN_NAME, method: 'getLocalMusicInfo' },
-  { endpoint: 'artworkOneMusicBrainz', type: 'user_interface', name: PLUGIN_NAME, method: 'getMusicBrainz' }
+  { endpoint: 'artworkOneMusicBrainz', type: 'user_interface', name: PLUGIN_NAME, method: 'getMusicBrainz' },
+  { endpoint: 'artworkOneLocalFileInfo', type: 'user_interface', name: PLUGIN_NAME, method: 'getLocalFileInfo' }
 ];
 var UPDATE_POLL = 1000, UPDATE_GIVE_UP = 10 * 60 * 1000;
 
@@ -531,11 +532,7 @@ ArtworkOne.prototype.getMusicBrainz = function (data) {
 };
 
 ArtworkOne.prototype.getLocalFileInfo = function (data) {
-  const uri = typeof data?.uri === 'string' ? data.uri : '';
-  return libQ.resolve((async () => {
-    const info = await this.localMusic?.fileInfo(uri);
-    return { message: 'pushArtworkLocalFileInfo', payload: { uri, ...info } };
-  })());
+  return this.localMusic?.fileInfo(data?.uri);
 };
 
 ArtworkOne.prototype.musicCacheSize = function () {

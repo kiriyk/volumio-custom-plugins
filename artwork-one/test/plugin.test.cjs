@@ -70,9 +70,7 @@ test('local library settings report usage, save the cache limit and clear cached
   await plugin.saveMusicCacheSize({ cacheSize: '2' });
   assert.equal(settings.get('musicCacheMiB'), 2);
   assert.equal(cache.maxBytes, 2 * 1024 * 1024);
-  assert.deepEqual(await plugin.getLocalFileInfo({ uri: 'mnt/USB/Drive/One.flac' }), {
-    message: 'pushArtworkLocalFileInfo', payload: { uri: 'mnt/USB/Drive/One.flac', size: 250, bitrate: 192000 }
-  });
+  assert.deepEqual(await plugin.getLocalFileInfo({ uri: 'mnt/USB/Drive/One.flac' }), { size: 250, bitrate: 192000 });
   await plugin.clearMusicCache();
   assert.equal(await cache.usage(), 0);
   assert(calls.some(call => call[1] === 'pushArtworkCacheCleared'));
@@ -87,14 +85,16 @@ test('onStart registers the interface; onStop takes it out and switches a player
   assert.equal(list.length, 1); assert.equal(list[0].uiName, 'artwork'); assert.ok(list[0].uiPath.endsWith('/ui'));
   assert.ok(calls.some(c => c[0] === 'register'));
   assert.deepEqual(calls.filter(c => c[0] === 'rest-add').map(c => [c[1].endpoint, c[1].method]), [
-    ['artworkOneLocalMusicInfo', 'getLocalMusicInfo'], ['artworkOneMusicBrainz', 'getMusicBrainz']
+    ['artworkOneLocalMusicInfo', 'getLocalMusicInfo'], ['artworkOneMusicBrainz', 'getMusicBrainz'],
+    ['artworkOneLocalFileInfo', 'getLocalFileInfo']
   ]);
   assert.equal((await p.getLocalMusicInfo({ requestId: 'bad' })).error, 'invalidRequest');
   // the player shows it
   fs.writeFileSync(p.paths.ACTIVE_UI, JSON.stringify(p.uiEntry()));
   fs.writeFileSync(p.paths.CORE_UI_LIST, JSON.stringify([{ uiPrettyName: 'Manifest', uiName: 'manifest', uiPath: tmp }]));
   await p.onStop();
-  assert.equal(calls.filter(c => c[0] === 'rest-remove').length, 2);
+  assert.deepEqual(calls.filter(c => c[0] === 'rest-remove').map(c => c[1]),
+    calls.filter(c => c[0] === 'rest-add').map(c => c[1]));
   assert.deepEqual(JSON.parse(fs.readFileSync(p.paths.UI_LIST, 'utf8')), []);
   assert.ok(calls.some(c => c[0] === 'exec' && c[3] === 'setVolumio3UI' && c[4].volumio3_ui.value === 'manifest'));
 });

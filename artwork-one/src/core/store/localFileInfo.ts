@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from 'react';
 import { create } from 'zustand';
-import { emit, on } from '../socket';
+import { pluginRest } from '../api';
+import { on } from '../socket';
 
 interface Entry { uri: string; size?: number; bitrate?: number | null }
 interface LocalFileStore { entries: Record<string, Entry> }
@@ -10,13 +11,17 @@ const requested = new Map<string, number>();
 export function requestLocalFileInfo(uri: string): void {
   if (!/^(?:\/?(?:mnt|music-library)\/)?(?:USB|NAS|INTERNAL)\//.test(uri)) return;
   if ((requested.get(uri) || 0) > Date.now() - 300000) return;
-  requested.set(uri, Date.now());
+  const started = Date.now();
+  requested.set(uri, started);
   if (requested.size > 500) requested.delete(requested.keys().next().value!);
-  emit('callMethod', { endpoint: 'user_interface/artwork_one', method: 'getLocalFileInfo', data: { uri } });
+  void pluginRest<Omit<Entry, 'uri'> | null>('artworkOneLocalFileInfo', { uri }).then(info => {
+    if (requested.get(uri) === started && info) store({ uri, ...info });
+  }).catch(() => {
+    if (requested.get(uri) === started) requested.delete(uri);
+  });
 }
 
-on('pushArtworkLocalFileInfo', (info: Entry) => {
-  if (!info || typeof info.uri !== 'string') return;
+function store(info: Entry) {
   useLocalFileStore.setState(state => {
     const entries = { ...state.entries };
     delete entries[info.uri];
@@ -25,7 +30,7 @@ on('pushArtworkLocalFileInfo', (info: Entry) => {
     if (keys.length > 500) delete entries[keys[0]];
     return { entries };
   });
-});
+}
 
 on('pushArtworkCacheCleared', () => {
   requested.clear();
