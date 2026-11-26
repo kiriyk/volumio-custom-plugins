@@ -1,6 +1,6 @@
 {
   "name": "artwork_one",
-  "version": "3.2.11",
+  "version": "3.2.12",
   "description": "Artwork One: a cover-led interface for Volumio. The cover of what plays fills the screen; every control floats above it.",
   "main": "index.js",
   "author": "Michal Tamas",

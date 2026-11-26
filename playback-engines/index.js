@@ -67,15 +67,15 @@ class ControllerPlaybackEngines{
     }catch(e){this.ensure().error='DEVICE_ERROR';this.ensure().publish?.();}finally{this.polling=false;}
   }
   onStop(){this.enabled=false;return kew((async()=>{await this.startPromise?.catch(()=>{});clearInterval(this.timer);await this.manager?.shutdown();this.started=false;this.manager=null;})());}
-  getTransport(service,onError){
+  getTransport(service,onError,onTrackEnd){
     // Providers can start before this plugin. Resolve readiness on the first play,
     // rather than permanently falling back to MPD in their startup ordering.
     let transport,owner,native;
-    const fallback=()=>native??=require('./lib/transport').createTransport({mpd:this.router.pluginManager.getPlugin('music_service','mpd'),sm:this.router.stateMachine});
+    const fallback=()=>native??=require('./lib/transport').createTransport({mpd:this.router.pluginManager.getPlugin('music_service','mpd'),sm:this.router.stateMachine,onTrackEnd});
     const current=()=>this.enabled?transport:fallback();
     return{get kind(){return transport?.kind||'mpd';},play:async(...args)=>{
       if(!this.enabled)return fallback().play(...args);
-      await this.start();const manager=this.ensure();if(owner!==manager){transport?.close();transport=manager.createTransport(service,onError);owner=manager;}
+      await this.start();const manager=this.ensure();if(owner!==manager){transport?.close();transport=manager.createTransport(service,onError,onTrackEnd);owner=manager;}
       return transport.play(...args);
     },activate:()=>current()?.activate()||Promise.resolve(),pause:()=>current()?.pause()||Promise.resolve(),resume:()=>current()?.resume()||Promise.resolve(),seek:ms=>current()?.seek(ms)||Promise.resolve(),stop:()=>current()?.stop()||Promise.resolve(),close:()=>{transport?.close();native?.close();}};
   }

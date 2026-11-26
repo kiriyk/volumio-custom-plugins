@@ -298,3 +298,9 @@ Artwork One rebuilt from the ground up in React. Same look, same features, a new
 [3.0.2]: https://github.com/michaltamas/volumio-artwork-one/releases/tag/v3.0.2
 [3.0.1]: https://github.com/michaltamas/volumio-artwork-one/releases/tag/v3.0.1
 [3.0.0]: https://github.com/michaltamas/volumio-artwork-one/releases/tag/v3.0.0
+
+## 3.2.12
+
+- Экран «Моя волна» в Яндекс Музыке: занятия, характер, настроение, язык,
+  запуск, применение и остановка. Состояние синхронизируется с плеером и
+  повторно запрашивается после переподключения браузера.

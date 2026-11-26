@@ -26,7 +26,7 @@ function createTransportWithManager(filename, options = {}) {
   const select = () => {
     const manager = options.getManager?.();
     if (!manager?.getTransport) return native();
-    if (owner !== manager) { managed?.close(); owner = manager; managed = manager.getTransport(options.service, options.onError); }
+    if (owner !== manager) { managed?.close(); owner = manager; managed = manager.getTransport(options.service, options.onError, options.onTrackEnd); }
     return managed;
   };
   return {

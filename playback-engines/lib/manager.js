@@ -22,7 +22,7 @@ function samePlaybackSettings(next,previous) {
 function kew(value) { const d = Q.defer(); Promise.resolve(value).then(v => d.resolve(v),e => d.reject(e)); return d.promise; }
 
 class ManagedTransport {
-  constructor(manager,service,onError) { Object.assign(this,{manager,service,onError}); this.delegate=null; }
+  constructor(manager,service,onError,onTrackEnd) { Object.assign(this,{manager,service,onError,onTrackEnd}); this.delegate=null; }
   get kind() { return this.manager.settings.managed ? this.manager.settings.engine : 'mpd'; }
   async play(url,track,valid,owns=valid) { return this.manager.play(this,url,track,valid,owns); }
   activate() { return this.delegate ? this.delegate.activate() : Promise.resolve(); }
@@ -155,7 +155,7 @@ class Manager {
     });
     this.chain=operation.catch(()=>{});return operation;
   }
-  createTransport(service,onError=()=>{}) {const facade=new ManagedTransport(this,service,onError);this.facades.add(facade);return facade;}
+  createTransport(service,onError=()=>{},onTrackEnd=()=>{}) {const facade=new ManagedTransport(this,service,onError,onTrackEnd);this.facades.add(facade);return facade;}
   play(facade,url,track,valid,owns) {
     if(this.closed||this.closing)return Promise.reject(fail('ENGINE_UNAVAILABLE'));
     const operation=this.chain.then(()=>{
@@ -211,7 +211,7 @@ class Manager {
     if(!valid())return false;
     const config=this.settings.managed && this.settings.engine==='album_player' ? {engine:'album_player',controlUrl:this.runtime.endpoints?.controlUrl} : {engine:'mpd'};
     facade.delegate?.close();
-    facade.delegate=engines.createTransport({config,mpd:{...this.mpd,stop:this.original.stop},sm:this.router.stateMachine,service:facade.service,updateSource:'playback_engines',onError:e=>{
+    facade.delegate=engines.createTransport({config,mpd:{...this.mpd,stop:this.original.stop},sm:this.router.stateMachine,service:facade.service,updateSource:'playback_engines',observerMpd:this.mpd,onTrackEnd:track=>facade.onTrackEnd?.(track),onError:e=>{
       if(this.active===facade){this.error=e.code||'ENGINE_ERROR';this.publish();facade.onError(e);}
     }});
     // MPD methods may be inherited from a prototype, so bind those explicitly.

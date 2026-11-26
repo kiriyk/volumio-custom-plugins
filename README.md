@@ -5,7 +5,7 @@
 32-битном userspace armhf. Совместимость с другими сборками не гарантируется.
 
 - [Яндекс Музыка](yandex-music/README.md): авторизация, поиск, коллекция,
-  плейлисты, страницы исполнителей и воспроизведение MP3 или FLAC.
+  плейлисты, страницы исполнителей, «Моя волна» и воспроизведение MP3 или FLAC.
 - [Qobuz Custom](qobuz/README.md): независимый плагин 0.3.1, браузерный вход,
   поиск треков, альбомов и исполнителей, дискография, воспроизведение и скачивание FLAC на внешний диск. Нужна подписка Qobuz.
 - [Playback Engines](playback-engines/README.md): отдельный выбор MPD / Album Player,
@@ -40,7 +40,7 @@ bash scripts/deploy.sh volumio@volumio.local
 Из каталога клонированного репозитория на компьютере:
 
 ```bash
-scp packages/yandex_music-0.2.2.tar.gz packages/artwork-one.tar.gz artwork-one/scripts/install.sh volumio@volumio.local:/tmp/
+scp packages/yandex_music-0.3.0.tar.gz packages/artwork-one.tar.gz artwork-one/scripts/install.sh volumio@volumio.local:/tmp/
 ssh volumio@volumio.local
 ```
 
@@ -48,7 +48,7 @@ ssh volumio@volumio.local
 
 ```bash
 mkdir -p /tmp/yandex-music-install
-tar -xzf /tmp/yandex_music-0.2.2.tar.gz -C /tmp/yandex-music-install
+tar -xzf /tmp/yandex_music-0.3.0.tar.gz -C /tmp/yandex-music-install
 cd /tmp/yandex-music-install/yandex_music
 volumio plugin install
 bash /tmp/install.sh --from /tmp/artwork-one.tar.gz --activate

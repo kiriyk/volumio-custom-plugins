@@ -85,3 +85,11 @@ test('disabling during startup never registers a source afterwards', async () =>
   await starting;
   assert.ok(!env.events.some(event => event[0] === 'add'));
 });
+
+test('wave queue expansion uses the already validated recommendation metadata', async () => {
+  const { controller } = environment();
+  const track = { uri: 'yandex_music/track/42', title: 'Recommendation', service: 'yandex_music' };
+  controller.wave = { tracks: new Map([[track.uri, track]]) };
+  controller.browse = { explode: () => { throw new Error('Wave must not refetch its tracks'); } };
+  assert.deepEqual(await controller.explodeUri(track.uri), [track]);
+});

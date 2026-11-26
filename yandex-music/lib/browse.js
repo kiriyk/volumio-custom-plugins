@@ -41,6 +41,9 @@ class Browse {
       items = ['tracks', 'playlists', 'albums', 'artists'].map(section => ({
         service: 'yandex_music', type: 'folder', title: this.t(section),
         uri: `yandex_music/library/${section}`, icon: ({ tracks: 'fa-heart', playlists: 'fa-list', albums: 'fa-music', artists: 'fa-user' })[section] }));
+      items.unshift({ service: 'yandex_music', type: 'folder', title: 'Моя волна', uri: 'yandex_music/wave', icon: 'fa-magic' });
+    } else if (uri === 'yandex_music/wave') {
+      items = [];
     } else {
       const page = await this.api.request('GET', this.resource(uri));
       items = page.items.map(mapItem);

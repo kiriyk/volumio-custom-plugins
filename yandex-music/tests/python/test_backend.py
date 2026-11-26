@@ -194,3 +194,25 @@ async def test_oauth_refresh_keeps_temporary_failures_distinct_from_invalid_cred
     with pytest.raises(ServiceError) as result:
         await backend.refresh('refresh-fixture')
     assert result.value.code == code
+
+
+async def test_wave_uses_current_session_sdk_and_normal_listening_feedback():
+    calls = []
+    class WaveClient:
+        async def rotor_session_new(self, seeds, **kwargs):
+            calls.append(('new', seeds, kwargs))
+            return Obj(radio_session_id='sid', batch_id='b', sequence=[Obj(track=track(1))])
+        async def rotor_session_tracks(self, session, **kwargs):
+            calls.append(('next', session, kwargs))
+            return Obj(batch_id='c', sequence=[Obj(track=track(2))])
+        async def rotor_session_feedback(self, session, event, **kwargs):
+            calls.append(('event', session, event.to_dict(), kwargs))
+            return True
+    backend = YandexBackend(client=WaveClient())
+    assert (await backend.wave_new(['user:onyourwave']))['session_id'] == 'sid'
+    assert calls[0][2]['incognito'] is False
+    await backend.wave_next('sid', ['1'])
+    assert calls[1][2]['queue'] == ['1']
+    await backend.wave_event('sid', '1', 'b', 'trackFinished', 12.5)
+    assert calls[-1][2]['total_played_seconds'] == 12.5
+    assert calls[-1][3]['batch_id'] == 'b'

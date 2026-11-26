@@ -7,6 +7,7 @@ const Q = require('kew');
 const ApiClient = require('./lib/api-client');
 const Browse = require('./lib/browse');
 const Playback = require('./lib/playback');
+const Wave = require('./lib/wave');
 const { createTransportWithManager, probeStream } = require('./lib/transport');
 const { LocalFileInfo } = require('./lib/local-file-info');
 
@@ -89,9 +90,10 @@ class ControllerYandexMusic {
       const api = this.client();
       this.browse = new Browse(api, key => this.t(key), code => this.notify(code, 'info'));
       const mpd = this.router.pluginManager.getPlugin('music_service', 'mpd');
-      const onError = error => { this.notify(error); Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {}); };
+      const onError = error => { void this.wave?.fail(error); this.notify(error); Promise.resolve(this.router.stateMachine.stop?.()).catch(() => {}); };
       const configFile = this.router.pluginManager.getConfigurationFile?.(this.context, 'transport.json');
-      const transport = createTransportWithManager(configFile, { mpd, sm: this.router.stateMachine, service: 'yandex_music', onError, getManager: () => this.router.pluginManager.getPlugin('audio_interface', 'playback_engines') });
+      this.wave = new Wave(api, this.router);
+      const transport = createTransportWithManager(configFile, { mpd, sm: this.router.stateMachine, service: 'yandex_music', onError, onTrackEnd: track => this.wave?.ended(track), getManager: () => this.router.pluginManager.getPlugin('audio_interface', 'playback_engines') });
       this.playback = new Playback(api, mpd, this.router.stateMachine, onError, () => this.quality, transport);
       this.playback.onQuality = info => this.router.broadcastMessage('pushYandexQuality', info);
       this.playback.probeQuality = probeStream;
@@ -107,10 +109,12 @@ class ControllerYandexMusic {
   async shutdown() {
     this.shutdownGeneration = ++this.lifecycleGeneration;
     this.started = false; this.loginGeneration++; clearTimeout(this.timer);
+    await this.wave?.close(); this.wave = null;
     this.router.volumioRemoveToBrowseSources('Яндекс Музыка');
     if (this.playback) {
       if (this.playback.current()) await this.playback.stop();
       else this.playback.cancel();
+      this.playback.transport.close?.();
     }
     this.browse = null; this.playback = null;
     await this.service.stop();
@@ -125,6 +129,13 @@ class ControllerYandexMusic {
   search(query) {
     return kew(this.browse ? this.browse.search(query).catch(error => { this.notify(error); return []; }) : []);
   }
+  getWave() { return kew(this.wave?.get()); }
+  startWave(data = {}) {
+    const selection = data.selection || Object.fromEntries(Object.entries(data).map(([key, item]) =>
+      [key, typeof item === 'object' ? item?.value : item]));
+    return kew((async () => { await this.wave?.start(selection); return this.refreshUI(); })());
+  }
+  stopWave() { return kew((async () => { await this.wave?.stop(); return this.refreshUI(); })()); }
   getPlaybackQuality() {
     const info = this.playback?.current() ? this.playback.lastQuality : null;
     this.router.broadcastMessage('pushYandexQuality', info || {});
@@ -154,7 +165,10 @@ class ControllerYandexMusic {
       this.router.broadcastMessage('pushRecordingQuality', { uri, recordingQuality });
     })());
   }
-  explodeUri(uri) { return kew(this.browse ? this.browse.explode(uri) : Promise.reject(new Error('SERVICE_UNAVAILABLE'))); }
+  explodeUri(uri) {
+    const track = this.wave?.tracks.get(uri);
+    return kew(track ? [track] : this.browse ? this.browse.explode(uri) : Promise.reject(new Error('SERVICE_UNAVAILABLE')));
+  }
   clearAddPlayTrack(track) { return kew(this.playback?.clearAddPlayTrack(track)); }
   pause() { return kew(this.playback?.pause()); }
   resume() { return kew(this.playback?.resume()); }
@@ -186,6 +200,21 @@ class ControllerYandexMusic {
     const setting = audio.content[0]; setting.label = this.t('quality');
     setting.options = ['auto', 'lossless', 'mp3'].map((value, i) => ({ value, label: this.t(['qualityAuto', 'qualityLossless', 'qualityMp3'][i]) }));
     setting.value = setting.options.find(option => option.value === this.quality);
+    if (this.wave) {
+      const wave = await this.wave.get();
+      const fields = Object.keys(wave.options);
+      config.sections.push({ id: 'wave', element: 'section', label: 'Моя волна',
+        description: wave.error || (wave.active ? 'Волна играет' : 'Волна остановлена'),
+        onSave: { type: 'controller', endpoint: 'music_service/yandex_music', method: 'startWave' },
+        saveButton: { label: wave.active ? 'Применить и перезапустить' : 'Запустить', data: fields },
+        content: [...fields.map(id => {
+          const options = [{ value: '', label: id === 'activity' ? 'Моя волна' : 'По умолчанию' }, ...wave.options[id].values];
+          return { id, element: 'select', label: wave.options[id].label, options,
+            value: options.find(o => o.value === wave.selection[id]) || options[0] };
+        }), { id: 'stopWave', element: 'button', label: 'Остановить',
+          onClick: { type: 'controller', endpoint: 'music_service/yandex_music', method: 'stopWave' } }]
+      });
+    }
     return config;
   }
   saveQuality(data) {
@@ -225,7 +254,7 @@ class ControllerYandexMusic {
         this.login = status;
         await this.refreshUI();
         if (status.status === 'pending') this.pollLogin(generation);
-        else if (status.status === 'success') this.notify('success', 'success');
+        else if (status.status === 'success') { await this.wave?.stop(false); this.notify('success', 'success'); }
       } catch (error) { this.notify(error); }
     }, 3000);
     this.timer.unref?.();
@@ -234,6 +263,7 @@ class ControllerYandexMusic {
     return kew((async () => {
       try {
         this.loginGeneration++; clearTimeout(this.timer);
+        await this.wave?.stop(false);
         await this.client().request('POST', '/v1/auth/token', { token: data.token });
         this.login = null;
         this.notify('success', 'success');
@@ -245,6 +275,7 @@ class ControllerYandexMusic {
     return kew((async () => {
       try {
         this.loginGeneration++; clearTimeout(this.timer); this.login = null;
+        await this.wave?.stop(false);
         if (this.playback?.current()) await this.playback.stop();
         await this.client().request('POST', '/v1/auth/logout', {});
       } catch (error) { this.notify(error); }

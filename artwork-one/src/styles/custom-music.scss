@@ -19,3 +19,11 @@ body#artwork .music-card__recording-quality { color:var(--ink-2); font-size:11px
 body#artwork .item__name { display:block; overflow:hidden; text-overflow:ellipsis; }
 body#artwork .item__recording-quality { display:block; font-weight:400; white-space:normal; }
 body#artwork .music-card__recording-quality { margin:4px 0 0; }
+
+body#artwork .aw-wave {
+  button { min-height: 44px; padding: 10px 18px; border: 1px solid var(--hairline); border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; }
+  .aw-wave__start { background: var(--ink); color: var(--on-ink); border-color: transparent; }
+  .aw-wave__stop { background: transparent; color: var(--ink); }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+}

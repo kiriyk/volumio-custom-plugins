@@ -106,3 +106,8 @@ explicitly. Unmanaged native MPD playback is unchanged.
 
 Artwork One fixes local CUE cover addresses by asking the album-art service for
 the album directory, instead of receiving the CUE text as an image.
+
+С версии 0.1.6 транспорт передаёт источнику внутренний `onTrackEnd(track)`
+до обработки EOF в Core. MPD исключает ошибки декодера и явный Stop; Album
+Player исключает раннюю остановку и повторное уведомление. Сигнал используется
+«Моей волной» для feedback и не меняет Core Volumio.

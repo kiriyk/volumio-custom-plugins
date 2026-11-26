@@ -71,3 +71,32 @@ async def test_bad_json_and_unexpected_errors_have_safe_json_responses(tmp_path,
             async with session.get(url + '/v1/search?q=test') as response:
                 assert response.status == 503
                 assert 'secret-token' not in await response.text()
+
+
+async def test_wave_boundary_logout_and_settings_survive_restart(tmp_path, serve):
+    class WaveBackend(FakeBackend):
+        async def wave_options(self):
+            return {'activity': {'label': 'Занятие', 'values': []}}
+        async def wave_new(self, seeds):
+            assert seeds == ['user:onyourwave']
+            return {'session_id': 'private-session', 'batch_id': 'b',
+                    'items': [{'id': '1', 'available': True}]}
+    async with serve(create_app(WaveBackend, tmp_path, 'key')) as url:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url + '/v1/wave') as response:
+                assert response.status == 401
+            async with session.get(url + '/v1/wave', headers={'X-API-Key': 'key', 'Origin': 'http://localhost'}) as response:
+                assert response.status == 403
+        async with aiohttp.ClientSession(headers={'X-API-Key': 'key'}) as session:
+            async with session.get(url + '/v1/wave') as response:
+                assert response.status == 401
+            await session.post(url + '/v1/auth/token', json={'token': 'private-token'})
+            async with session.post(url + '/v1/wave/start', json={'selection': {}}) as response:
+                assert response.status == 200
+                text = await response.text()
+                assert 'private-' not in text
+                id_ = (await response.json())['id']
+            await session.post(url + '/v1/auth/logout', json={})
+            async with session.post(url + '/v1/wave/next', json={'id': id_}) as response:
+                assert response.status == 409
+    assert (tmp_path / 'wave-settings.json').read_text() == '{}'

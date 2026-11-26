@@ -30,7 +30,7 @@ test('root and paged collection use native navigation and escaped continuation U
   const api = { request: async () => ({ items: [track], next_cursor: '50' }) };
   const browse = new Browse(api);
   const root = await browse.browse('yandex_music');
-  assert.equal(root.navigation.lists[0].items.length, 4);
+  assert.equal(root.navigation.lists[0].items.length, 5);
   const page = await browse.browse('yandex_music/library/tracks');
   assert.equal(page.navigation.lists[0].items[0].title, 'Трек');
   assert.equal(page.navigation.lists[0].items.at(-1).uri, 'yandex_music/library/tracks?cursor=50');

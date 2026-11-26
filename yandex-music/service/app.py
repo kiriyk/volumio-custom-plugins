@@ -9,6 +9,7 @@ from pathlib import Path
 
 from aiohttp import web
 
+from .wave import Wave
 from .auth import AuthManager
 from .backend import YandexBackend
 from .catalog import pagination
@@ -53,7 +54,9 @@ def create_app(backend=YandexBackend, state_dir=None, api_key=None, upstream_pol
                                                    'message': 'Invalid request'}}, status=400)
         except Exception as error:
             safe = public_error(error)
-            logging.getLogger(__name__).warning('request=%s code=%s', request_id, safe.code)
+            resource = request.match_info.route.resource
+            route = resource.canonical if resource is not None else 'unknown'
+            logging.getLogger(__name__).warning('request=%s route=%s code=%s', request_id, route, safe.code)
             response = web.json_response({'error': {'code': safe.code, 'message': safe.message}},
                                          status=safe.status)
         if not response.prepared:
@@ -64,7 +67,11 @@ def create_app(backend=YandexBackend, state_dir=None, api_key=None, upstream_pol
     app = web.Application(middlewares=[boundary], client_max_size=16384)
     auth = AuthManager(CredentialStore(state_dir / 'credentials.json'), backend)
     streaming = Streaming(auth, upstream_policy or validate_upstream)
-    auth.on_change = streaming.invalidate
+    wave = Wave(auth, state_dir / 'wave-settings.json')
+    def invalidate():
+        streaming.invalidate()
+        wave.invalidate()
+    auth.on_change = invalidate
     app[AUTH], app[STREAMING] = auth, streaming
 
     async def lifecycle(application):
@@ -136,6 +143,17 @@ def create_app(backend=YandexBackend, state_dir=None, api_key=None, upstream_pol
     async def track_quality(request):
         return web.json_response({'recording_quality': await auth.call('track_quality', request.match_info['id'])})
 
+    async def wave_api(request):
+        if request.method == 'GET':
+            result = await wave.options()
+        else:
+            data = await body(request)
+            action = request.match_info['action']
+            result = await wave.start(data.get('selection', {})) if action == 'start' else await wave.action(action, data)
+        return web.json_response(result)
+
+    app.router.add_get('/v1/wave', wave_api)
+    app.router.add_post('/v1/wave/{action}', wave_api)
     app.router.add_get('/health', health)
     app.router.add_get('/v1/account', account)
     app.router.add_post('/v1/auth/{action}', auth_action)

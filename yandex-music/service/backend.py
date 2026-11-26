@@ -260,6 +260,52 @@ class YandexBackend:
         url = await selected.get_direct_link_async()
         return {'url': url, 'codec': 'mp3', 'bitrate': selected.bitrate_in_kbps}
 
+    async def wave_options(self):
+        result = await (await self._client()).rotor_wave_settings()
+        options = {'activity': {'label': 'Занятие', 'values': []}}
+        for block in value(result, 'blocks', []):
+            if value(block, 'type') == 'contexts':
+                for station in value(block, 'items', []):
+                    id_ = value(station, 'id')
+                    options['activity']['values'].append({
+                        'value': f"{value(id_, 'type')}:{value(id_, 'tag')}",
+                        'label': value(station, 'name')})
+        restrictions = value(result, 'setting_restrictions')
+        for field in ('diversity', 'mood_energy', 'language'):
+            enum = value(restrictions, field)
+            choices = [{'value': v.serialized_seed, 'label': v.name}
+                       for v in value(enum, 'possible_values', []) if v.serialized_seed]
+            if not choices:
+                raise ServiceError('UNAVAILABLE', 'Missing wave settings', 502)
+            options[field] = {'label': value(enum, 'name'), 'values': choices}
+        return options
+
+    @staticmethod
+    def wave_batch(result):
+        return {'session_id': value(result, 'radio_session_id'),
+                'batch_id': value(result, 'batch_id'),
+                'terminated': value(result, 'terminated', False),
+                'unknown_session': value(result, 'unknown_session', False),
+                'items': [track_dto(item.track) for item in value(result, 'sequence', [])
+                          if value(item, 'track')]}
+
+    async def wave_new(self, seeds, *, incognito=False):
+        result = await (await self._client()).rotor_session_new(
+            seeds, incognito=incognito, include_tracks_in_response=True, include_wave_model=True)
+        return self.wave_batch(result)
+
+    async def wave_next(self, session, queue):
+        return self.wave_batch(await (await self._client()).rotor_session_tracks(session, queue=queue))
+
+    async def wave_event(self, session, track, batch, event, seconds):
+        from yandex_music import SessionEvent
+        from yandex_music._client_base import utc_now_iso
+        feedback = SessionEvent(event, utc_now_iso(), track_id=track,
+                                total_played_seconds=seconds if event != 'trackStarted' else None)
+        accepted = await (await self._client()).rotor_session_feedback(session, feedback, batch_id=batch)
+        if not accepted:
+            raise ServiceError('UNAVAILABLE', 'Wave feedback rejected', 502)
+
     async def close(self):
         if self.session:
             await self.session.close()

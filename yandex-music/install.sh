@@ -3,6 +3,9 @@
 set -euo pipefail
 if [ "$(id -u)" != 0 ]; then exec sudo bash "$0" "$@"; fi
 PLUGIN_DIR=$(cd -- "$(dirname -- "$0")" && pwd -P)
+# The adapter is shipped with this release; reinstallation reproduces the fix.
+node --check "$PLUGIN_DIR/lib/volumio-queue.js"
+echo 'Installing verified queue adapter for the Volumio 4.239 pushQueue defect (Core unchanged)'
 INSTALL_ROOT=${DESTDIR:-}
 STATE_DIR="$INSTALL_ROOT/data/configuration/music_service/yandex_music"
 UNIT_DIR="$INSTALL_ROOT/etc/systemd/system"

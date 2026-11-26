@@ -3,13 +3,17 @@ const { metadata, milliseconds, time, error } = require('./soap');
 const UNKNOWN_DURATION = 0xffffffff * 1000;
 
 class AlbumPlayerTransport {
-  constructor({ client, mpd, sm, service, updateSource = service, onError = () => {}, pollMs = 500, startupTimeoutMs = 20000 }) {
-    Object.assign(this, { client, mpd, sm, service, updateSource, onError, pollMs, startupTimeoutMs });
+  constructor({ client, mpd, sm, service, updateSource = service, onError = () => {}, onTrackEnd = () => {}, pollMs = 500, startupTimeoutMs = 20000 }) {
+    Object.assign(this, { client, mpd, sm, service, updateSource, onError, onTrackEnd, pollMs, startupTimeoutMs });
     this.kind = 'album_player'; this.session = null; this.timer = null; this.polling = false;
   }
   async activate() {
-    await this.sm.setConsumeUpdateService(this.updateSource, true, false);
-    if (this.sm.consumeState) this.sm.consumeState.service = this.service;
+    const activated = this.sm.setConsumeUpdateService(this.updateSource, true, false);
+    if (this.sm.consumeState) {
+      this.sm.consumeState.service = this.service;
+      this.sm.consumeState.status = this.sm.currentStatus;
+    }
+    await activated;
   }
   close() { clearTimeout(this.timer); this.timer = null; this.session = null; }
   owned(session) { return this.session === session && session.valid(); }
@@ -68,6 +72,7 @@ class AlbumPlayerTransport {
         if (!session.duration || session.duration - session.position > Math.max(3000, this.pollMs * 2)) throw error('ENGINE_ERROR');
         if (session.ended) return;
         session.ended = true;
+        this.onTrackEnd(session.track);
         this.close();
       }
       await this.sm.syncState({ status, uri: session.track.uri, service: this.service, isStreaming: true,

@@ -8,6 +8,7 @@ import { showDownloads, showTrackColumns } from '../core/browsePresentation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon';
+import YandexWave from '../components/browse/YandexWave';
 import ServiceFilters, { hasServiceFilters, hasServiceSortings } from '../components/browse/ServiceFilters';
 import { searchPlaylists } from '../core/playlistSearch';
 import { jumpVirtual } from '../components/browse/VirtualItems';
@@ -197,6 +198,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
               </div>} />
             ) : null}
 
+            {uri === 'yandex_music/wave' ? <><PageHead variant="list" back={() => b.goBack()} nav={<Crumbs trail={crumbs} current="Моя волна" onHome={() => b.backHome()} onCrumb={goCrumb} />} /><YandexWave /></> : <>
             {!b.isBrowsing ? <BrowseLanding dedicated={dedicated} /> : null}
 
             {info && !hideInfo && (isAlbum || info.type === 'song' || isPlaylist) ? <AlbumPageHead filter={filter} onFilter={setFilter} /> : null}
@@ -251,6 +253,7 @@ export default function Browse({ dedicated }: { dedicated?: boolean }) {
                 {letters.map(l => <button type="button" key={l} className={l === activeLetter ? 'active' : ''} onClick={() => jumpTo(l)}>{l}</button>)}
               </nav>
             ) : null}
+            </>}
           </div>
         </div>
       </div>

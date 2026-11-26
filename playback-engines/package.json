@@ -1,6 +1,6 @@
 {
   "name": "playback_engines",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "category": "audio_interface",
   "description": "Playback engines, processing profiles and ALSA output selection for Volumio",
   "main": "index.js",

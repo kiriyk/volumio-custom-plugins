@@ -75,7 +75,10 @@ class Playback {
       if (generation !== this.generation || !this.current(track)) return;
       await this.transport.activate();
       if (generation !== this.generation || !this.current(track)) return;
-      return this.transport.stop();
+      await this.transport.stop();
+      if (generation === this.generation && this.current(track)) {
+        await this.sm.setConsumeUpdateService(undefined);
+      }
     });
   }
   pause() {

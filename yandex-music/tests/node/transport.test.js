@@ -7,13 +7,14 @@ test('selected transport receives resolved URL and keeps ownership after pause',
   let valid, owns; const received = [], errors = [];
   const transport = { play: async (url, track, current, owner) => { received.push([url, track]); valid = current; owns = owner; return true; }, activate: async () => {}, pause: async () => {}, resume: async () => {}, seek: async ms => received.push(ms), stop: async () => {}, close: () => {} };
   const track = { service: 'yandex_music', uri: 'yandex_music/track/42', duration: 247 };
-  const sm = { getTrack: () => track };
+  let released = false;
+  const sm = { getTrack: () => track, setConsumeUpdateService: async value => { released = value === undefined; } };
   const p = new Playback({ request: async () => ({ path: '/stream/ticket', codec: 'flac' }), streamUrl: path => `http://127.0.0.1:17899${path}` }, {}, sm, e => errors.push(e), undefined, transport);
   await p.clearAddPlayTrack(track);
   assert.equal(received[0][0], 'http://127.0.0.1:17899/stream/ticket'); assert.equal(received[0][1].trackType, 'flac');
   await p.pause(); assert.equal(valid(), false); assert.equal(owns(), true);
   await p.seek(10500); assert.equal(received.at(-1), 10500);
-  await p.stop(); assert.equal(owns(), false); assert.deepEqual(errors, []);
+  await p.stop(); assert.equal(owns(), false); assert.equal(released, true); assert.deepEqual(errors, []);
 });
 
 test('failed renderer launch cannot report successful quality', async () => {

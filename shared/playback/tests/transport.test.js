@@ -155,3 +155,62 @@ test('startup readiness deadline begins after Play acknowledgement', async t => 
   state.status = 'STOPPED'; await engine.poll();
   assert.equal(errors.length, 0); assert.ok(engine.session);
 });
+
+test('MPD end signal excludes decoder errors, Stop, and duplicate notifications', async () => {
+  const { MpdTransport } = require('..');
+  const ended = [], sm = { currentStatus: 'play', setConsumeUpdateService: async () => {} };
+  const mpd = { parseState: raw => ({ status: raw.state, seek: raw.seek }), sendMpdCommand: async () => ({}), stop: async () => {} };
+  const original = mpd.parseState;
+  const transport = new MpdTransport({ mpd, sm, onTrackEnd: track => ended.push(track.uri) });
+  const track = { uri: 'wave/1', duration: 10 };
+  await transport.play('http://127.0.0.1/one', track, () => true);
+  mpd.parseState({ state: 'play', seek: 9500 }); mpd.parseState({ state: 'stop' }); mpd.parseState({ state: 'stop' });
+  assert.deepEqual(ended, [track.uri]);
+  await transport.play('http://127.0.0.1/one', track, () => true);
+  mpd.parseState({ state: 'play', seek: 9500 }); mpd.parseState({ state: 'stop', error: 'decode failed' });
+  await transport.play('http://127.0.0.1/one', track, () => true);
+  mpd.parseState({ state: 'play', seek: 9500 }); await transport.stop(); mpd.parseState({ state: 'stop' });
+  assert.equal(ended.length, 1); transport.close(); assert.equal(mpd.parseState, original);
+});
+
+test('MPD activation keeps the logical source during pause and seek', async () => {
+  const { MpdTransport } = require('..');
+  const sm = { consumeState: {}, setConsumeUpdateService: async source => { sm.consumeState.service = source; } };
+  const transport = new MpdTransport({ sm, service: 'yandex_music' });
+  await transport.activate(); assert.equal(sm.consumeState.service, 'yandex_music');
+});
+
+test('MPD EOF uses decoder duration and elapsed playback between status events', async () => {
+  const { MpdTransport } = require('..'); const ended = [], errors = [];
+  const sm = { currentStatus: 'play', setConsumeUpdateService: async () => {} };
+  const mpd = { parseState: raw => raw, sendMpdCommand: async () => ({}) };
+  const transport = new MpdTransport({ mpd, sm, onTrackEnd: track => ended.push(track.uri), onError: e => errors.push(e) });
+  await transport.play('http://localhost/track', { uri: 'track', duration: 30 }, () => true);
+  mpd.parseState({ status: 'play', seek: 16000, duration: 20 });
+  transport.session.at -= 4000;
+  mpd.parseState({ status: 'stop' }); assert.deepEqual(ended, ['track']); assert.deepEqual(errors, []);
+  transport.close();
+});
+
+test('activating a new engine cannot expose the previous consume playback status', async () => {
+  const { MpdTransport, AlbumPlayerTransport } = require('..');
+  for (const Type of [MpdTransport, AlbumPlayerTransport]) {
+    const sm = { currentStatus: 'stop', consumeState: { status: 'play' }, setConsumeUpdateService: async () => {} };
+    const transport = new Type({ sm, service: 'yandex_music' });
+    await transport.activate(); assert.equal(sm.consumeState.status, 'stop');
+  }
+});
+
+test('closing an old MPD source cannot break the new source parser', async () => {
+  const { MpdTransport } = require('..'), ended = [];
+  const sm = { currentStatus: 'play', setConsumeUpdateService: async () => {} };
+  const mpd = { parseState: raw => raw, sendMpdCommand: async () => ({}) };
+  const original = mpd.parseState;
+  const first = new MpdTransport({ sm, mpd });
+  const second = new MpdTransport({ sm, mpd, onTrackEnd: track => ended.push(track.uri) });
+  await first.play('http://localhost/one', { uri: 'one', duration: 10 }, () => false);
+  await second.play('http://localhost/two', { uri: 'two', duration: 10 }, () => true);
+  first.close();
+  mpd.parseState({ status: 'play', seek: 9500, duration: 10 }); mpd.parseState({ status: 'stop' });
+  assert.deepEqual(ended, ['two']); second.close(); assert.equal(mpd.parseState, original);
+});
